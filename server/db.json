@@ -23,5 +23,24 @@
       "notes": ""
     }
   ],
-  "media": []
+  "media": [
+    {
+      "id": "m-1782489250829",
+      "date": "2026-06-26",
+      "title": "日常训练",
+      "description": "",
+      "type": "video",
+      "url": "/uploads/file-1782489250807-29167927.mp4",
+      "category": "日常训练"
+    },
+    {
+      "id": "m-1782489259103",
+      "date": "2026-06-26",
+      "title": "日常训练",
+      "description": "",
+      "type": "video",
+      "url": "/uploads/file-1782489259090-516342653.mp4",
+      "category": "日常训练"
+    }
+  ]
 }
