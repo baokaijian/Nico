@@ -1,0 +1,27 @@
+{
+  "growth": [
+    {
+      "id": "g-1782487893553",
+      "date": "2026-06-19",
+      "height": 128.4,
+      "armSpan": 127.6,
+      "weight": 27.77,
+      "handLength": 14.2,
+      "handWidth": 6.7,
+      "footLength": 19.4
+    }
+  ],
+  "swim": [
+    {
+      "id": "s-1782488023314",
+      "date": "2026-06-25",
+      "distance": "50m",
+      "stroke": "自由泳",
+      "time": "01:14.00",
+      "seconds": 74,
+      "poolLength": "50m",
+      "notes": ""
+    }
+  ],
+  "media": []
+}
