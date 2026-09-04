@@ -9,6 +9,16 @@
       "handLength": 14.2,
       "handWidth": 6.7,
       "footLength": 19.4
+    },
+    {
+      "id": "g-1787000000001",
+      "date": "2026-08-28",
+      "height": 129.6,
+      "armSpan": 129.5,
+      "weight": 28.2,
+      "handLength": 14.5,
+      "handWidth": 6.8,
+      "footLength": 19.8
     }
   ],
   "swim": [
@@ -20,7 +30,227 @@
       "time": "01:14.00",
       "seconds": 74,
       "poolLength": "50m",
-      "notes": ""
+      "notes": "暑期前初测，基础水感良好，后程打腿频率需加强"
+    },
+    {
+      "id": "s-1787000000002",
+      "date": "2026-08-15",
+      "distance": "50m",
+      "stroke": "自由泳",
+      "time": "01:08.50",
+      "seconds": 68.5,
+      "poolLength": "50m",
+      "notes": "暑期集训中期测验，换气动作更紧凑，后程冲刺有力"
+    },
+    {
+      "id": "s-1787000000003",
+      "date": "2026-08-27",
+      "distance": "50m",
+      "stroke": "自由泳",
+      "time": "01:04.20",
+      "seconds": 64.2,
+      "poolLength": "50m",
+      "notes": "大关三线选拔达标测试，成绩大幅提升近10秒，入选三线队！"
+    },
+    {
+      "id": "s-1787000000004",
+      "date": "2026-08-28",
+      "distance": "50m",
+      "stroke": "仰泳",
+      "time": "01:09.80",
+      "seconds": 69.8,
+      "poolLength": "50m",
+      "notes": "仰泳转体动作标准，头部水平线保持极佳"
+    },
+    {
+      "id": "s-1787000000005",
+      "date": "2026-09-02",
+      "distance": "25m",
+      "stroke": "自由泳",
+      "time": "00:26.50",
+      "seconds": 26.5,
+      "poolLength": "25m",
+      "notes": "25米冲刺测验，出发反应敏捷，划幅充分"
+    }
+  ],
+  "trainings": [
+    {
+      "id": "t-1787000000101",
+      "date": "2026-08-26",
+      "session": "下午主训",
+      "trainingType": "技术水感课",
+      "totalMeters": 1600,
+      "kickMeters": 500,
+      "intensity": "中高强度 (A2有氧基础)",
+      "focusSkills": "高肘抱水抓水深度、蹬壁流线型减阻、后半程划幅保持",
+      "rpe": 8,
+      "coachNotes": "划手抱水厚度明显增加，体能分配比6月更成熟，出勤积极！",
+      "completionRate": 100
+    },
+    {
+      "id": "t-1787000000102",
+      "date": "2026-08-29",
+      "session": "上午集训",
+      "trainingType": "打腿专项课",
+      "totalMeters": 1500,
+      "kickMeters": 700,
+      "intensity": "中强度 (A2有氧基础)",
+      "focusSkills": "扶板打腿高频鞭打、水下海豚腿距离保持、核心收紧",
+      "rpe": 7,
+      "coachNotes": "脚踝柔韧性体现出天然脚蹼优势，打腿下沉问题已基本纠正。",
+      "completionRate": 100
+    },
+    {
+      "id": "t-1787000000103",
+      "date": "2026-09-02",
+      "session": "下午主训",
+      "trainingType": "有氧基础包",
+      "totalMeters": 1800,
+      "kickMeters": 600,
+      "intensity": "中强度 (A2有氧基础)",
+      "focusSkills": "自由泳与仰泳长距离交替、划频节拍器配合、三划一呼吸",
+      "rpe": 7,
+      "coachNotes": "走训开学第一周适应良好，1800米训练包全量完成，心率恢复迅速。",
+      "completionRate": 100
+    },
+    {
+      "id": "t-1787000000104",
+      "date": "2026-09-04",
+      "session": "下午主训",
+      "trainingType": "四式混合课",
+      "totalMeters": 1700,
+      "kickMeters": 500,
+      "intensity": "中高强度 (EN1混氧)",
+      "focusSkills": "四式转换流畅度、蛙泳收腿不外翻、蝶泳双腿连贯鞭水",
+      "rpe": 8,
+      "coachNotes": "四式结构均衡，混合泳底子非常好，重点攻坚蛙泳蹬夹水合拢速度。",
+      "completionRate": 100
+    }
+  ],
+  "fitness": [
+    {
+      "id": "f-1787000000201",
+      "date": "2026-08-25",
+      "standingJump": 135.0,
+      "plankSeconds": 60,
+      "sitAndReach": 16.0,
+      "shoulderFlex": "70cm (脱手宽及格线优秀)",
+      "ankleFlex": "极佳 (天生脚蹼特征，踝背屈超常)",
+      "shuttleRun": 5.9,
+      "notes": "大关三线队入选体能摸底测试：下肢弹跳良好，肩踝柔韧性极佳，符合优秀游泳苗子模型。"
+    },
+    {
+      "id": "f-1787000000202",
+      "date": "2026-09-03",
+      "standingJump": 136.0,
+      "plankSeconds": 65,
+      "sitAndReach": 16.5,
+      "shoulderFlex": "68cm (肩部柔韧稳步提高)",
+      "ankleFlex": "极佳 (天生脚蹼特征)",
+      "shuttleRun": 5.8,
+      "notes": "核心抗旋转力量与腹背肌耐力测试提升5秒，坐位体前屈+0.5cm，柔韧操效果明显。"
+    }
+  ],
+  "nutrition": [
+    {
+      "id": "n-1787000000301",
+      "date": "2026-09-02",
+      "preMeal": "全麦吐司1片 + 新鲜香蕉半根 + 温开水200ml (课前1小时)",
+      "postMeal": "脱脂纯牛奶250ml + 水煮土鸡蛋1个 + 蓝莓一把 (课后25分钟)",
+      "waterMl": 1600,
+      "calciumTaken": true,
+      "ironTaken": true,
+      "zincTaken": true,
+      "sleepHours": 9.8,
+      "morningPulse": 72,
+      "recoveryScore": 5,
+      "notes": "晚间深度睡眠充足，课后30分钟内快速补足优质蛋白与糖原，肌肉无酸胀感。"
+    },
+    {
+      "id": "n-1787000000302",
+      "date": "2026-09-04",
+      "preMeal": "即食燕麦片 + 蒸红薯小块 (慢消化复合碳水充能)",
+      "postMeal": "高蛋白酸奶1杯 + 清蒸牛肉卷2片 + 鲜橙半个 (维C促铁吸收)",
+      "waterMl": 1750,
+      "calciumTaken": true,
+      "ironTaken": true,
+      "zincTaken": true,
+      "sleepHours": 9.6,
+      "morningPulse": 71,
+      "recoveryScore": 5,
+      "notes": "晨起静息心率71次/分非常平稳，神经系统疲劳完全恢复，食欲良好。"
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal-1",
+      "title": "成功入选杭州大关三线运动员",
+      "category": "赛事达级",
+      "targetMetric": "选拔测试总分达标",
+      "currentProgress": 100,
+      "deadline": "2026-08-31",
+      "status": "已达成",
+      "notes": "暑期高强度集训圆满结业，正式入选大关少年游泳竞技梯队！"
+    },
+    {
+      "id": "goal-2",
+      "title": "50米自由泳突破 1分钟 大关 (58.00秒)",
+      "category": "技术达标",
+      "targetMetric": "58.00 秒",
+      "currentProgress": 78,
+      "deadline": "2026-12-31",
+      "status": "重点攻坚",
+      "notes": "当前最好成绩 1:04.20，距离58秒大关仅差6.2秒，重点抠转身与打腿频次。"
+    },
+    {
+      "id": "goal-3",
+      "title": "杭州“市长杯”少儿组及拱墅区小学生赛达标参赛",
+      "category": "赛事达级",
+      "targetMetric": "代表大关队参赛并争进决赛",
+      "currentProgress": 65,
+      "deadline": "2027-04-30",
+      "status": "进行中",
+      "notes": "市长杯是杭州顶尖少儿游泳摇篮赛事，检验三线走训实战能力。"
+    },
+    {
+      "id": "goal-4",
+      "title": "四式（蝶仰蛙自）50米技术结构规范化达标",
+      "category": "技术达标",
+      "targetMetric": "四式技术无扣分项",
+      "currentProgress": 82,
+      "deadline": "2027-01-15",
+      "status": "进行中",
+      "notes": "自由泳仰泳技术成熟，蛙泳合拢与蝶泳二次腿处于动作定型期。"
+    },
+    {
+      "id": "goal-5",
+      "title": "国家三级运动员达标 (女子50自 35.00秒)",
+      "category": "赛事达级",
+      "targetMetric": "35.00 秒",
+      "currentProgress": 40,
+      "deadline": "2028-06-30",
+      "status": "进行中",
+      "notes": "8-9岁阶段关键达标线，中国业余少体校正式技术等级证书。"
+    },
+    {
+      "id": "goal-6",
+      "title": "国家二级运动员 (女子50自 31.50秒 / 100自 1:09.50)",
+      "category": "赛事达级",
+      "targetMetric": "31.50 秒",
+      "currentProgress": 25,
+      "deadline": "2030-06-30",
+      "status": "进行中",
+      "notes": "竞技体育分水岭，中考/高考高水平运动员核心硬核门槛。"
+    },
+    {
+      "id": "goal-7",
+      "title": "终极梦想：冲刺国家级运动健将 (50自 26.50秒)",
+      "category": "赛事达级",
+      "targetMetric": "26.50 秒 (健将级标准)",
+      "currentProgress": 15,
+      "deadline": "2033-06-30",
+      "status": "进行中",
+      "notes": "大关历代前辈（陈慧佳、杨雨）指引的长远巅峰蓝图。"
     }
   ],
   "media": [
