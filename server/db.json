@@ -184,9 +184,9 @@
   "goals": [
     {
       "id": "goal-1",
-      "title": "成功入选杭州大关三线运动员",
-      "category": "赛事达级",
-      "targetMetric": "选拔测试总分达标",
+      "title": "起点成就：成功入选杭州大关三线运动员",
+      "category": "梯队选拔",
+      "targetMetric": "入选大关少年走训竞技梯队",
       "currentProgress": 100,
       "deadline": "2026-08-31",
       "status": "已达成",
@@ -194,63 +194,53 @@
     },
     {
       "id": "goal-2",
-      "title": "50米自由泳突破 1分钟 大关 (58.00秒)",
-      "category": "技术达标",
-      "targetMetric": "58.00 秒",
-      "currentProgress": 78,
+      "title": "【阶段一·奠基】水感与打腿动力链成型：50米自由泳突破 52.00秒",
+      "category": "成绩达标",
+      "targetMetric": "52.00 秒 (50米打腿 ≤ 55秒)",
+      "currentProgress": 65,
       "deadline": "2026-12-31",
-      "status": "重点攻坚",
-      "notes": "当前最好成绩 1:04.20，距离58秒大关仅差6.2秒，重点抠转身与打腿频次。"
+      "status": "攻坚中",
+      "notes": "当前最好成绩 1:04.20。重点强化前交叉转体、高肘水感与无停顿6次腿，目标突破52秒。"
     },
     {
       "id": "goal-3",
-      "title": "杭州“市长杯”少儿组及拱墅区小学生赛达标参赛",
+      "title": "【阶段二·迎春杯】突破 39.50秒 · 荣膺“国家三级运动员”",
       "category": "赛事达级",
-      "targetMetric": "代表大关队参赛并争进决赛",
-      "currentProgress": 65,
+      "targetMetric": "39.50 秒 (达标国家三级运动员)",
+      "currentProgress": 40,
       "deadline": "2027-04-30",
-      "status": "进行中",
-      "notes": "市长杯是杭州顶尖少儿游泳摇篮赛事，检验三线走训实战能力。"
+      "status": "备战中",
+      "notes": "出战杭州市迎春杯少儿赛，通过滚翻转身提速与后程冲刺，跨过国家三级运动员门槛。"
     },
     {
       "id": "goal-4",
-      "title": "四式（蝶仰蛙自）50米技术结构规范化达标",
-      "category": "技术达标",
-      "targetMetric": "四式技术无扣分项",
-      "currentProgress": 82,
-      "deadline": "2027-01-15",
-      "status": "进行中",
-      "notes": "自由泳仰泳技术成熟，蛙泳合拢与蝶泳二次腿处于动作定型期。"
+      "title": "【阶段三·暑期强化】突破 35.00秒 · 逼近二级门槛",
+      "category": "成绩达标",
+      "targetMetric": "35.00 秒 (周游程达 13000m)",
+      "currentProgress": 25,
+      "deadline": "2027-08-31",
+      "status": "规划中",
+      "notes": "大关三线暑期高强度双训，提升无氧乳酸耐受与50米全程无衰减冲刺能力。"
     },
     {
       "id": "goal-5",
-      "title": "国家三级运动员达标 (女子50自 35.00秒)",
-      "category": "赛事达级",
-      "targetMetric": "35.00 秒",
-      "currentProgress": 40,
-      "deadline": "2028-06-30",
-      "status": "进行中",
-      "notes": "8-9岁阶段关键达标线，中国业余少体校正式技术等级证书。"
+      "title": "【阶段四·决战市长杯】市长杯决赛：突破 31.50秒 · 斩获“国家二级运动员”！",
+      "category": "终极战略",
+      "targetMetric": "31.50 秒 (市长杯决赛夺牌 & 二级认证)",
+      "currentProgress": 15,
+      "deadline": "2027-12-31",
+      "status": "终极目标",
+      "notes": "2027年底杭州市市长杯少儿游泳锦标赛决赛，发挥极致出发反应（<0.68s）与途中游划幅，冲击国家二级运动员！"
     },
     {
       "id": "goal-6",
-      "title": "国家二级运动员 (女子50自 31.50秒 / 100自 1:09.50)",
-      "category": "赛事达级",
-      "targetMetric": "31.50 秒",
-      "currentProgress": 25,
-      "deadline": "2030-06-30",
-      "status": "进行中",
-      "notes": "竞技体育分水岭，中考/高考高水平运动员核心硬核门槛。"
-    },
-    {
-      "id": "goal-7",
-      "title": "终极梦想：冲刺国家级运动健将 (50自 26.50秒)",
-      "category": "赛事达级",
-      "targetMetric": "26.50 秒 (健将级标准)",
-      "currentProgress": 15,
-      "deadline": "2033-06-30",
-      "status": "进行中",
-      "notes": "大关历代前辈（陈慧佳、杨雨）指引的长远巅峰蓝图。"
+      "title": "体能体魄硬支撑：立定跳远 160cm+ & 核心平板支撑 120s",
+      "category": "体能达标",
+      "targetMetric": "跳远 ≥ 160cm / 支撑 ≥ 120秒",
+      "currentProgress": 50,
+      "deadline": "2027-11-15",
+      "status": "持续提升",
+      "notes": "爆发力与核心流线型是市长杯破31.50秒的动力底座，严防骨骼过载，专注自重协调。"
     }
   ],
   "media": [

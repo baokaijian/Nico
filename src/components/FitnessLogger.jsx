@@ -90,10 +90,10 @@ export default function FitnessLogger({ fitnessRecords, onAddFitness, onUpdateFi
           <ShieldAlert size={22} color="#ff9500" style={{ flexShrink: 0, marginTop: '2px' }} />
           <div>
             <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary-color)', margin: '0 0 4px 0' }}>
-              6-7 岁少儿幼体发育敏感期体能指引
+              2027 市长杯二级达标 · 陆上体能与敏感期指标
             </h4>
             <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6, margin: 0 }}>
-              大关体校重点监测：<strong>立定跳远</strong>（预测起跳与转身蹬壁瞬间爆发力）、<strong>平板支撑</strong>（打造躯干抗伸展稳定性）、<strong>肩踝关节柔韧度</strong>（高肘与鞭水推进核心）。严禁器械深蹲负重！
+              市长杯二级发动机指标：<strong>立定跳远 ≥ 160cm</strong>（起跳出发与蹬壁反弹爆发力）、<strong>平板支撑 ≥ 120秒</strong>（全程保持流线型刚性，杜绝后程塌腰）、<strong>肩踝超常柔韧度</strong>（大幅度水动力推进）。严禁大重量深蹲，专注神经协调与自重核心！
             </p>
           </div>
         </div>
