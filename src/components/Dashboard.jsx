@@ -237,14 +237,14 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
                 终极战役战略目标
               </span>
               <span style={{ 
-                background: 'rgba(255, 149, 0, 0.15)', 
-                color: '#d35400', 
+                background: 'rgba(0, 113, 227, 0.12)', 
+                color: '#0071e3', 
                 fontSize: '0.75rem', 
                 padding: '4px 12px', 
                 borderRadius: '20px', 
                 fontWeight: 700 
               }}>
-                2027年底 杭州市“市长杯”决赛
+                大关走训实况：一周五练 · 每练1小时 (1:15大组)
               </span>
               <span style={{ 
                 background: 'rgba(52, 199, 89, 0.18)', 
@@ -254,7 +254,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
                 borderRadius: '20px', 
                 fontWeight: 700 
               }}>
-                冲击国家二级运动员 (≤ 31.50s)
+                当前：自由泳精雕 + 仰泳启蒙
               </span>
             </div>
             
@@ -262,7 +262,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
               2027 市长杯决赛 · 国家二级运动员冲刺工程
             </h2>
             <p style={{ color: 'var(--secondary-color)', fontSize: '0.92rem', marginTop: '6px' }}>
-              锁定 2027 年 12 月市长杯总决赛，以女子 50 米自由泳突破 <strong>31.50 秒</strong> 为核心纲领，分阶段攻克动力链、三级达标与二级冲线。
+              立足当前 <strong>一周五练 · 每次1小时 · 15人大组</strong> 实况，不盲目堆量，把 60 分钟自由泳转体与仰泳打腿质量拉满，稳扎稳打向 2027 年底市长杯二级标准（31.50s）推进！
             </p>
           </div>
 
@@ -338,12 +338,12 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
             boxShadow: '0 2px 8px rgba(0, 113, 227, 0.1)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)' }}>阶段一：动力链奠基</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)' }}>阶段一：自仰动作精雕</span>
               <span style={{ fontSize: '0.68rem', background: 'rgba(0, 113, 227, 0.1)', color: 'var(--accent-color)', padding: '2px 6px', borderRadius: '8px', fontWeight: 600 }}>当前攻坚</span>
             </div>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>突破 52.00 秒</div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>冲刺 54 - 56 秒</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              2026.09 - 2026.12 | 强化前交叉高肘与50m打腿≤55s
+              2026.09 - 2026.12 | 自由泳侧向转体呼吸 + 仰泳平躺打腿
             </div>
           </div>
 
@@ -360,7 +360,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
             </div>
             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>突破 39.50 秒</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              2027.01 - 2027.04 | 滚翻转身提速与斩获国家三级
+              2027.01 - 2027.04 | 自仰双项兼修与斩获国家三级
             </div>
           </div>
 
@@ -377,7 +377,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
             </div>
             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>突破 35.00 秒</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              2027.05 - 2027.08 | 大关暑期双训与无氧乳酸耐受
+              2027.05 - 2027.08 | 大关暑期双训与自仰蛙三项融合
             </div>
           </div>
 
@@ -421,7 +421,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
                 大关三线走训档案 · Nico
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--secondary-color)' }}>
-                6.5岁女子竞技梯队 | 骨骼发育超常 | 天生大桨叶与脚蹼特征
+                6.5岁走训队员 | 一周五练 (每练1小时 · 1:15大组) | 自由泳精雕 & 仰泳启蒙中
               </div>
             </div>
           </div>
@@ -789,20 +789,21 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
 
             <hr style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.06)' }} />
 
-            {/* Master of Sports Next-Step Focus */}
+            {/* Group Training 1:15 & Stage 1 Focus */}
             <div>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#ff9500', marginBottom: '10px' }}>
-                🏆 冲刺 2027 市长杯国家二级：下阶段（阶段一）核心攻坚指令
+                🏆 大关 15 人大组走训（1小时/课）· 现阶段突围与技术攻坚要诀
               </h4>
               <div style={{ background: 'rgba(255, 149, 0, 0.04)', border: '1px solid rgba(255, 149, 0, 0.15)', padding: '16px', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--primary-color)' }}>
                 <p style={{ fontWeight: 700, marginBottom: '8px', color: '#d35400' }}>
-                  从当前 1:04.20 向 2026 年底 52.00 秒发起总攻：
+                  当前一周五练、每次 60 分钟、自由泳精雕 + 仰泳初学阶段核心落地指令：
                 </p>
                 <ol style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', margin: 0 }}>
-                  <li><strong>打腿专项突破：</strong> 扶板25米全力打腿必须进入 <strong>24秒</strong> 以内；50米板打进入 <strong>55秒</strong>。每堂水上课保持 600m 以上打腿量，强化大腿带小腿无停顿鞭打。</li>
-                  <li><strong>滚翻转身与反弹：</strong> 转身前 5 米坚决不抬头减速，以肚脐为轴快速折叠翻转，蹬壁后水下海豚腿滑行突破 <strong>4.5米 - 5米</strong> 线（单次转身可减少耗时 0.8 秒）。</li>
-                  <li><strong>出发反应时打磨：</strong> 陆上练习听发令哨下肢强力蹬地反应（目标反应时 &lt; 0.68秒），建立下水瞬间极致流线型。</li>
-                  <li><strong>黄金营养与作息：</strong> 课后 30 分钟内立即补充纯牛奶250ml+水煮蛋，晚间 21:15 前深睡就寝，确保夜间生长素高效分泌。</li>
+                  <li><strong>大组突围（领流水手原则）：</strong> 2名教练各带15人，单道人数多。Nico 具备速度优势，训练中应主动排在队伍<strong>前 1~3 位出发</strong>，避免跟游吃前人水花涡流，确保全程在平稳活水中建立动作本体感知。</li>
+                  <li><strong>自由泳动作精雕（侧向换气）：</strong> 严禁抬头换气！换气时保持“一只眼睛在水下一只在水上（咬苹果式换气）”，身体沿中轴转动 45 度，呼吸完成后下巴微收迅速复位，杜绝下半身下沉。</li>
+                  <li><strong>仰泳启蒙关键点（平躺中轴）：</strong> 仰卧时双眼坚决凝视天花板正上方，腹部微提贴近水面（像小托盘），以肩为轴直臂向上提手，脚背绷直向上踢出细密沸水水花，严防“坐水”。</li>
+                  <li><strong>1小时高效不堆量：</strong> 60分钟总游程控制在 850m~1000m（专项打腿 350-450m）。追求“少划臂、长滑行”的高质量动作经济性，杜绝无效疲劳。</li>
+                  <li><strong>课后家庭营养与深睡：</strong> 课后 30 分钟内一杯温牛奶+水煮蛋快速修复肌糖原，每晚 21:15 前关灯入睡，为生长发育与神经突触修复提供充足时间。</li>
                 </ol>
               </div>
             </div>

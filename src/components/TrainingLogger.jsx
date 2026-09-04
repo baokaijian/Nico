@@ -3,13 +3,13 @@ import { Waves, Plus, Calendar, Trash2, Edit2, X, Activity, Award } from 'lucide
 
 export default function TrainingLogger({ trainings, onAddTraining, onUpdateTraining, onDeleteTraining }) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [session, setSession] = useState('下午主训');
-  const [trainingType, setTrainingType] = useState('技术水感课');
-  const [totalMeters, setTotalMeters] = useState('1600');
-  const [kickMeters, setKickMeters] = useState('500');
-  const [intensity, setIntensity] = useState('中强度 (A2有氧基础)');
+  const [session, setSession] = useState('走训课 (1小时 · 15人组)');
+  const [trainingType, setTrainingType] = useState('自由泳动作精雕');
+  const [totalMeters, setTotalMeters] = useState('900');
+  const [kickMeters, setKickMeters] = useState('400');
+  const [intensity, setIntensity] = useState('技术定型 (动作规范/长滑行)');
   const [focusSkills, setFocusSkills] = useState('');
-  const [rpe, setRpe] = useState('7');
+  const [rpe, setRpe] = useState('6');
   const [coachNotes, setCoachNotes] = useState('');
   const [completionRate, setCompletionRate] = useState('100');
 
@@ -23,13 +23,13 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
   const handleStartEdit = (t) => {
     setEditingId(t.id);
     setDate(t.date);
-    setSession(t.session || '下午主训');
-    setTrainingType(t.trainingType || '技术水感课');
-    setTotalMeters(t.totalMeters ? t.totalMeters.toString() : '');
-    setKickMeters(t.kickMeters ? t.kickMeters.toString() : '');
-    setIntensity(t.intensity || '中强度 (A2有氧基础)');
+    setSession(t.session || '走训课 (1小时 · 15人组)');
+    setTrainingType(t.trainingType || '自由泳动作精雕');
+    setTotalMeters(t.totalMeters ? t.totalMeters.toString() : '900');
+    setKickMeters(t.kickMeters ? t.kickMeters.toString() : '400');
+    setIntensity(t.intensity || '技术定型 (动作规范/长滑行)');
     setFocusSkills(t.focusSkills || '');
-    setRpe(t.rpe ? t.rpe.toString() : '7');
+    setRpe(t.rpe ? t.rpe.toString() : '6');
     setCoachNotes(t.coachNotes || '');
     setCompletionRate(t.completionRate ? t.completionRate.toString() : '100');
     setError('');
@@ -38,13 +38,13 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
   const handleCancelEdit = () => {
     setEditingId(null);
     setDate(new Date().toISOString().split('T')[0]);
-    setSession('下午主训');
-    setTrainingType('技术水感课');
-    setTotalMeters('1600');
-    setKickMeters('500');
-    setIntensity('中强度 (A2有氧基础)');
+    setSession('走训课 (1小时 · 15人组)');
+    setTrainingType('自由泳动作精雕');
+    setTotalMeters('900');
+    setKickMeters('400');
+    setIntensity('技术定型 (动作规范/长滑行)');
     setFocusSkills('');
-    setRpe('7');
+    setRpe('6');
     setCoachNotes('');
     setCompletionRate('100');
     setError('');
@@ -68,7 +68,7 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
       kickMeters: kickMeters ? parseInt(kickMeters, 10) : 0,
       intensity,
       focusSkills,
-      rpe: rpe ? parseInt(rpe, 10) : 7,
+      rpe: rpe ? parseInt(rpe, 10) : 6,
       coachNotes,
       completionRate: completionRate ? parseInt(completionRate, 10) : 100
     };
@@ -92,7 +92,7 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
   const totalMetersSum = trainings ? trainings.reduce((acc, c) => acc + (c.totalMeters || 0), 0) : 0;
   const kickMetersSum = trainings ? trainings.reduce((acc, c) => acc + (c.kickMeters || 0), 0) : 0;
   const avgRpe = trainings && trainings.length > 0 
-    ? (trainings.reduce((acc, c) => acc + (c.rpe || 7), 0) / trainings.length).toFixed(1) 
+    ? (trainings.reduce((acc, c) => acc + (c.rpe || 6), 0) / trainings.length).toFixed(1) 
     : '0.0';
 
   const filteredTrainings = (trainings || []).filter(t => {
@@ -101,24 +101,46 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
   }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const trainingTypes = [
-    '打腿专项课', 
-    '技术水感课', 
-    '市长杯冲刺模拟课', 
-    '滚翻转身与出发特训', 
-    '有氧基础包', 
-    '四式混合课', 
-    '阶段达标测验'
+    '自由泳动作精雕', 
+    '仰泳启蒙与转体', 
+    '自由泳/仰泳专项打腿', 
+    '自仰双姿水感配合', 
+    '流线型与出发蹬壁', 
+    '阶段摸底测验'
   ];
   const intensityLevels = [
-    '低强度 (A1恢复/技术)', 
-    '中强度 (A2有氧基础)', 
-    '中高强度 (EN1混氧耐力)', 
-    '高强度 (EN2乳酸耐受)', 
-    '极限冲刺 (SP比赛速度)'
+    '技术定型 (动作规范/长滑行)', 
+    '中低强度 (有氧打底/打腿节奏)', 
+    '中强度 (段落配合/自仰交替)', 
+    '短距离刺激 (15-25m趣味短冲)'
   ];
 
   return (
     <div>
+      {/* Real-world setup guidance strip */}
+      <div className="glass-card mb-lg" style={{ 
+        background: 'linear-gradient(135deg, rgba(0, 113, 227, 0.06) 0%, rgba(52, 199, 89, 0.06) 100%)',
+        border: '1px solid rgba(0, 113, 227, 0.15)',
+        padding: '14px 18px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ background: 'var(--accent-color)', color: '#fff', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+              大关走训实况
+            </span>
+            <span style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--primary-color)' }}>
+              一周五练 · 每练 1 小时 · 2 名教练各带 15 名队员
+            </span>
+          </div>
+          <span style={{ fontSize: '0.8rem', color: '#248a3d', fontWeight: 600 }}>
+            当前重点：精雕自由泳动作 + 仰泳启蒙打腿
+          </span>
+        </div>
+        <p style={{ fontSize: '0.82rem', color: 'var(--secondary-color)', margin: '6px 0 0 0', lineHeight: 1.5 }}>
+          在 15 人走训大组中，不盲目追求过大包干量（单课 800-1000m 为宜）。重点在于<strong>每一次划臂的流线型、转体换气角度与高频打腿</strong>，把 60 分钟的水上质量做到极致！
+        </p>
+      </div>
+
       {/* Top Aggregates Strip */}
       <div className="grid-3 mb-lg">
         <div className="glass-card metrics-card">
@@ -131,7 +153,7 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
             <span className="metrics-unit">米</span>
           </div>
           <div className="text-secondary" style={{ fontSize: '0.85rem' }}>
-            市长杯冲刺备战 · 累计完成 {trainings.length} 节专业走训课
+            一周五练 (1小时/课) · 累计完成 {trainings.length} 节走训课
           </div>
         </div>
 
@@ -191,12 +213,11 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">课次时段</label>
+                <label className="form-label">课次时段 (实况)</label>
                 <select className="apple-select" value={session} onChange={(e) => setSession(e.target.value)}>
-                  <option value="下午主训">下午主训 (16:30-18:15)</option>
-                  <option value="上午集训">上午集训 (09:00-11:00)</option>
-                  <option value="早训">早晨早训</option>
-                  <option value="周末大包课">周末大包课</option>
+                  <option value="走训课 (1小时 · 15人组)">走训主课 (16:30-17:30 · 1小时 · 15人大组)</option>
+                  <option value="周末走训课 (1小时)">周末走训课 (1小时)</option>
+                  <option value="早训/加练 (1小时)">早训/加练 (1小时)</option>
                 </select>
               </div>
             </div>
@@ -218,11 +239,11 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
 
             <div className="grid-2" style={{ gap: '12px' }}>
               <div className="form-group">
-                <label className="form-label">总泳程 (米)</label>
+                <label className="form-label">单课总泳程 (米)</label>
                 <input 
                   type="number" 
                   step="50" 
-                  placeholder="例如 1600" 
+                  placeholder="例如 900" 
                   className="apple-input" 
                   value={totalMeters} 
                   onChange={(e) => setTotalMeters(e.target.value)} 
