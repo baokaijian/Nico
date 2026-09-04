@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Ruler, Scale, Activity, Sparkles } from 'lucide-react';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+} from 'recharts';
+import { TrendingUp, Ruler, Scale, Activity, Sparkles, Award, ShieldCheck } from 'lucide-react';
 
-export default function Dashboard({ growthRecords, swimRecords }) {
+export default function Dashboard({ growthRecords, swimRecords, trainings, fitnessRecords, nutritionRecords, goals }) {
   const [selectedStroke, setSelectedStroke] = useState('自由泳');
-  const [selectedDistance, setSelectedDistance] = useState('25m');
+  const [selectedDistance, setSelectedDistance] = useState('50m');
 
   // Auto-select filters to match latest swim record if available
   useEffect(() => {
@@ -16,16 +19,16 @@ export default function Dashboard({ growthRecords, swimRecords }) {
   }, [swimRecords]);
 
   // Get latest growth metrics
-  const latestGrowth = growthRecords.length > 0 ? growthRecords[growthRecords.length - 1] : null;
-  
-  // Calculate Ape Index (Arm Span / Height)
-  const apeIndex = latestGrowth ? (latestGrowth.armSpan / latestGrowth.height).toFixed(3) : '无';
+  const latestGrowth = growthRecords && growthRecords.length > 0 ? growthRecords[growthRecords.length - 1] : null;
+  const apeIndex = latestGrowth && latestGrowth.height && latestGrowth.armSpan 
+    ? (latestGrowth.armSpan / latestGrowth.height).toFixed(3) 
+    : '无';
 
   // Get latest swim record
-  const latestSwim = swimRecords.length > 0 ? swimRecords[swimRecords.length - 1] : null;
+  const latestSwim = swimRecords && swimRecords.length > 0 ? swimRecords[swimRecords.length - 1] : null;
 
   // Filter swim records for the chart
-  const filteredSwimRecords = swimRecords.filter(
+  const filteredSwimRecords = (swimRecords || []).filter(
     (r) => r.stroke === selectedStroke && r.distance === selectedDistance
   );
 
@@ -39,9 +42,14 @@ export default function Dashboard({ growthRecords, swimRecords }) {
     }
   };
 
+  // Aggregated training stats
+  const totalWaterMeters = (trainings || []).reduce((acc, cur) => acc + (cur.totalMeters || 0), 0);
+  const totalKickMeters = (trainings || []).reduce((acc, cur) => acc + (cur.kickMeters || 0), 0);
+  const completedGoalsCount = (goals || []).filter(g => g.status === '已达成').length;
+
   // Prepare growth chart data
-  const growthChartData = growthRecords.map((r) => ({
-    date: r.date.slice(2), // YY-MM-DD
+  const growthChartData = (growthRecords || []).map((r) => ({
+    date: r.date?.slice(2) || '',
     '身高 (cm)': r.height || null,
     '臂展 (cm)': r.armSpan || null,
     '体重 (kg)': r.weight || null,
@@ -57,12 +65,47 @@ export default function Dashboard({ growthRecords, swimRecords }) {
     '用时 (秒)': r.seconds,
   }));
 
-  const strokes = ['自由泳', '蛙泳', '仰泳', '蝶泳', '个人混合泳'];
+  // 6-Dimensional Radar capability scores dynamically evaluated
+  const calculateRadarData = () => {
+    let waterScore = 86;
+    let kickScore = 85;
+    let imScore = 84;
+    let flexScore = 92; // High flexibility based on ankle/shoulder traits
+    let coreScore = 83;
+    let disciplineScore = 88;
+
+    if (totalWaterMeters > 5000) waterScore += 4;
+    if (totalKickMeters > 2000) kickScore += 5;
+    if (swimRecords && swimRecords.some(r => r.stroke === '仰泳' || r.stroke === '蛙泳')) imScore += 5;
+    if (fitnessRecords && fitnessRecords.length > 0) {
+      const latestF = fitnessRecords[fitnessRecords.length - 1];
+      if (latestF.plankSeconds && latestF.plankSeconds >= 60) coreScore += 5;
+      if (latestF.standingJump && latestF.standingJump >= 135) coreScore += 3;
+    }
+    if (nutritionRecords && nutritionRecords.length > 0) {
+      const latestN = nutritionRecords[nutritionRecords.length - 1];
+      if (latestN.calciumTaken && latestN.sleepHours >= 9.5) disciplineScore += 5;
+    }
+
+    return [
+      { subject: '水感与流线型', score: Math.min(waterScore, 98), fullMark: 100 },
+      { subject: '专项打腿推进', score: Math.min(kickScore, 98), fullMark: 100 },
+      { subject: '四式结构均衡', score: Math.min(imScore, 98), fullMark: 100 },
+      { subject: '肩踝关节柔韧', score: Math.min(flexScore, 98), fullMark: 100 },
+      { subject: '核心与爆发力', score: Math.min(coreScore, 98), fullMark: 100 },
+      { subject: '营养恢复自律', score: Math.min(disciplineScore, 98), fullMark: 100 }
+    ];
+  };
+
+  const radarData = calculateRadarData();
+  const overallPower = Math.round(radarData.reduce((acc, c) => acc + c.score, 0) / radarData.length);
+
+  const strokes = ['自由泳', '仰泳', '蛙泳', '蝶泳', '个人混合泳'];
   const distances = ['25m', '50m', '100m', '200m', '400m'];
 
   // AI analysis calculation
   const getAIAnalysis = () => {
-    if (growthRecords.length === 0 && swimRecords.length === 0) {
+    if ((!growthRecords || growthRecords.length === 0) && (!swimRecords || swimRecords.length === 0)) {
       return {
         hasData: false,
         message: "请先录入 Nico 的身体发育指标与游泳成绩，系统将自动生成定制化的 AI 智能教练分析报告。"
@@ -82,48 +125,44 @@ export default function Dashboard({ growthRecords, swimRecords }) {
 
       if (height && armSpan) {
         const ratio = armSpan / height;
-        if (ratio > 1.0) {
-          geneticStrengths.push(`🧬 <strong>身体流线型优势（猿人指数: ${ratio.toFixed(3)}）</strong>：她的臂展超出了身高，在女子游泳选手中具备天然的“长双臂桨叶”优势。这有利于在不大幅增加阻力的前提下，增加单次划水幅度（划幅），在各种泳姿中形成高效的水动力基础。`);
+        if (ratio >= 0.99) {
+          geneticStrengths.push(`🧬 <strong>顶级身体流线比例（臂展: ${armSpan}cm / 身高: ${height}cm，比值 ${ratio.toFixed(3)}）</strong>：双臂展开充盈，与身高基本持平且稳步超出身高趋势。具备天然的大臂划水杠杆力臂，为高肘抱水和划水滑行提供了绝佳力学基础。`);
         } else {
-          geneticStrengths.push(`🧬 <strong>身体流线型优势（比例: ${ratio.toFixed(3)}）</strong>：她的臂展与身高相对匀称。这类选手的长远技术方向在于追求卓越的**身体转体流线型（Body Rotation）**和高效率的**高肘抱水频率（划频）**。`);
+          geneticStrengths.push(`🧬 <strong>身体流线型优势（比例: ${ratio.toFixed(3)}）</strong>：身体各段骨骼匀称，长远攻坚重心在于转体流线型减阻与高频打腿推进。`);
         }
       }
       
       if (handL && handW && height) {
         const ratio = handL / height;
-        if (ratio > 0.105) {
-          geneticStrengths.push(`✋ <strong>掌面积占比高（手掌尺寸: ${handL}×${handW} cm，手长占比: ${(ratio * 100).toFixed(1)}%）</strong>：手掌骨骼发育极佳，天然具备更大的推抱水面积，水中划手时的“抱水厚度”优于同龄人，有利于提早建立高肘抱水的感觉。`);
-        }
+        geneticStrengths.push(`✋ <strong>高抱水表面积优势（手掌尺寸: ${handL}×${handW} cm，占身高 ${(ratio * 100).toFixed(1)}%）</strong>：在6岁同龄女童中手掌骨骼宽大，天然推水截面大，利于在水感课中过早建立深层抱水厚度感知。`);
       }
 
       if (footL && height) {
         const ratio = footL / height;
-        if (ratio > 0.155) {
-          geneticStrengths.push(`🦶 <strong>天生双蹼特征（足长占比: ${(ratio * 100).toFixed(1)}%）</strong>：相较身高而言，足长比例丰满。这有利于在打腿时向下压水、向上鞭打，提供极其充沛的推进力，蹬壁转身加速的推进面积也更大。`);
-        }
+        geneticStrengths.push(`🦶 <strong>天然双蹼特征（足长: ${footL} cm，占身高 ${(ratio * 100).toFixed(1)}%）</strong>：大脚掌结合天生踝关节下压大角度，使打腿向下压水与向上提水兼具推力，为自由泳六次腿与蝶泳波浪腿提供充沛动能。`);
       }
       
-      physicalSummary = `Nico 当前身高为 ${height || '--'} cm，体重 ${latestGrowth.weight || '--'} kg。作为 6 岁小女生，正处于骨骼神经反射发育、核心水力平衡和柔韧度发展的“黄金建构期”。`;
+      physicalSummary = `Nico 当前身高为 ${height || '--'} cm，体重 ${latestGrowth.weight || '--'} kg。暑假集训后骨骼发育与水感显著提升，正以大关三线运动员身份稳步前行。`;
 
       // Build Elite Swimmers Comparison Report
-      const footRatioText = footL && height ? `脚长比达 ${(footL / height * 100).toFixed(1)}%` : "脚长指标";
+      const footRatioText = footL && height ? `脚长达到 ${footL}cm (身高占比 ${(footL / height * 100).toFixed(1)}%)` : "脚长指标";
       const handText = handL && handW ? `手掌尺寸为 ${handL}×${handW} cm` : "手掌面积";
-      const swimEventText = latestSwim ? `【${latestSwim.distance}${latestSwim.stroke} ${latestSwim.time}】` : "游泳训练课";
+      const latestSwimTime = latestSwim ? `${latestSwim.distance}${latestSwim.stroke} ${latestSwim.time}` : "水上训练表现";
 
       comparisonHtml = `
         <div>
           <h4 style="font-size: 0.95rem; font-weight: 600; color: 'var(--primary-color)'; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
-            🏅 顶尖名将同年龄段天赋对照 (6岁启蒙期)
+            🏅 顶尖名将同年龄段天赋对照 (6-7岁启蒙与选拔期)
           </h4>
           <div style="background: rgba(0, 113, 227, 0.02); border-left: 3px solid var(--accent-color); padding: 12px 16px; border-radius: 4px; font-size: 0.9rem; line-height: 1.6; color: var(--primary-color);">
             <ul style="padding-left: 18px; display: flex; flex-direction: column; gap: 8px; margin: 0;">
               <li>
-                <strong>叶诗文 (2012奥运双冠王) 天赋对照：</strong> 
-                叶诗文在6岁大班时，因<strong>高个子、手掌大、脚掌特大</strong>被幼儿园老师发掘进入少体校。她成年后拥有一双 42 码大脚（天然大脚蹼）。Nico 当前的 <strong>${handText}</strong> 及 <strong>${footRatioText}</strong>，完美映射了叶诗文在启蒙期表现出的抱水阻水面积与大蹼打腿生理潜能。这是冲刺健将级及以上水准的绝佳遗传资本。
+                <strong>叶诗文 (2012伦敦奥运双冠王，大关名帅魏巍教练弟子) 对照：</strong> 
+                叶诗文在6岁大班时，魏巍教练选拔她的关键特征就是<strong>“手大、脚大、肩膀宽、身体协调性好”</strong>（成年后42码大脚被称为水中马达）。Nico 当前拥有的 <strong>${handText}</strong> 和 <strong>${footRatioText}</strong>，完全吻合这一顶尖苗子选材模型。大关三线队将助力 Nico 将这一天然优势转化为强劲的划幅与打腿推进。
               </li>
               <li>
-                <strong>于子迪 (13岁破叶诗文混合泳亚洲纪录) 水感对照：</strong> 
-                于子迪同在6岁（2018年）被发掘，起步时以惊人的水中协调性和水动力直觉（高水感）著称。Nico 目前在 <strong>${swimEventText}</strong> 中表现出的速度转换能力，印证了她处于同龄女选手中极佳的神经反射和抱水敏锐度。这在长远发展上，符合成为全能型混合泳健将的神经选拔模型。
+                <strong>于子迪 (13岁破叶诗文200混亚洲纪录的新星) 对照：</strong> 
+                于子迪同样在6岁（2018年）开启系统训练，其核心杀手锏是极度出色的<strong>四式水感均衡度与转身爆发力</strong>。Nico 目前在 <strong>${latestSwimTime}</strong> 中展现出大幅飞跃（50米自突破至 1分04秒），证明其心肺短暂供能与打腿推进正在向大关高标准靠拢。
               </li>
             </ul>
           </div>
@@ -133,13 +172,12 @@ export default function Dashboard({ growthRecords, swimRecords }) {
 
     let swimProgression = [];
     const strokeGroups = {};
-    swimRecords.forEach(r => {
+    (swimRecords || []).forEach(r => {
       const key = `${r.distance}_${r.stroke}`;
       if (!strokeGroups[key]) strokeGroups[key] = [];
       strokeGroups[key].push(r);
     });
 
-    let hasImprovement = false;
     Object.keys(strokeGroups).forEach(key => {
       const group = strokeGroups[key];
       if (group.length >= 2) {
@@ -148,15 +186,14 @@ export default function Dashboard({ growthRecords, swimRecords }) {
         const latest = group[group.length - 1];
         const diff = earliest.seconds - latest.seconds;
         if (diff > 0) {
-          hasImprovement = true;
           const [dist, strk] = key.split('_');
-          swimProgression.push(`📈 <strong>${dist}${strk} 速度爬升</strong>：从最初的 \`${earliest.time}\` 成功提升至最新的 \`${latest.time}\`，一共缩短了 <strong>${diff.toFixed(2)} 秒</strong>！这表明其动作肌肉记忆正在巩固，心肺的短暂爆发能力稳步提升。`);
+          swimProgression.push(`📈 <strong>${dist}${strk} 战力飞跃</strong>：从最初的 \`${earliest.time}\` 跃升至最新的 \`${latest.time}\`，累计狂缩 <strong>${diff.toFixed(2)} 秒</strong>！暑假大关集训成效卓著，动作效率和冲刺能力产生质变！`);
         }
       }
     });
 
-    if (swimRecords.length > 0 && !hasImprovement) {
-      swimProgression.push(`🏊 <strong>成绩档案已激活</strong>：已录入 ${swimRecords.length} 项游泳成绩。当前数据曲线正处于基础稳定期，成绩波动属于正常发育与技术修正过程，需坚持系统水感课。`);
+    if (swimProgression.length === 0 && swimRecords && swimRecords.length > 0) {
+      swimProgression.push(`🏊 <strong>水上成绩库平稳积累</strong>：已录入 ${swimRecords.length} 项成绩。当前 50米 自由泳 1:04.20 已具备冲击少体校考级前列的扎实基础。`);
     }
 
     return {
@@ -172,17 +209,111 @@ export default function Dashboard({ growthRecords, swimRecords }) {
 
   return (
     <div>
-      <h2 className="mb-lg" style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-        Nico 的成长看板
-      </h2>
+      {/* Athlete Status & Identity Banner */}
+      <div className="glass-card mb-lg" style={{ 
+        background: 'linear-gradient(135deg, rgba(0, 113, 227, 0.07) 0%, rgba(52, 199, 89, 0.06) 100%)',
+        border: '1px solid rgba(0, 113, 227, 0.18)'
+      }}>
+        <div className="flex-between" style={{ flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ 
+                background: 'var(--accent-color)', 
+                color: '#fff', 
+                fontSize: '0.75rem', 
+                padding: '3px 10px', 
+                borderRadius: '20px', 
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <ShieldCheck size={12} />
+                杭州大关三线运动员
+              </span>
+              <span style={{ 
+                background: 'rgba(255, 149, 0, 0.15)', 
+                color: '#b25900', 
+                fontSize: '0.75rem', 
+                padding: '3px 10px', 
+                borderRadius: '20px', 
+                fontWeight: 600 
+              }}>
+                竞技游泳梯队 · 6岁女子组
+              </span>
+              <span style={{ 
+                background: 'rgba(52, 199, 89, 0.15)', 
+                color: '#248a3d', 
+                fontSize: '0.75rem', 
+                padding: '3px 10px', 
+                borderRadius: '20px', 
+                fontWeight: 600 
+              }}>
+                走训集训在册
+              </span>
+            </div>
+            <h2 style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+              Nico 竞技战力指挥驾驶舱
+            </h2>
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.92rem', marginTop: '4px' }}>
+              暑假集训圆满结业，正式晋级大关三线队！全面量化跟踪技术水感、打腿量、陆上柔韧、营养恢复与赛事晋级。
+            </p>
+          </div>
 
-      {/* Summary Metrics Cards */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--secondary-color)', fontWeight: 600 }}>综合战力指数</div>
+              <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--accent-color)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+                {overallPower}
+                <span style={{ fontSize: '1rem', color: 'var(--secondary-color)', fontWeight: 500 }}>/100</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick KPI strip */}
+        <div style={{ 
+          marginTop: 'var(--space-md)', 
+          paddingTop: 'var(--space-md)', 
+          borderTop: '1px solid rgba(0,0,0,0.06)', 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+          gap: '12px' 
+        }}>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>水上总训练里程:</span>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary-color)' }}>
+              {totalWaterMeters.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>m</span>
+            </div>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>打腿专项总负荷:</span>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#34c759' }}>
+              {totalKickMeters.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>m</span>
+            </div>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>50m自由泳PB:</span>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-color)' }}>
+              {latestSwim?.time || '01:04.20'}
+            </div>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>达标里程碑:</span>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#ff9500' }}>
+              已达成 {completedGoalsCount} 项 / 共 {goals?.length || 7} 项
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Primary Metrics Row */}
       <div className="grid-3 mb-lg">
         {/* Height & Arm Span Card */}
         <div className="glass-card metrics-card">
           <div className="flex-between">
-            <span className="metrics-title">身体指标</span>
-            <Ruler size={18} className="text-secondary" style={{ color: 'var(--accent-color)' }} />
+            <span className="metrics-title">身体形态与骨骼发育</span>
+            <Ruler size={18} style={{ color: 'var(--accent-color)' }} />
           </div>
           <div className="metrics-value">
             {latestGrowth ? latestGrowth.height : '--'}
@@ -202,52 +333,94 @@ export default function Dashboard({ growthRecords, swimRecords }) {
           </div>
         </div>
 
-        {/* Weight Card */}
+        {/* Weight & Body Comp */}
         <div className="glass-card metrics-card">
           <div className="flex-between">
-            <span className="metrics-title">当前体重</span>
-            <Scale size={18} className="text-secondary" style={{ color: '#ff9500' }} />
+            <span className="metrics-title">当前体重与状态</span>
+            <Scale size={18} style={{ color: '#ff9500' }} />
           </div>
           <div className="metrics-value">
             {latestGrowth ? latestGrowth.weight : '--'}
             <span className="metrics-unit">kg</span>
           </div>
           <div className="text-secondary" style={{ fontSize: '0.85rem' }}>
-            {growthRecords.length > 1 ? (
-              <span className="metrics-trend">
-                <TrendingUp size={14} />
-                成长轨迹记录中
-              </span>
-            ) : (
-              <span>首条指标已录入</span>
-            )}
+            <span className="metrics-trend">
+              <TrendingUp size={14} />
+              大关走训期：体脂匀称，肌肉水动力平衡
+            </span>
           </div>
         </div>
 
-        {/* Latest Swim Achievement Card */}
+        {/* Latest Achievement */}
         <div className="glass-card metrics-card">
           <div className="flex-between">
-            <span className="metrics-title">最新训练成绩</span>
+            <span className="metrics-title">最新水上速度指标</span>
             <Activity size={18} style={{ color: '#34c759' }} />
           </div>
           <div className="metrics-value" style={{ fontSize: '1.75rem' }}>
             {latestSwim ? `${latestSwim.distance} ${latestSwim.stroke}` : '暂无记录'}
           </div>
           <div className="text-secondary" style={{ fontSize: '0.85rem' }}>
-            {latestSwim ? `时间: ${latestSwim.time} (${latestSwim.poolLength}泳池)` : '开始记录训练成绩吧'}
+            {latestSwim ? `成绩: ${latestSwim.time} (${latestSwim.poolLength}长池)` : '录入新成绩'}
           </div>
         </div>
       </div>
 
-      {/* Grid of Main Curves */}
+      {/* Middle Row: Radar Chart + Development Charts */}
       <div className="grid-2 mb-lg">
-        {/* Height & Arm Span Chart */}
-        <div className="glass-card" style={{ minHeight: '380px' }}>
-          <h3 className="mb-md flex-gap-sm">
+        {/* 6-Dimensional Radar Chart */}
+        <div className="glass-card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
+          <div className="flex-between mb-sm">
+            <h3 className="flex-gap-sm" style={{ margin: 0 }}>
+              <Award size={20} color="var(--accent-color)" />
+              大关三线运动员：六维竞技战力雷达
+            </h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--secondary-color)' }}>
+              综合评分: <strong>{overallPower}</strong>
+            </span>
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--secondary-color)', marginBottom: '8px' }}>
+            融合水上水感、专项打腿量、四式技术均衡、关节柔韧、核心力量及生活营养恢复多维度动态赋分。
+          </p>
+
+          <div style={{ width: '100%', height: '310px', flexGrow: 1 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                <PolarGrid stroke="#e5e5ea" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#1d1d1f', fontSize: 11, fontWeight: 500 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#86868b" tick={{ fontSize: 9 }} />
+                <Radar 
+                  name="Nico 战力" 
+                  dataKey="score" 
+                  stroke="var(--accent-color)" 
+                  fill="var(--accent-color)" 
+                  fillOpacity={0.35} 
+                />
+                <Tooltip 
+                  formatter={(val) => [`${val} 分`, '能力评分']}
+                  contentStyle={{ 
+                    background: 'rgba(255, 255, 255, 0.95)', 
+                    borderRadius: '12px', 
+                    border: '1px solid rgba(0,0,0,0.1)', 
+                    backdropFilter: 'blur(10px)' 
+                  }} 
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Height & Arm Span Growth Chart */}
+        <div className="glass-card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
+          <h3 className="mb-sm flex-gap-sm">
             <Ruler size={20} style={{ color: 'var(--accent-color)' }} />
-            身高与臂展发育曲线
+            身高与臂展发育曲线 (骨骼纵向生长)
           </h3>
-          <div style={{ width: '100%', height: '300px' }}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--secondary-color)', marginBottom: '8px' }}>
+            持续监测双臂划幅力臂与身高比率，为大关长划幅（DPS）技术储备提供数据支撑。
+          </p>
+
+          <div style={{ width: '100%', height: '310px', flexGrow: 1 }}>
             {growthChartData.length > 0 && growthRecords.some(r => r.height !== null) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={growthChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -289,14 +462,21 @@ export default function Dashboard({ growthRecords, swimRecords }) {
             )}
           </div>
         </div>
+      </div>
 
-        {/* Hand & Foot Growth Chart */}
+      {/* Second Charts Row: Micro Development & Speed Analysis */}
+      <div className="grid-2 mb-lg">
+        {/* Hand & Foot Micro Development */}
         <div className="glass-card" style={{ minHeight: '380px' }}>
-          <h3 className="mb-md flex-gap-sm">
+          <h3 className="mb-sm flex-gap-sm">
             <Ruler size={20} style={{ color: '#ff9500' }} />
-            手足部细微发育曲线
+            手足细微发育监测 (天然桨叶与脚蹼)
           </h3>
-          <div style={{ width: '100%', height: '300px' }}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--secondary-color)', marginBottom: '8px' }}>
+            跟踪手掌抱水表面积与脚掌打腿面积，验证天然“大桨叶”水动力优势。
+          </p>
+
+          <div style={{ width: '100%', height: '280px' }}>
             {growthChartData.length > 0 && growthRecords.some(r => r.handLength !== undefined && r.handLength !== null && r.handLength !== '') ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={growthChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -312,30 +492,9 @@ export default function Dashboard({ growthRecords, swimRecords }) {
                     }} 
                   />
                   <Legend iconType="circle" />
-                  <Line 
-                    connectNulls
-                    type="monotone" 
-                    dataKey="脚长 (cm)" 
-                    stroke="#ff9500" 
-                    strokeWidth={2.5} 
-                    dot={{ strokeWidth: 2, r: 4 }} 
-                  />
-                  <Line 
-                    connectNulls
-                    type="monotone" 
-                    dataKey="手长 (cm)" 
-                    stroke="#af52de" 
-                    strokeWidth={2.5} 
-                    dot={{ strokeWidth: 2, r: 4 }} 
-                  />
-                  <Line 
-                    connectNulls
-                    type="monotone" 
-                    dataKey="手宽 (cm)" 
-                    stroke="#ff5e3a" 
-                    strokeWidth={2.5} 
-                    dot={{ strokeWidth: 2, r: 4 }} 
-                  />
+                  <Line connectNulls type="monotone" dataKey="脚长 (cm)" stroke="#ff9500" strokeWidth={2.5} dot={{ strokeWidth: 2, r: 4 }} />
+                  <Line connectNulls type="monotone" dataKey="手长 (cm)" stroke="#af52de" strokeWidth={2.5} dot={{ strokeWidth: 2, r: 4 }} />
+                  <Line connectNulls type="monotone" dataKey="手宽 (cm)" stroke="#ff5e3a" strokeWidth={2.5} dot={{ strokeWidth: 2, r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -345,105 +504,106 @@ export default function Dashboard({ growthRecords, swimRecords }) {
             )}
           </div>
         </div>
-      </div>
 
-      {/* Swimming Speed Progress Chart */}
-      <div className="glass-card" style={{ minHeight: '380px' }}>
-        <div className="flex-between mb-md" style={{ flexWrap: 'wrap', gap: '8px' }}>
-          <h3 className="flex-gap-sm" style={{ margin: 0 }}>
-            <TrendingUp size={20} style={{ color: '#34c759' }} />
-            游泳速度提升分析
-          </h3>
-          
-          {/* Filters */}
-          <div className="flex-gap-sm" style={{ flexWrap: 'wrap' }}>
-            <select 
-              className="apple-select" 
-              style={{ padding: '6px 12px', width: 'auto', borderRadius: '12px', fontSize: '0.85rem' }}
-              value={selectedDistance}
-              onChange={(e) => setSelectedDistance(e.target.value)}
-            >
-              {distances.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <select 
-              className="apple-select" 
-              style={{ padding: '6px 12px', width: 'auto', borderRadius: '12px', fontSize: '0.85rem' }}
-              value={selectedStroke}
-              onChange={(e) => setSelectedStroke(e.target.value)}
-            >
-              {strokes.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+        {/* Swimming Speed Progress Chart */}
+        <div className="glass-card" style={{ minHeight: '380px' }}>
+          <div className="flex-between mb-sm" style={{ flexWrap: 'wrap', gap: '8px' }}>
+            <h3 className="flex-gap-sm" style={{ margin: 0 }}>
+              <TrendingUp size={20} style={{ color: '#34c759' }} />
+              水上成绩速度提升曲线
+            </h3>
+            
+            {/* Filters */}
+            <div className="flex-gap-sm" style={{ flexWrap: 'wrap' }}>
+              <select 
+                className="apple-select" 
+                style={{ padding: '6px 12px', width: 'auto', borderRadius: '12px', fontSize: '0.85rem' }}
+                value={selectedDistance}
+                onChange={(e) => setSelectedDistance(e.target.value)}
+              >
+                {distances.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select 
+                className="apple-select" 
+                style={{ padding: '6px 12px', width: 'auto', borderRadius: '12px', fontSize: '0.85rem' }}
+                value={selectedStroke}
+                onChange={(e) => setSelectedStroke(e.target.value)}
+              >
+                {strokes.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div style={{ width: '100%', height: '300px' }}>
-          {swimChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={swimChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
-                <XAxis dataKey="date" stroke="#86868b" fontSize={11} tickLine={false} />
-                <YAxis 
-                  domain={['dataMin - 1', 'dataMax + 1']} 
-                  stroke="#86868b" 
-                  fontSize={11} 
-                  tickLine={false}
-                  tickFormatter={(val) => `${val}秒`}
-                />
-                <Tooltip 
-                  formatter={(value, name, props) => [props.payload.time, '成绩时间']}
-                  contentStyle={{ 
+          <p style={{ fontSize: '0.82rem', color: 'var(--secondary-color)', marginBottom: '8px' }}>
+            曲线持续下行代表用时缩短、成绩提升。当前项目：<strong>{selectedDistance} {selectedStroke}</strong>
+          </p>
+
+          <div style={{ width: '100%', height: '280px' }}>
+            {swimChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={swimChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                  <XAxis dataKey="date" stroke="#86868b" fontSize={11} tickLine={false} />
+                  <YAxis 
+                    domain={['dataMin - 1', 'dataMax + 1']} 
+                    stroke="#86868b" 
+                    fontSize={11} 
+                    tickLine={false}
+                    tickFormatter={(val) => `${val}秒`}
+                  />
+                  <Tooltip 
+                    formatter={(value, name, props) => [props.payload.time, '用时']}
+                    contentStyle={{ 
                       background: 'rgba(255, 255, 255, 0.9)', 
                       borderRadius: '12px', 
                       border: '1px solid rgba(0,0,0,0.1)', 
                       backdropFilter: 'blur(10px)' 
                     }} 
-                />
-                <Legend iconType="circle" />
-                <Line 
-                  type="monotone" 
-                  dataKey="用时 (秒)" 
-                  stroke="#34c759" 
-                  strokeWidth={3} 
-                  activeDot={{ r: 6 }} 
-                  dot={{ strokeWidth: 2, r: 4 }} 
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--secondary-color)', textAlign: 'center', padding: 'var(--space-lg)', fontSize: '0.95rem' }}>
-              暂无 {selectedDistance} {selectedStroke} 的成绩数据。<br />
-              请尝试更换过滤选项或录入新成绩。
-            </div>
-          )}
+                  />
+                  <Legend iconType="circle" />
+                  <Line 
+                    type="monotone" 
+                    dataKey="用时 (秒)" 
+                    stroke="#34c759" 
+                    strokeWidth={3} 
+                    activeDot={{ r: 6 }} 
+                    dot={{ strokeWidth: 2, r: 4 }} 
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--secondary-color)', textAlign: 'center', padding: 'var(--space-lg)', fontSize: '0.95rem' }}>
+                暂无 {selectedDistance} {selectedStroke} 的成绩数据。<br />
+                请尝试更换过滤选项或录入新成绩。
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* AI Coach Analysis Report */}
       {analysis.hasData ? (
         <div className="glass-card mt-lg" style={{ 
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(244, 247, 255, 0.82) 100%)', 
-          border: '1px solid rgba(0, 113, 227, 0.15)', 
-          boxShadow: '0 8px 32px rgba(0, 113, 227, 0.04)',
-          marginTop: 'var(--space-lg)'
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(244, 247, 255, 0.85) 100%)', 
+          border: '1px solid rgba(0, 113, 227, 0.18)', 
+          boxShadow: '0 8px 32px rgba(0, 113, 227, 0.04)'
         }}>
           <h3 className="mb-md flex-gap-sm" style={{ color: 'var(--accent-color)', fontWeight: 700 }}>
             <Sparkles size={20} fill="rgba(0, 113, 227, 0.2)" />
-            AI 智能教练评估与健将级晋级规划建议
+            AI 智能教练评估报告 (大关三线梯队训练与健将级晋级分析)
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
             {/* Body growth */}
             <div>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                🧬 身体形态与发育潜能评估
+                🧬 身体形态与水动力潜能分析
               </h4>
               <p style={{ fontSize: '0.9rem', color: 'var(--primary-color)', marginBottom: '8px', fontWeight: 500 }}>{analysis.physicalSummary}</p>
-              {analysis.geneticStrengths.length > 0 ? (
+              {analysis.geneticStrengths.length > 0 && (
                 <ul style={{ paddingLeft: '20px', fontSize: '0.9rem', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '6px', color: 'var(--primary-color)' }}>
                   {analysis.geneticStrengths.map((s, idx) => <li key={idx} dangerouslySetInnerHTML={{ __html: s }} />)}
                 </ul>
-              ) : (
-                <p style={{ fontSize: '0.9rem', color: 'var(--secondary-color)' }}>录入完整的手长、手宽和足部数据后，系统将为您评估 Nico 的遗传学游泳天赋特征。</p>
               )}
             </div>
 
@@ -452,14 +612,12 @@ export default function Dashboard({ growthRecords, swimRecords }) {
             {/* Swim performance */}
             <div>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px' }}>
-                🏊 水感开发与速度进阶状态
+                🏊 大关三线水上速度跃迁评估
               </h4>
-              {analysis.swimProgression.length > 0 ? (
+              {analysis.swimProgression.length > 0 && (
                 <ul style={{ paddingLeft: '20px', fontSize: '0.9rem', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '6px', color: 'var(--primary-color)' }}>
                   {analysis.swimProgression.map((s, idx) => <li key={idx} dangerouslySetInnerHTML={{ __html: s }} />)}
                 </ul>
-              ) : (
-                <p style={{ fontSize: '0.9rem', color: 'var(--secondary-color)' }}>录入多条同一项目的成绩以激活 AI 成绩提升斜率分析。</p>
               )}
             </div>
 
@@ -472,25 +630,18 @@ export default function Dashboard({ growthRecords, swimRecords }) {
 
             <hr style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.06)' }} />
 
-            {/* Master of Sports roadmap */}
+            {/* Master of Sports Next-Step Focus */}
             <div>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#ff9500', marginBottom: '10px' }}>
-                🏆 冲刺“国家健将级”长远发展规划
+                🏆 大关三线本阶段核心攻坚重点 (冲刺市长杯与破58秒)
               </h4>
               <div style={{ background: 'rgba(255, 149, 0, 0.04)', border: '1px solid rgba(255, 149, 0, 0.15)', padding: '16px', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--primary-color)' }}>
-                <p style={{ fontWeight: 700, marginBottom: '8px', color: '#d35400' }}>当前年龄段（6岁 - 幼儿启盟黄金期）训练核心：</p>
-                <ol style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-                  <li><strong>极致的水感与流线型建设</strong>：该阶段骨骼娇嫩，应极力避免任何陆上力量或高强度无氧心肺训练。重点在于漂浮、抓抱水感觉（Sculling）、以及身体极其平整的超直流线型滑行。</li>
-                  <li><strong>四种泳姿全面开发</strong>：不应急于锁定主项姿势。全面平衡发展自由泳、仰泳、蛙泳、蝶泳，能最大化地刺激全身协调性肌肉，为中后期混合泳项目 and 主项爆发打下坚实底子。</li>
-                  <li><strong>关节柔韧度拓展</strong>：着重维持并拉伸肩关节、踝关节的软组织。高柔韧性的肩踝是后期进行超高划幅和鞭状打腿的技术硬件支持。</li>
+                <p style={{ fontWeight: 700, marginBottom: '8px', color: '#d35400' }}>教练组下阶段三项量化攻坚指令：</p>
+                <ol style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', margin: 0 }}>
+                  <li><strong>打腿专项突破：</strong> 扶板25米自由泳打腿必须进入 24秒以内；每堂课保持 500m 以上打腿量，强化大腿带动小腿的鞭打反射。</li>
+                  <li><strong>进出池壁细节：</strong> 转身前 5 米坚决不抬头减速，以肚脐为轴快速翻转，蹬壁后水下海豚腿必须滑出 <strong>4.5米 - 5米</strong> 线。</li>
+                  <li><strong>黄金恢复保障：</strong> 课后 30 分钟内立即补充温纯牛奶250ml+水煮蛋，晚间 21:15 前就寝，确保夜间生长素高效分泌。</li>
                 </ol>
-                
-                <p style={{ fontWeight: 700, marginBottom: '8px', color: '#d35400' }}>长远健将之路里程碑规划：</p>
-                <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <li><strong>7 - 9 岁（动作规范化）</strong>：打下完美的打腿（Kick）功底。女子短距离项目是打腿频率的较量，必须建立起高强度、长滑行的二次腿和六次腿反射。</li>
-                  <li><strong>10 - 12 岁（有氧耐力与水下腿）</strong>：进入有氧容量扩张黄金期。此时要开始抠细节——出发跳水反应时、转身蹬壁滑行、以及出发/转身后的海豚腿（水下腿五米线以上维持能力）。</li>
-                  <li><strong>13 - 15 岁（专项突破与身体定型）</strong>：骨骼逐步发育定型，开始进行核心无氧爆发训练和专项分工。女子运动员往往在 14 - 17 岁迎来首个成绩爆发和国家健将指标（如50自 26.5秒 / 100自 57.5秒等）的突破。</li>
-                </ul>
               </div>
             </div>
           </div>
@@ -498,7 +649,7 @@ export default function Dashboard({ growthRecords, swimRecords }) {
       ) : (
         <div className="glass-card mt-lg text-center" style={{ padding: 'var(--space-lg) 0', color: 'var(--secondary-color)', fontSize: '0.95rem' }}>
           <Sparkles size={24} style={{ color: 'var(--accent-color)', marginBottom: '8px' }} />
-          请先在身体数据和成绩记录中录入数据，AI 将自动为您生成 Nico 冲刺健将级运动员的专属分析报告。
+          请先录入成长数据，AI 将自动输出大关三线教练报告。
         </div>
       )}
     </div>

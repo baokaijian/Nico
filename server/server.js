@@ -26,7 +26,7 @@ const readDB = () => {
     return JSON.parse(data);
   } catch (error) {
     console.error('Error reading database:', error);
-    return { growth: [], swim: [], media: [] };
+    return { growth: [], swim: [], media: [], trainings: [], fitness: [], nutrition: [], goals: [] };
   }
 };
 
@@ -227,6 +227,302 @@ app.delete('/api/swim/:id', (req, res) => {
   db.swim = (db.swim || []).filter(item => item.id !== id);
   writeDB(db);
   res.json({ success: true, message: 'Record deleted.' });
+});
+
+// Water Training Logs Routes
+app.get('/api/trainings', (req, res) => {
+  const db = readDB();
+  res.json(db.trainings || []);
+});
+
+app.post('/api/trainings', (req, res) => {
+  const {
+    date, session, trainingType, totalMeters, kickMeters,
+    intensity, focusSkills, rpe, coachNotes, completionRate
+  } = req.body;
+
+  if (!date) {
+    return res.status(400).json({ error: '训练日期为必填项。' });
+  }
+
+  const db = readDB();
+  const newRecord = {
+    id: 't-' + Date.now(),
+    date,
+    session: session || '下午主训',
+    trainingType: trainingType || '技术水感课',
+    totalMeters: totalMeters ? parseInt(totalMeters, 10) : 0,
+    kickMeters: kickMeters ? parseInt(kickMeters, 10) : 0,
+    intensity: intensity || '中强度 (A2有氧基础)',
+    focusSkills: focusSkills || '',
+    rpe: rpe ? parseInt(rpe, 10) : 7,
+    coachNotes: coachNotes || '',
+    completionRate: completionRate ? parseInt(completionRate, 10) : 100
+  };
+
+  db.trainings = db.trainings || [];
+  db.trainings.push(newRecord);
+  db.trainings.sort((a, b) => new Date(a.date) - new Date(b.date));
+  writeDB(db);
+  res.status(201).json(newRecord);
+});
+
+app.put('/api/trainings/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  const index = (db.trainings || []).findIndex(item => item.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: '训练记录未找到。' });
+  }
+
+  const {
+    date, session, trainingType, totalMeters, kickMeters,
+    intensity, focusSkills, rpe, coachNotes, completionRate
+  } = req.body;
+
+  db.trainings[index] = {
+    id,
+    date: date || db.trainings[index].date,
+    session: session || db.trainings[index].session,
+    trainingType: trainingType || db.trainings[index].trainingType,
+    totalMeters: totalMeters !== undefined ? parseInt(totalMeters, 10) : db.trainings[index].totalMeters,
+    kickMeters: kickMeters !== undefined ? parseInt(kickMeters, 10) : db.trainings[index].kickMeters,
+    intensity: intensity || db.trainings[index].intensity,
+    focusSkills: focusSkills !== undefined ? focusSkills : db.trainings[index].focusSkills,
+    rpe: rpe !== undefined ? parseInt(rpe, 10) : db.trainings[index].rpe,
+    coachNotes: coachNotes !== undefined ? coachNotes : db.trainings[index].coachNotes,
+    completionRate: completionRate !== undefined ? parseInt(completionRate, 10) : db.trainings[index].completionRate
+  };
+
+  db.trainings.sort((a, b) => new Date(a.date) - new Date(b.date));
+  writeDB(db);
+  res.json(db.trainings[index]);
+});
+
+app.delete('/api/trainings/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  db.trainings = (db.trainings || []).filter(item => item.id !== id);
+  writeDB(db);
+  res.json({ success: true, message: '训练记录已删除。' });
+});
+
+// Dryland Fitness & Flexibility Routes
+app.get('/api/fitness', (req, res) => {
+  const db = readDB();
+  res.json(db.fitness || []);
+});
+
+app.post('/api/fitness', (req, res) => {
+  const {
+    date, standingJump, plankSeconds, sitAndReach,
+    shoulderFlex, ankleFlex, shuttleRun, notes
+  } = req.body;
+
+  if (!date) {
+    return res.status(400).json({ error: '测试日期为必填项。' });
+  }
+
+  const db = readDB();
+  const newRecord = {
+    id: 'f-' + Date.now(),
+    date,
+    standingJump: standingJump ? parseFloat(standingJump) : null,
+    plankSeconds: plankSeconds ? parseInt(plankSeconds, 10) : null,
+    sitAndReach: sitAndReach ? parseFloat(sitAndReach) : null,
+    shoulderFlex: shoulderFlex || '',
+    ankleFlex: ankleFlex || '极佳 (天生脚蹼特征)',
+    shuttleRun: shuttleRun ? parseFloat(shuttleRun) : null,
+    notes: notes || ''
+  };
+
+  db.fitness = db.fitness || [];
+  db.fitness.push(newRecord);
+  db.fitness.sort((a, b) => new Date(a.date) - new Date(b.date));
+  writeDB(db);
+  res.status(201).json(newRecord);
+});
+
+app.put('/api/fitness/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  const index = (db.fitness || []).findIndex(item => item.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: '体能记录未找到。' });
+  }
+
+  const {
+    date, standingJump, plankSeconds, sitAndReach,
+    shoulderFlex, ankleFlex, shuttleRun, notes
+  } = req.body;
+
+  db.fitness[index] = {
+    id,
+    date: date || db.fitness[index].date,
+    standingJump: standingJump !== undefined ? (standingJump ? parseFloat(standingJump) : null) : db.fitness[index].standingJump,
+    plankSeconds: plankSeconds !== undefined ? (plankSeconds ? parseInt(plankSeconds, 10) : null) : db.fitness[index].plankSeconds,
+    sitAndReach: sitAndReach !== undefined ? (sitAndReach ? parseFloat(sitAndReach) : null) : db.fitness[index].sitAndReach,
+    shoulderFlex: shoulderFlex !== undefined ? shoulderFlex : db.fitness[index].shoulderFlex,
+    ankleFlex: ankleFlex !== undefined ? ankleFlex : db.fitness[index].ankleFlex,
+    shuttleRun: shuttleRun !== undefined ? (shuttleRun ? parseFloat(shuttleRun) : null) : db.fitness[index].shuttleRun,
+    notes: notes !== undefined ? notes : db.fitness[index].notes
+  };
+
+  db.fitness.sort((a, b) => new Date(a.date) - new Date(b.date));
+  writeDB(db);
+  res.json(db.fitness[index]);
+});
+
+app.delete('/api/fitness/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  db.fitness = (db.fitness || []).filter(item => item.id !== id);
+  writeDB(db);
+  res.json({ success: true, message: '体能记录已删除。' });
+});
+
+// Nutrition & Recovery Routes
+app.get('/api/nutrition', (req, res) => {
+  const db = readDB();
+  res.json(db.nutrition || []);
+});
+
+app.post('/api/nutrition', (req, res) => {
+  const {
+    date, preMeal, postMeal, waterMl,
+    calciumTaken, ironTaken, zincTaken, sleepHours,
+    morningPulse, recoveryScore, notes
+  } = req.body;
+
+  if (!date) {
+    return res.status(400).json({ error: '记录日期为必填项。' });
+  }
+
+  const db = readDB();
+  const newRecord = {
+    id: 'n-' + Date.now(),
+    date,
+    preMeal: preMeal || '',
+    postMeal: postMeal || '',
+    waterMl: waterMl ? parseInt(waterMl, 10) : 1500,
+    calciumTaken: Boolean(calciumTaken),
+    ironTaken: Boolean(ironTaken),
+    zincTaken: Boolean(zincTaken),
+    sleepHours: sleepHours ? parseFloat(sleepHours) : 9.5,
+    morningPulse: morningPulse ? parseInt(morningPulse, 10) : null,
+    recoveryScore: recoveryScore ? parseInt(recoveryScore, 10) : 5,
+    notes: notes || ''
+  };
+
+  db.nutrition = db.nutrition || [];
+  db.nutrition.push(newRecord);
+  db.nutrition.sort((a, b) => new Date(a.date) - new Date(b.date));
+  writeDB(db);
+  res.status(201).json(newRecord);
+});
+
+app.put('/api/nutrition/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  const index = (db.nutrition || []).findIndex(item => item.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: '饮食营养记录未找到。' });
+  }
+
+  const {
+    date, preMeal, postMeal, waterMl,
+    calciumTaken, ironTaken, zincTaken, sleepHours,
+    morningPulse, recoveryScore, notes
+  } = req.body;
+
+  db.nutrition[index] = {
+    id,
+    date: date || db.nutrition[index].date,
+    preMeal: preMeal !== undefined ? preMeal : db.nutrition[index].preMeal,
+    postMeal: postMeal !== undefined ? postMeal : db.nutrition[index].postMeal,
+    waterMl: waterMl !== undefined ? parseInt(waterMl, 10) : db.nutrition[index].waterMl,
+    calciumTaken: calciumTaken !== undefined ? Boolean(calciumTaken) : db.nutrition[index].calciumTaken,
+    ironTaken: ironTaken !== undefined ? Boolean(ironTaken) : db.nutrition[index].ironTaken,
+    zincTaken: zincTaken !== undefined ? Boolean(zincTaken) : db.nutrition[index].zincTaken,
+    sleepHours: sleepHours !== undefined ? parseFloat(sleepHours) : db.nutrition[index].sleepHours,
+    morningPulse: morningPulse !== undefined ? (morningPulse ? parseInt(morningPulse, 10) : null) : db.nutrition[index].morningPulse,
+    recoveryScore: recoveryScore !== undefined ? parseInt(recoveryScore, 10) : db.nutrition[index].recoveryScore,
+    notes: notes !== undefined ? notes : db.nutrition[index].notes
+  };
+
+  db.nutrition.sort((a, b) => new Date(a.date) - new Date(b.date));
+  writeDB(db);
+  res.json(db.nutrition[index]);
+});
+
+app.delete('/api/nutrition/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  db.nutrition = (db.nutrition || []).filter(item => item.id !== id);
+  writeDB(db);
+  res.json({ success: true, message: '饮食营养记录已删除。' });
+});
+
+// Goals & Milestones Routes
+app.get('/api/goals', (req, res) => {
+  const db = readDB();
+  res.json(db.goals || []);
+});
+
+app.post('/api/goals', (req, res) => {
+  const { title, category, targetMetric, currentProgress, deadline, status, notes } = req.body;
+  if (!title) {
+    return res.status(400).json({ error: '目标名称为必填项。' });
+  }
+
+  const db = readDB();
+  const newRecord = {
+    id: 'goal-' + Date.now(),
+    title,
+    category: category || '赛事达级',
+    targetMetric: targetMetric || '',
+    currentProgress: currentProgress !== undefined ? parseInt(currentProgress, 10) : 0,
+    deadline: deadline || '',
+    status: status || '进行中',
+    notes: notes || ''
+  };
+
+  db.goals = db.goals || [];
+  db.goals.push(newRecord);
+  writeDB(db);
+  res.status(201).json(newRecord);
+});
+
+app.put('/api/goals/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  const index = (db.goals || []).findIndex(item => item.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: '目标未找到。' });
+  }
+
+  const { title, category, targetMetric, currentProgress, deadline, status, notes } = req.body;
+  db.goals[index] = {
+    id,
+    title: title || db.goals[index].title,
+    category: category || db.goals[index].category,
+    targetMetric: targetMetric !== undefined ? targetMetric : db.goals[index].targetMetric,
+    currentProgress: currentProgress !== undefined ? parseInt(currentProgress, 10) : db.goals[index].currentProgress,
+    deadline: deadline !== undefined ? deadline : db.goals[index].deadline,
+    status: status || db.goals[index].status,
+    notes: notes !== undefined ? notes : db.goals[index].notes
+  };
+
+  writeDB(db);
+  res.json(db.goals[index]);
+});
+
+app.delete('/api/goals/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  db.goals = (db.goals || []).filter(item => item.id !== id);
+  writeDB(db);
+  res.json({ success: true, message: '目标已删除。' });
 });
 
 // Media Routes

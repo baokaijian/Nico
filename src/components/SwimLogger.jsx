@@ -291,6 +291,18 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
               取消修改
             </button>
           )}
+
+          {/* National Athlete Standards Reference Strip */}
+          <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(0, 113, 227, 0.04)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 113, 227, 0.12)', fontSize: '0.8rem', lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, color: 'var(--accent-color)', marginBottom: '4px' }}>
+              🎯 国家女子游泳运动员技术等级标准对照 (50米标准池)：
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', color: 'var(--primary-color)' }}>
+              <div>• <strong>三级：</strong>50自 35.0s / 50仰 40.5s</div>
+              <div>• <strong>二级：</strong>50自 31.5s / 50仰 36.2s</div>
+              <div>• <strong>健将：</strong>50自 26.5s / 50仰 29.8s</div>
+            </div>
+          </div>
         </form>
       </div>
 
