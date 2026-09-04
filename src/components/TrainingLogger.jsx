@@ -100,13 +100,21 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
     return t.trainingType === filterType;
   }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const trainingTypes = ['技术水感课', '打腿专项课', '有氧基础包', '四式混合课', '冲刺速度耐力', '阶段测验'];
+  const trainingTypes = [
+    '打腿专项课', 
+    '技术水感课', 
+    '市长杯冲刺模拟课', 
+    '滚翻转身与出发特训', 
+    '有氧基础包', 
+    '四式混合课', 
+    '阶段达标测验'
+  ];
   const intensityLevels = [
     '低强度 (A1恢复/技术)', 
     '中强度 (A2有氧基础)', 
-    '中高强度 (EN1混氧)', 
-    '高强度 (EN2乳酸耐力)', 
-    '极限冲刺 (SP速度)'
+    '中高强度 (EN1混氧耐力)', 
+    '高强度 (EN2乳酸耐受)', 
+    '极限冲刺 (SP比赛速度)'
   ];
 
   return (
@@ -123,7 +131,7 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
             <span className="metrics-unit">米</span>
           </div>
           <div className="text-secondary" style={{ fontSize: '0.85rem' }}>
-            累计完成 {trainings.length} 次专业走训水上课
+            市长杯冲刺备战 · 累计完成 {trainings.length} 节专业走训课
           </div>
         </div>
 

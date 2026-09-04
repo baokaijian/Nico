@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Waves, HeartPulse, Apple, Target, CheckCircle2, Printer, Clock } from 'lucide-react';
+import { Waves, HeartPulse, Apple, Printer, Zap, ShieldAlert, Flag } from 'lucide-react';
 
 export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
   const [activeSubTab, setActiveSubTab] = useState('water');
@@ -12,39 +12,50 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
     <div>
       {/* Header Banner */}
       <div className="glass-card mb-lg" style={{ 
-        background: 'linear-gradient(135deg, rgba(0, 113, 227, 0.08) 0%, rgba(52, 199, 89, 0.08) 100%)',
-        border: '1px solid rgba(0, 113, 227, 0.2)'
+        background: 'linear-gradient(135deg, rgba(0, 113, 227, 0.12) 0%, rgba(52, 199, 89, 0.12) 100%)',
+        border: '1.5px solid rgba(0, 113, 227, 0.25)',
+        boxShadow: '0 8px 32px rgba(0, 113, 227, 0.08)'
       }}>
         <div className="flex-between" style={{ flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
               <span style={{ 
-                background: 'var(--accent-color)', 
+                background: 'linear-gradient(135deg, #0071e3 0%, #005bb5 100%)', 
                 color: '#fff', 
                 fontSize: '0.75rem', 
-                padding: '3px 10px', 
+                padding: '4px 12px', 
                 borderRadius: '20px', 
-                fontWeight: 600,
+                fontWeight: 700,
                 letterSpacing: '0.04em'
               }}>
                 杭州大关三线游泳队
               </span>
               <span style={{ 
+                background: 'rgba(255, 149, 0, 0.15)', 
+                color: '#d35400', 
+                fontSize: '0.75rem', 
+                padding: '4px 12px', 
+                borderRadius: '20px', 
+                fontWeight: 700 
+              }}>
+                2027市长杯二级运动员决战方案
+              </span>
+              <span style={{ 
                 background: 'rgba(52, 199, 89, 0.15)', 
                 color: '#248a3d', 
                 fontSize: '0.75rem', 
-                padding: '3px 10px', 
+                padding: '4px 12px', 
                 borderRadius: '20px', 
-                fontWeight: 600 
+                fontWeight: 700 
               }}>
-                6-7岁女子竞技梯队专属
+                15个月周期化纲要
               </span>
             </div>
-            <h2 style={{ fontSize: '1.85rem', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
-              Nico 个人竞技战力提升与健将级进阶培养方案
+            <h2 style={{ fontSize: '1.95rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, color: 'var(--primary-color)' }}>
+              2027年底市长杯决赛 · 国家二级运动员冲刺纲领
             </h2>
             <p style={{ color: 'var(--secondary-color)', fontSize: '0.92rem', marginTop: '6px' }}>
-              基于杭州大关世界冠军摇篮（陈慧佳、杨雨）教练组青训大纲，融合运动生理学敏感期规律与国家健将级梯级成长模型。
+              对标大关名将（杨雨、叶诗文启蒙阶段）实战体系：以女子 50 米自由泳突破 <strong>31.50 秒</strong> 为终极统领，分阶段攻关水上、陆上爆发力与赛事实战。
             </p>
           </div>
 
@@ -68,310 +79,363 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
           gap: '12px' 
         }}>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>当前发育状态:</span>
-            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>当前骨骼形态:</span>
+            <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--primary-color)' }}>
               身高 {latestGrowth?.height || 129.6} cm | 臂展 {latestGrowth?.armSpan || 129.5} cm
             </div>
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>水上基线速度:</span>
-            <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--accent-color)' }}>
-              50米自由泳: {latestSwim?.time || '01:04.20'}
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>50m自由泳基准:</span>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-color)' }}>
+              当前 {latestSwim?.time || '01:04.20'} ➔ 终极目标 ≤ 31.50s
             </div>
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>三线队出勤累计:</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>大关走训累计游程:</span>
             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#34c759' }}>
-              {totalWaterMeters} 米 水上包已入库
-            </div>
-          </div>
-          <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>长远奋斗目标:</span>
-            <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#ff9500' }}>
-              国家健将级运动员 (女子50自 26.5s)
+              {totalWaterMeters.toLocaleString()} 米 (专项打腿 ≥ 35%)
             </div>
           </div>
         </div>
       </div>
 
-      {/* Plan Navigation Tabs */}
-      <div className="nav-tabs mb-lg" style={{ maxWidth: '640px' }}>
+      {/* Navigation Sub-Tabs */}
+      <div className="tab-nav mb-lg" style={{ 
+        display: 'flex', 
+        gap: '8px', 
+        borderBottom: '1px solid rgba(0,0,0,0.08)', 
+        paddingBottom: '12px',
+        overflowX: 'auto'
+      }}>
         <button 
           className={`tab-btn ${activeSubTab === 'water' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('water')}
+          style={{ whiteSpace: 'nowrap' }}
         >
-          <Waves size={15} />
-          <span>水上专项提升</span>
+          <Waves size={16} />
+          <span>四阶段水上攻坚计划</span>
         </button>
+
         <button 
-          className={`tab-btn ${activeSubTab === 'fitness' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('fitness')}
+          className={`tab-btn ${activeSubTab === 'turn_start' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('turn_start')}
+          style={{ whiteSpace: 'nowrap' }}
         >
-          <HeartPulse size={15} />
-          <span>陆上体能与柔韧</span>
+          <Zap size={16} />
+          <span>出发与滚翻转身攻坚</span>
         </button>
+
+        <button 
+          className={`tab-btn ${activeSubTab === 'dryland' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('dryland')}
+          style={{ whiteSpace: 'nowrap' }}
+        >
+          <HeartPulse size={16} />
+          <span>陆上体能与爆发力</span>
+        </button>
+
         <button 
           className={`tab-btn ${activeSubTab === 'nutrition' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('nutrition')}
+          style={{ whiteSpace: 'nowrap' }}
         >
-          <Apple size={15} />
-          <span>科学饮食与恢复</span>
+          <Apple size={16} />
+          <span>高强度走训营养处方</span>
         </button>
+
         <button 
-          className={`tab-btn ${activeSubTab === 'roadmap' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('roadmap')}
+          className={`tab-btn ${activeSubTab === 'strategy' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('strategy')}
+          style={{ whiteSpace: 'nowrap' }}
         >
-          <Target size={15} />
-          <span>健将级晋级路线</span>
+          <Flag size={16} />
+          <span>市长杯决赛战术与巅峰</span>
         </button>
       </div>
 
-      {/* Sub-Tab 1: Water Technical Plan */}
+      {/* Tab 1: 4-Phase Water Program */}
       {activeSubTab === 'water' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
-          {/* Card 1: Kicking & Water Feel */}
-          <div className="glass-card">
-            <h3 className="mb-sm flex-gap-sm" style={{ color: 'var(--accent-color)' }}>
-              <Waves size={20} />
-              维度一：大关三线水上训练四大专项攻坚模块
-            </h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--secondary-color)', marginBottom: 'var(--space-md)' }}>
-              6-7岁是水感建构（Water Feel）和动作神经元链接的核心窗口，重质不求盲目跑量，以高划幅（DPS）和高频流线型打腿为主核。
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          {/* Phase 1 */}
+          <div className="glass-card" style={{ borderLeft: '4px solid #0071e3' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'rgba(0, 113, 227, 0.1)', color: '#0071e3', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.8rem' }}>
+                  第 1 阶段 · 动力链奠基
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>水感与前交叉动力成型 (2026.09 - 2026.12 · 6.5岁)</h3>
+              </div>
+              <span style={{ fontWeight: 700, color: '#0071e3', fontSize: '0.95rem' }}>目标：50自进入 52.00秒 内</span>
+            </div>
+            
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '12px' }}>
+              <strong>攻坚核心：</strong>将 Nico 暑假入选大关三线的基础动作全面定型。重点建立<strong>“大腿发力、小腿鞭状、脚踝内旋”</strong>的6次打腿动力链，确保游进过程中躯干像一条笔直鱼雷，杜绝塌腰与下半身下沉。
             </p>
 
-            <div className="grid-2" style={{ gap: '16px' }}>
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px' }}>
-                  <CheckCircle2 size={16} color="var(--accent-color)" />
-                  1. 专项打腿发动机工程 (Kicking Engine)
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
-                  • <strong>打腿占课比：</strong> 每堂训练课打腿量不少于 <strong>30%~40% (500m-800m)</strong>。<br />
-                  • <strong>自由泳打腿：</strong> 保持膝关节微屈、以髋为轴、鞭状下压。利用 Nico 天生脚踝柔韧优势，形成大面积推水。<br />
-                  • <strong>海豚打腿：</strong> 每组蹬壁必接 <strong>3-4次深水海豚腿</strong>，出水前保持平整身体姿态，训练腹背核心节律。
-                </p>
+            <div className="grid-2" style={{ gap: '12px' }}>
+              <div style={{ background: 'rgba(0, 113, 227, 0.03)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: 'var(--accent-color)', display: 'block', marginBottom: '4px' }}>每周负荷与课次结构：</strong>
+                • 课次：每周 4 次走训（每次 90-105 分钟）<br />
+                • 单课总包干：1,400m - 1,800m（周游程 6,500m - 7,500m）<br />
+                • 专项打腿占比：<strong>≥ 35%</strong>（每课打腿 500m~700m）
               </div>
-
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px' }}>
-                  <CheckCircle2 size={16} color="var(--accent-color)" />
-                  2. 超直流线型与高肘抓水 (Streamline & Catch)
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
-                  • <strong>减阻重于发力：</strong> 水中阻力与速度平方成正比。入水后头部死死夹在两臂之间，下颌微收，维持水平中轴。<br />
-                  • <strong>早立小臂高肘抱水 (EVF)：</strong> 利用手长优势，入水后快速屈腕屈肘，使小臂与手掌形成垂直截面，感受整片水柱向后推。<br />
-                  • <strong>摇橹划水 (Sculling)：</strong> 课前 200 米进行前摇橹与中摇橹，培养敏感抓水水膜。
-                </p>
-              </div>
-
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px' }}>
-                  <CheckCircle2 size={16} color="var(--accent-color)" />
-                  3. 转身蹬壁与出水衔接 (Turn & Breakout)
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
-                  • <strong>短池比赛分水岭：</strong> 50米/100米短池比赛胜负往往在转身。进池壁前 5 米绝不减速、绝不抬头寻找池壁。<br />
-                  • <strong>团身翻滚：</strong> 下颌贴紧锁骨，以肚脐为轴快速翻转，双足掌精准、结实蹬击池壁中偏上方。<br />
-                  • <strong>出水第一划：</strong> 蹬壁滑行后第一划必须是强力抱水冲刺，无呼吸启动，快速抢占水面初速度。
-                </p>
-              </div>
-
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px' }}>
-                  <CheckCircle2 size={16} color="var(--accent-color)" />
-                  4. 四式均衡兼修 (200米个人混合泳底子)
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
-                  • <strong>拒绝过早单项化：</strong> 6-7岁坚决不可只游自由泳。大关传统优势正是混合泳人才辈出（如于子迪）。<br />
-                  • <strong>仰泳：</strong> 强化躯干两侧45度滚动，头颈稳定不摆动。<br />
-                  • <strong>蛙泳：</strong> 收腿窄、蹬夹迅猛合拢，滑行充分；蝶泳强化胸椎波浪起伏传导至指尖。
-                </p>
+              <div style={{ background: 'rgba(0, 113, 227, 0.03)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: 'var(--accent-color)', display: 'block', marginBottom: '4px' }}>量化验收指标：</strong>
+                • 25m 扶板全力打腿：进入 <strong>24.00秒</strong> 以内<br />
+                • 50m 扶板有氧打腿：进入 <strong>55.00秒</strong> 以内<br />
+                • 50m 自由泳配合测试：从 1:04.20 突破至 <strong>≤ 52.00秒</strong>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Weekly Schedule Model */}
-          <div className="glass-card">
-            <h3 className="mb-sm flex-gap-sm" style={{ color: 'var(--primary-color)' }}>
-              <Clock size={20} color="var(--accent-color)" />
-              大关三线走训期：周课表负荷科学配置模版
-            </h3>
-            <div className="history-table-container">
-              <table className="history-table">
-                <thead>
-                  <tr>
-                    <th>星期</th>
-                    <th>训练时段</th>
-                    <th>核心主题</th>
-                    <th>建议水上量</th>
-                    <th>强度区间与攻坚关键</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>周一</strong></td>
-                    <td>下午 16:30 - 18:00</td>
-                    <td>水感唤醒与四式打腿专项</td>
-                    <td>1400m - 1600m</td>
-                    <td><span style={{ color: '#248a3d', fontWeight: 600 }}>A1~A2</span>：打腿占比50%，纠正周末休整后的动作细节</td>
-                  </tr>
-                  <tr>
-                    <td><strong>周二</strong></td>
-                    <td>下午 16:30 - 18:15</td>
-                    <td>自由泳/仰泳长划幅有氧配合</td>
-                    <td>1600m - 1800m</td>
-                    <td><span style={{ color: 'var(--accent-color)', fontWeight: 600 }}>A2基础有氧</span>：高肘抱水，三划一换气平衡呼吸</td>
-                  </tr>
-                  <tr>
-                    <td><strong>周三</strong></td>
-                    <td>下午 16:30 - 18:00</td>
-                    <td>出发跳水、转身与水下海豚腿</td>
-                    <td>1300m - 1500m</td>
-                    <td><span style={{ color: '#af52de', fontWeight: 600 }}>技术精度课</span>：起跳反应速度测验，转身不减速练习</td>
-                  </tr>
-                  <tr>
-                    <td><strong>周四</strong></td>
-                    <td>下午 16:30 - 18:15</td>
-                    <td>蛙泳收蹬夹与蝶泳节律专项</td>
-                    <td>1500m - 1700m</td>
-                    <td><span style={{ color: 'var(--accent-color)', fontWeight: 600 }}>A2~EN1</span>：蛙泳窄收快夹，蝶泳胸部波浪起伏</td>
-                  </tr>
-                  <tr>
-                    <td><strong>周五</strong></td>
-                    <td>下午 16:30 - 18:00</td>
-                    <td>25m/50m 短冲刺与计时测验</td>
-                    <td>1200m - 1400m</td>
-                    <td><span style={{ color: '#ff9500', fontWeight: 600 }}>SP速度冲刺</span>：全力以赴冲刺记录，模拟比赛心理刺激</td>
-                  </tr>
-                  <tr>
-                    <td><strong>周六</strong></td>
-                    <td>上午 09:00 - 11:00</td>
-                    <td>四式综合大包与水上耐力拓展</td>
-                    <td>1800m - 2200m</td>
-                    <td><span style={{ color: 'var(--accent-color)', fontWeight: 600 }}>EN1综合有氧</span>：混合泳模拟大容量包，打牢心肺耐力</td>
-                  </tr>
-                  <tr>
-                    <td><strong>周日</strong></td>
-                    <td>全天休整</td>
-                    <td>深度睡眠、家庭亲子放松与恢复</td>
-                    <td>0m (静养)</td>
-                    <td><span style={{ color: '#34c759', fontWeight: 600 }}>超量恢复</span>：充分补水、高钙饮食、早睡生长素分泌</td>
-                  </tr>
-                </tbody>
-              </table>
+          {/* Phase 2 */}
+          <div className="glass-card" style={{ borderLeft: '4px solid #ff9500' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'rgba(255, 149, 0, 0.1)', color: '#d35400', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.8rem' }}>
+                  第 2 阶段 · 速度成型
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>迎春杯达标测试与斩获“国家三级” (2027.01 - 2027.04 · 7.0岁)</h3>
+              </div>
+              <span style={{ fontWeight: 700, color: '#d35400', fontSize: '0.95rem' }}>目标：突破 39.50秒 (国家三级达标)</span>
+            </div>
+            
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '12px' }}>
+              <strong>攻坚核心：</strong>出战杭州市迎春杯少儿达标赛。此阶段 Nico 骨骼与肌肉力量自然增长，重点攻克<strong>高肘抱水（EVF）深度感知与滚翻转身后水下海豚腿滑行</strong>，跨越中国竞技游泳第一座里程碑（国家三级运动员：50自 39.50s）。
+            </p>
+
+            <div className="grid-2" style={{ gap: '12px' }}>
+              <div style={{ background: 'rgba(255, 149, 0, 0.03)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: '#d35400', display: 'block', marginBottom: '4px' }}>每周负荷与课次结构：</strong>
+                • 课次：每周 4-5 次（周游程 8,000m - 10,000m）<br />
+                • 单课总包干：1,800m - 2,200m<br />
+                • 重点训练：25m段落极速爆发（SP）+ 滚翻转身不抬头练习
+              </div>
+              <div style={{ background: 'rgba(255, 149, 0, 0.03)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: '#d35400', display: 'block', marginBottom: '4px' }}>量化验收指标：</strong>
+                • 迎春杯 50m 自由泳：突破 <strong>39.50秒（正式申办国家三级运动员）</strong><br />
+                • 滚翻转身蹬壁出水点：稳定越过 <strong>4.5米 - 5米线</strong><br />
+                • 划幅效率（DPS）：50米比赛控制在 <strong>30-32 划</strong> 内完成
+              </div>
+            </div>
+          </div>
+
+          {/* Phase 3 */}
+          <div className="glass-card" style={{ borderLeft: '4px solid #af52de' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'rgba(175, 82, 222, 0.1)', color: '#af52de', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.8rem' }}>
+                  第 3 阶段 · 暑期强化
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>大关暑期双训与无氧耐力攻坚 (2027.05 - 2027.08 · 7.5岁)</h3>
+              </div>
+              <span style={{ fontWeight: 700, color: '#af52de', fontSize: '0.95rem' }}>目标：突破 35.00秒 (逼近二级门槛)</span>
+            </div>
+            
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '12px' }}>
+              <strong>攻坚核心：</strong>大关三线每年最关键的<strong>“暑期大包干黄金期”</strong>。利用暑假无课业负担，执行“上午水上打底 + 下午速度强化”节奏，全面提升乳酸耐受力，消灭 50 米后半程速度衰减。
+            </p>
+
+            <div className="grid-2" style={{ gap: '12px' }}>
+              <div style={{ background: 'rgba(175, 82, 222, 0.03)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: '#af52de', display: 'block', marginBottom: '4px' }}>暑期特训负荷：</strong>
+                • 课次：周一至周六单双训结合（周游程 12,000m - 15,000m）<br />
+                • 专项耐力：8×50m 自由泳极速组包干（包干时间 50秒，冲刺在 36秒内）<br />
+                • 专项打腿：10×50m 板打（包干 1分05秒）
+              </div>
+              <div style={{ background: 'rgba(175, 82, 222, 0.03)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: '#af52de', display: 'block', marginBottom: '4px' }}>量化验收指标：</strong>
+                • 50m 自由泳测验：进入 <strong>35.00秒以内（力争 33~34s）</strong><br />
+                • 50m 仰泳兼项：进入 <strong>39.00秒以内</strong><br />
+                • 后程 25m 降速差：与前程 25m 差距控制在 <strong>1.5秒以内</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Phase 4 */}
+          <div className="glass-card" style={{ borderLeft: '4px solid #34c759' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'rgba(52, 199, 89, 0.15)', color: '#248a3d', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.8rem' }}>
+                  第 4 阶段 · 终极决战
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>市长杯决赛决战 · 斩获国家二级运动员 (2027.09 - 2027.12 · 7.8岁)</h3>
+              </div>
+              <span style={{ fontWeight: 800, color: '#248a3d', fontSize: '1rem' }}>终极指标：≤ 31.50秒 (国家二级！)</span>
+            </div>
+            
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '12px' }}>
+              <strong>攻坚核心：</strong>2027年底杭州市“市长杯”少儿游泳锦标赛决赛。在赛前 2 周严格实施减量巅峰策略（Tapering），在决赛发令枪响后，将 15 个月打磨的出发反应（0.65s）、前交叉抱水、转身反弹与终点触壁全力释放，达标国家二级运动员并登上领奖台！
+            </p>
+
+            <div className="grid-2" style={{ gap: '12px' }}>
+              <div style={{ background: 'rgba(52, 199, 89, 0.04)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: '#248a3d', display: 'block', marginBottom: '4px' }}>赛前精细调教：</strong>
+                • 赛前 14 天开始逐步减少游程，保证肌肉神经超量恢复<br />
+                • 模拟市长杯检录流程与发令枪声起跳<br />
+                • 呼吸战术：前 15m 不换气，全程仅呼吸 3~4 次
+              </div>
+              <div style={{ background: 'rgba(52, 199, 89, 0.04)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ color: '#248a3d', display: 'block', marginBottom: '4px' }}>决战圆满成果：</strong>
+                • 50m 自由泳决赛用时：<strong>≤ 31.50 秒（荣膺国家二级运动员）</strong><br />
+                • 50m 仰泳达标：<strong>≤ 36.50 秒</strong><br />
+                • 获得杭州市市长杯决赛奖牌，锁定杭州市二线队升队选拔席位！
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Sub-Tab 2: Dryland Fitness & Flexibility Plan */}
-      {activeSubTab === 'fitness' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+      {/* Tab 2: Turn & Start Details */}
+      {activeSubTab === 'turn_start' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           <div className="glass-card">
-            <h3 className="mb-sm flex-gap-sm" style={{ color: '#ff9500' }}>
-              <HeartPulse size={20} />
-              维度二：6-7岁幼少儿陆上体能与柔韧敏感期科学方案
+            <h3 className="mb-sm flex-gap-sm">
+              <Zap size={20} style={{ color: '#ff9500' }} />
+              市长杯决战抢分利器：出发与滚翻转身 (减耗 1.5~2.0 秒实战教案)
             </h3>
-            <div style={{ background: 'rgba(255, 59, 48, 0.08)', border: '1px solid rgba(255, 59, 48, 0.2)', padding: '12px 16px', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)', fontSize: '0.88rem', color: 'rgb(200, 30, 20)' }}>
-              <strong>⚠️ 6-7岁少儿体能训练第一铁律：</strong> 该年龄段骨骼骨骺板未闭合、软骨组织占比较高，<strong>严禁进行深蹲负重、杠铃抓举、哑铃大重量抗阻等器械负荷</strong>！体能训练重心必须100%集中于：<strong>核心抗旋稳定性、肩踝关节柔韧度、下肢弹跳协调性、神经灵敏反应</strong>。
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '16px' }}>
+              短距离 50 米比赛胜负往往在毫厘之间。通过出发反应时压缩 0.15s、滚翻转身提速 0.8s、水下海豚腿多滑行 1.5m， Nico 可在不额外增加耗能的情况下直接减掉 1.5 秒以上！
+            </p>
+
+            <div className="grid-3" style={{ gap: '16px' }}>
+              {/* Point 1 */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#0071e3', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>1</span>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>跳台出发反应与“穿针入水”</h4>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
+                  • <strong>准备口令：</strong>双手紧扣起跳台前沿，重心前移至大拇指，双眼凝视池壁前方1米水面。<br />
+                  • <strong>发令反应：</strong>听枪声下肢爆发后蹬，躯干呈流线型向前上方跃出，<strong>反应时控制在 &lt; 0.68秒</strong>。<br />
+                  • <strong>穿针入水：</strong>双手、头、躯干与双腿从水面同一个洞滑入，将入水阻力降到绝对最低。
+                </div>
+              </div>
+
+              {/* Point 2 */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#ff9500', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>2</span>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>进出池壁“无呼吸折叠滚翻”</h4>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
+                  • <strong>进壁前 5 米：</strong>坚决禁止抬头换气，保持游进全速，以胸口带动低头切水。<br />
+                  • <strong>高速折叠：</strong>以肚脐为圆心收腹屈膝，像弹簧一样瞬间翻转，双脚掌快速触碰池壁。<br />
+                  • <strong>强力反弹：</strong>双腿蹬壁瞬间双臂紧夹耳朵，身体以仰卧或侧卧姿势飞速反弹射出。
+                </div>
+              </div>
+
+              {/* Point 3 */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#34c759', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>3</span>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>水下海豚腿与破水衔接</h4>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
+                  • <strong>水下 4~5 次大推进海豚腿：</strong>利用 Nico 天生大脚蹼优势，利用波浪由胸部传至脚踝，高速滑行破水。<br />
+                  • <strong>出水破面点：</strong>稳定越过 <strong>5 米红线</strong>，出水瞬间第一下划臂借势加速，严禁出水立刻仰头呼吸！
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Dryland Fitness */}
+      {activeSubTab === 'dryland' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          <div className="glass-card">
+            <h3 className="mb-sm flex-gap-sm">
+              <HeartPulse size={20} style={{ color: '#ff2d55' }} />
+              市长杯二级发动机：陆上体能与敏感期爆发力方案
+            </h3>
+            
+            <div style={{ background: 'rgba(255, 149, 0, 0.08)', border: '1px solid rgba(255, 149, 0, 0.2)', padding: '12px 16px', borderRadius: 'var(--radius-md)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <ShieldAlert size={20} color="#ff9500" />
+              <span style={{ fontSize: '0.85rem', color: 'var(--primary-color)' }}>
+                <strong>少儿发育安全第一：</strong>Nico 当前 6.5 岁，处于神经反应与柔韧敏感期。<strong>严禁使用杠铃深蹲或大重量器械</strong>，以自重弹跳、核心平衡与关节拉伸为主。
+              </span>
             </div>
 
             <div className="grid-3" style={{ gap: '16px' }}>
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px' }}>
-                  1. 核心与姿态控制 (水中平漂身躯)
+              {/* Exercise 1 */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary-color)', marginBottom: '8px' }}>
+                  1. 下肢爆发力 (目标跳远 ≥ 160cm)
                 </h4>
-                <ul style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6, paddingLeft: '16px' }}>
-                  <li><strong>标准静态平板支撑：</strong> 目标 60-90 秒。要求头、背、臀、脚跟成绝对直线，不塌腰、不翘臀。</li>
-                  <li><strong>俯卧两头起 (小飞燕)：</strong> 每次保持 3 秒，15次/组，强化竖脊肌与后背链，防止水中沉臀。</li>
-                  <li><strong>死虫式 (Dead Bug)：</strong> 仰卧四肢对角线延展伸缩，20次/组，建立水中换气时不失核心平衡的控制力。</li>
-                </ul>
+                <div style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
+                  • <strong>原地单脚跳/双脚连续障碍跳：</strong>每周 2 次，每次 3 组×15次，刺激足弓弹性储能。<br />
+                  • <strong>敏捷梯脚步频率练习：</strong>高频碎步与开合跳，锻炼下肢神经肌肉放电频率。<br />
+                  • <strong>实效转化：</strong>起跳台腾空距离更远，入水即自带 0.3 秒初速度优势。
+                </div>
               </div>
 
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#af52de', marginBottom: '8px' }}>
-                  2. 游泳专项肩踝柔韧 (双蹼与高肘硬件)
+              {/* Exercise 2 */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary-color)', marginBottom: '8px' }}>
+                  2. 核心刚性支撑 (目标平板 ≥ 120s)
                 </h4>
-                <ul style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6, paddingLeft: '16px' }}>
-                  <li><strong>踝关节跪压脚背：</strong> 每天 10-15 分钟。脚背完全贴地跪坐，必要时双膝下垫毛巾微抬，拉长足背韧带，打造顶级脚蹼。</li>
-                  <li><strong>肩关节转肩拉伸：</strong> 双手持跳绳/木棍做前后过肩，测量脱手宽度，目标接近肩宽 1.2 倍。</li>
-                  <li><strong>坐位体前屈牵拉：</strong> 双腿并拢膝盖贴地，双手触碰脚尖并越过脚掌，保障出发翻转时躯干折叠速度。</li>
-                </ul>
+                <div style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
+                  • <strong>标准平板支撑：</strong>每次 3 组，每组 60~90 秒，腹横肌收紧，背部保持水平线。<br />
+                  • <strong>瑞士球流线型俯卧挺身：</strong>双臂伸直夹耳，锻炼背阔肌与深层竖脊肌抗旋转力。<br />
+                  • <strong>实效转化：</strong>50米冲刺全程躯干无塌陷，游速越快阻力系数越小。
+                </div>
               </div>
 
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#34c759', marginBottom: '8px' }}>
-                  3. 弹跳爆发与敏捷反应 (出发蹬壁原型)
+              {/* Exercise 3 */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary-color)', marginBottom: '8px' }}>
+                  3. 踝肩极度柔韧 (守护天然脚蹼)
                 </h4>
-                <ul style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6, paddingLeft: '16px' }}>
-                  <li><strong>立定跳远技术强化：</strong> 摆臂屈膝蹬地，目标 135-145 cm。直接对应池壁转身蹬击反作用力。</li>
-                  <li><strong>单双脚敏捷梯连续跳：</strong> 刺激脚踝弹性势能储存与足弓刚性。</li>
-                  <li><strong>发令声反应起跳：</strong> 闭眼听掌声/哨声瞬间向垫子扑跳入水姿势，训练前庭神经与声感反应时。</li>
-                </ul>
+                <div style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.6 }}>
+                  • <strong>跪姿踝背屈压脚面操：</strong>课前课后各 3 分钟，巩固脚踝超长背屈范围。<br />
+                  • <strong>绳操肩部环绕拉伸：</strong>双手握拉伸带由前往后匀速翻转，保持肩关节脱手宽在优秀区间。<br />
+                  • <strong>实效转化：</strong>打腿如鞭，每一脚都能切中水流核心受压面。
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Sub-Tab 3: Nutrition & Bio-Recovery Plan */}
+      {/* Tab 4: High-Intensity Nutrition */}
       {activeSubTab === 'nutrition' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           <div className="glass-card">
-            <h3 className="mb-sm flex-gap-sm" style={{ color: '#248a3d' }}>
-              <Apple size={20} />
-              维度三：大关少体校专业营养配比与黄金恢复食谱
+            <h3 className="mb-sm flex-gap-sm">
+              <Apple size={20} style={{ color: '#34c759' }} />
+              高强度走训期专属营养方案 (打赢15个月体能消耗战)
             </h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--secondary-color)', marginBottom: 'var(--space-md)' }}>
-              游泳是全身高能量消耗运动，水温吸热加快基础代谢。6岁女童处在骨骼拉长黄金期，必须保证<strong>“高密度优质能量、精准修复时机、深度生长激素睡眠”</strong>。
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '16px' }}>
+              6-7 岁三线走训每天水上消耗超过 600-800 千卡。吃对吃好不仅能防运动性贫血，更能在黄金深睡期促进生长激素成倍释放！
             </p>
 
             <div className="grid-2" style={{ gap: '16px' }}>
-              {/* Timeline Strategy */}
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '10px' }}>
-                  ⏰ 训练日进餐时间轴精准策略
+              {/* Daily Meal Schedule */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-color)', marginBottom: '10px' }}>
+                  ⏰ 走训日“三餐两点”作息食谱
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', lineHeight: 1.6 }}>
-                  <div style={{ padding: '8px 12px', background: 'rgba(0, 113, 227, 0.04)', borderRadius: '8px' }}>
-                    <strong>课前 60 - 90 分钟（稳态充能）：</strong><br />
-                    • 推荐：香蕉半根/1根 + 全麦吐司1片 / 杂粮粥1小碗 + 温水 150ml。<br />
-                    • 禁忌：严禁吃油炸食物、奶油、大量肥肉（导致消化停滞、水中胃痉挛反胃）。
-                  </div>
-                  <div style={{ padding: '8px 12px', background: 'rgba(52, 199, 89, 0.04)', borderRadius: '8px' }}>
-                    <strong>课中每 20 分钟（水合电解质）：</strong><br />
-                    • 泳池即使不出汗感觉，身体也处在脱水状态。准备专属水壶，备好低浓度淡盐水或果汁稀释水，润口小口慢咽。
-                  </div>
-                  <div style={{ padding: '8px 12px', background: 'rgba(255, 149, 0, 0.04)', borderRadius: '8px' }}>
-                    <strong>课后 30 分钟内（黄金修复窗口）：</strong><br />
-                    • 肌糖原合成酶活性最高时机。立即饮用脱脂/低脂温纯牛奶 200-250ml + 水煮蛋1个 + 少量蓝莓/葡萄干。<br />
-                    • 快速修复受损肌肉微纤维，阻止肌肉组织自身分解供能。
-                  </div>
-                  <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.02)', borderRadius: '8px' }}>
-                    <strong>正餐晚餐（19:00左右）：</strong><br />
-                    • 优质蛋白质（清蒸海鱼/去皮鸡胸/瘦牛肉 80-100g）+ 充足深色蔬菜（西兰花/菠菜 150g）+ 优质碳水（杂粮饭 1碗）。
-                  </div>
+                <div style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--primary-color)' }}>
+                  • <strong>早餐 (07:15)：</strong>煮鸡蛋1个 + 全麦面包2片 + 纯牛奶200ml + 奇异果/苹果半个<br />
+                  • <strong>午餐 (12:00)：</strong>清蒸鲈鱼/牛里脊肉 100g + 西兰花/胡萝卜 150g + 五谷米饭大半碗<br />
+                  • <strong>训前加餐 (15:30，课前1小时)：</strong>香蕉半根 + 全麦小饼干2片 + 温开水150ml (快速补糖)<br />
+                  • <strong>水上训练中 (16:30-18:15)：</strong>每 20 分钟小口补充稀释温蜂蜜水或少儿电解质水 80ml<br />
+                  • <strong>训后黄金30分 (18:25)：</strong>温纯牛奶 250ml + 水煮蛋清 1 个 (肌肉超量修复黄金期)<br />
+                  • <strong>晚餐 (19:15)：</strong>鲜虾/鸡胸肉 + 豆腐菠菜汤 + 杂粮粥 1 碗
                 </div>
               </div>
 
-              {/* Micronutrients & Sleep */}
-              <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '10px' }}>
-                  🦴 骨骼长高、抗贫血与生长激素管理
+              {/* Supplements & Sleep */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#34c759', marginBottom: '10px' }}>
+                  💊 骨骼微量元素与生长素深睡守则
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', lineHeight: 1.6 }}>
-                  <div style={{ padding: '8px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '8px' }}>
-                    <strong>1. 骨量储备与身高峰值（钙 + 维生素D3）：</strong><br />
-                    每日保证 500ml 优质牛奶或酸奶，搭配维生素D3促进肠道钙吸收。骨骼纵向拉长是游泳顶尖选手的硬件天花板。
-                  </div>
-                  <div style={{ padding: '8px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '8px' }}>
-                    <strong>2. 防范少儿游泳运动性贫血（铁 + 维C）：</strong><br />
-                    水中高频足部拍打可能导致足底微血管红细胞机械性破坏。每周摄入 2 次猪肝/鸭血或红瘦肉，搭配富含维生素C的水果（猕猴桃、橙子）。
-                  </div>
-                  <div style={{ padding: '8px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '8px' }}>
-                    <strong>3. 夜间生长激素分泌黄金窗口：</strong><br />
-                    生长激素（HGH）在夜间 <strong>22:00 - 02:00</strong> 深度睡眠期呈脉冲式爆发分泌。要求 Nico 在 <strong>21:15 前洗漱完毕上床</strong>，确保每晚 <strong>9.5 - 10 小时</strong> 深度睡眠，关掉小夜灯保持完全黑暗。
-                  </div>
+                <div style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--primary-color)' }}>
+                  • <strong>钙 + 维生素D3：</strong>每日随晚餐补充少儿液体乳钙（600mg）+ 400IU VD3，配合晒太阳促进纵向骨骼生长。<br />
+                  • <strong>铁 + 维生素C：</strong>每周 2 次新鲜猪肝或红肉，配合富含 VC 水果，坚决预防“女童运动性隐性贫血”。<br />
+                  • <strong>深睡眠红线：</strong>每晚 <strong>21:15 前</strong> 关灯上床，确保 22:00 前进入深睡状态（脑垂体分泌生长素高峰期在 22:00 - 02:00）。<br />
+                  • <strong>清晨晨脉监测：</strong>起床前自测 60 秒脉搏。基线维持在 <strong>70~73 次/分</strong>。若高于基线 6 次以上，当天水上课降为技术慢游。
                 </div>
               </div>
             </div>
@@ -379,111 +443,41 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
         </div>
       )}
 
-      {/* Sub-Tab 4: Master of Sports Pathway & Standards */}
-      {activeSubTab === 'roadmap' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+      {/* Tab 5: Mayor's Cup Strategy */}
+      {activeSubTab === 'strategy' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           <div className="glass-card">
-            <h3 className="mb-sm flex-gap-sm" style={{ color: '#d35400' }}>
-              <Target size={20} />
-              维度四：国家健将级游泳运动员梯次晋级路线图谱
+            <h3 className="mb-sm flex-gap-sm">
+              <Flag size={20} style={{ color: '#248a3d' }} />
+              2027 市长杯决赛战术与赛前减量巅峰策略 (Tapering)
             </h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--secondary-color)', marginBottom: 'var(--space-md)' }}>
-              按照国家体育总局最新《游泳运动员技术等级标准》，梳理从“杭州大关三线队走训”到“国家级运动健将”的递进里程碑。
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '16px' }}>
+              如何在大战来临前将竞技状态调整至最兴奋点，并在 50 米决赛中战胜心魔、破壁封王？
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Stage 1 */}
-              <div style={{ display: 'flex', gap: '14px', background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid rgba(52, 199, 89, 0.4)' }}>
-                <div style={{ minWidth: '80px', textAlign: 'center' }}>
-                  <span style={{ background: '#34c759', color: '#fff', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>
-                    当前阶段
-                  </span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>6-7 岁</div>
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-color)' }}>
-                    阶段一：杭州大关三线运动员立足与水感打底 (已顺利达标入选)
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.5, marginTop: '4px' }}>
-                    • <strong>核心任务：</strong> 适度走训出勤节奏，50米自由泳从 1:14 稳步提升至 1:04。四式动作定型，掌握高肘抱水和蹬壁滑行。<br />
-                    • <strong>考核指标：</strong> 大关队内月度测验合格，全勤完成每日水上1500m-1800m包。
-                  </p>
+            <div className="grid-2" style={{ gap: '16px' }}>
+              {/* Strategy 1: Tapering */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0071e3', marginBottom: '8px' }}>
+                  1. 赛前 14 天梯度减量（Tapering）
+                </h4>
+                <div style={{ fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--secondary-color)' }}>
+                  • <strong>第 1 周（赛前 D-14 至 D-7）：</strong>游程减少 25%，保持极短距离 15m 爆发力刺激。<br />
+                  • <strong>第 2 周（赛前 D-7 至 D-1）：</strong>游程减少 50%，以水感、转身蹬壁滑行和听枪起跳为主。<br />
+                  • <strong>赛前前夜：</strong>清淡碳水为主，热水温水擦身，做 10 分钟心理积极成像演练。
                 </div>
               </div>
 
-              {/* Stage 2 */}
-              <div style={{ display: 'flex', gap: '14px', background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <div style={{ minWidth: '80px', textAlign: 'center' }}>
-                  <span style={{ background: 'var(--accent-color)', color: '#fff', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>
-                    近程目标
-                  </span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>7-8 岁</div>
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-color)' }}>
-                    阶段二：杭州“市长杯”少儿游泳赛亮相与破1分钟冲刺
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.5, marginTop: '4px' }}>
-                    • <strong>核心任务：</strong> 代表大关队出征拱墅区中小学生赛与杭州市长杯。50米自由泳目标 <strong>突破 58.00 秒大关</strong>。<br />
-                    • <strong>考核指标：</strong> 200米个人混合泳能够以标准动作无扣分完赛，具备正式大赛竞技心理。
-                  </p>
-                </div>
-              </div>
-
-              {/* Stage 3 */}
-              <div style={{ display: 'flex', gap: '14px', background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <div style={{ minWidth: '80px', textAlign: 'center' }}>
-                  <span style={{ background: '#af52de', color: '#fff', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>
-                    等级起点
-                  </span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>9-10 岁</div>
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-color)' }}>
-                    阶段三：国家三级运动员达标 (女子 50自 35.00s / 100自 1:18.00)
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.5, marginTop: '4px' }}>
-                    • <strong>核心任务：</strong> 取得中国游泳协会颁发的首张正式国家等级运动员证书。开始进入大容量有氧基础扩张期。<br />
-                    • <strong>考核指标：</strong> 转身蹬壁海豚腿出水达到5米线以上，打腿具备高频六次腿本能。
-                  </p>
-                </div>
-              </div>
-
-              {/* Stage 4 */}
-              <div style={{ display: 'flex', gap: '14px', background: '#fff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--card-border)' }}>
-                <div style={{ minWidth: '80px', textAlign: 'center' }}>
-                  <span style={{ background: '#ff9500', color: '#fff', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>
-                    竞技分水岭
-                  </span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>11-13 岁</div>
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-color)' }}>
-                    阶段四：国家二级运动员认证 (女子 50自 31.50s / 100自 1:09.50)
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.5, marginTop: '4px' }}>
-                    • <strong>核心任务：</strong> 竞技体育黄金分水岭。达到国家二级后，已具备国内所有一流重点初高中高水平运动队特招资格。<br />
-                    • <strong>考核指标：</strong> 有机会选拔进入市二线集训队或省少体校预备组。
-                  </p>
-                </div>
-              </div>
-
-              {/* Stage 5 */}
-              <div style={{ display: 'flex', gap: '14px', background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 149, 0, 0.08) 100%)', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid rgba(255, 149, 0, 0.3)' }}>
-                <div style={{ minWidth: '80px', textAlign: 'center' }}>
-                  <span style={{ background: '#d35400', color: '#fff', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>
-                    最高殿堂
-                  </span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>14-16 岁+</div>
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#d35400' }}>
-                    阶段五：国家级运动健将 (女子 50自 26.50s / 100自 57.50s)
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', lineHeight: 1.5, marginTop: '4px' }}>
-                    • <strong>终极目标：</strong> 代表浙江省/国家征战全国游泳锦标赛、全运会乃至国际泳联大赛。大关学姐（陈慧佳、杨雨）曾经登顶的巅峰！<br />
-                    • <strong>考级达标：</strong> 国家健将级认证直接享有顶尖高校免试保送及国家队集训荣誉。
-                  </p>
+              {/* Strategy 2: 50m Free Race Pacing */}
+              <div style={{ background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#248a3d', marginBottom: '8px' }}>
+                  2. 女子 50米自由泳 决赛分段战术（冲刺 31.50s）
+                </h4>
+                <div style={{ fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--secondary-color)' }}>
+                  • <strong>0 ~ 15m (起跳潜泳)：</strong>发令枪响瞬间蹬出，水下海豚腿 4 次，破水前绝对不抬头，用时控制在 8.5 秒内。<br />
+                  • <strong>15 ~ 25m (途中前程)：</strong>高频6次腿全力输出，大臂高肘抱水滑行，保持身体如冰刀切水。<br />
+                  • <strong>25 ~ 35m (转身减耗)：</strong>快速贴水折叠，强力蹬壁射出，反弹越过 5 米线。<br />
+                  • <strong>35 ~ 50m (拼死冲刺)：</strong>最后 10 米全油门，最后 5 米低头屏气，双手如闪电砸向终点触壁感应板！
                 </div>
               </div>
             </div>
