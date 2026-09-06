@@ -174,7 +174,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
         const latest = free50Records[free50Records.length - 1];
         const diff = (first.seconds - latest.seconds).toFixed(2);
         if (diff > 0) {
-          swimProgression.push(`⚡ <strong>50米自由泳从初测 ${first.time} 飙升至 ${latest.time}，累计缩短 ${diff} 秒！</strong> 这标志着暑期打腿基础全面成型，已成功叩开大关三线大门。`);
+          swimProgression.push(`⚡ <strong>50米自由泳从初测 ${first.time} 跃升至最新实测 ${latest.time}，累计缩短 ${diff} 秒！</strong> 较入队前测再提速 1.2 秒，距离打破 1 分钟（60秒）大关仅差 3.0 秒，动作流线感与打腿动力持续提升！`);
         }
       } else if (free50Records.length === 1) {
         swimProgression.push(`⏱️ <strong>50米自由泳基准成绩为 ${free50Records[0].time}</strong>，展现出优秀的大关三线水动力雏形。`);
@@ -341,9 +341,9 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)' }}>阶段一：自仰动作精雕</span>
               <span style={{ fontSize: '0.68rem', background: 'rgba(0, 113, 227, 0.1)', color: 'var(--accent-color)', padding: '2px 6px', borderRadius: '8px', fontWeight: 600 }}>当前攻坚</span>
             </div>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>冲刺 54 - 56 秒</div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>破 1 分钟 ➔ 冲 54-56 秒</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              2026.09 - 2026.12 | 自由泳侧向转体呼吸 + 仰泳平躺打腿
+              最新实测 63.00s (距破分仅3s) | 自由泳转体侧向换气 + 仰泳平躺打腿
             </div>
           </div>
 
