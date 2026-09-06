@@ -373,10 +373,10 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
               <div style={{ background: 'rgba(0, 113, 227, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #0071e3' }}>
                 <div className="flex-between" style={{ marginBottom: '4px' }}>
                   <strong style={{ color: '#0071e3', fontSize: '0.95rem' }}>2026 秋冬季 (当前 6.5岁)：自仰动作规范定型</strong>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary-color)' }}>50自稳步冲刺 54-56 秒</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary-color)' }}>实测 63.00s ➔ 破1分钟 ➔ 冲 54-56秒</span>
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', lineHeight: 1.5 }}>
-                  在每天 1 小时的 15 人走训课中，把自由泳咬苹果换气和仰泳平躺打腿彻底定型，形成肌肉本能。
+                  在每天 1 小时的 15 人走训课中，把自由泳咬苹果侧向换气和仰泳平躺打腿彻底定型。最新实测达 63.00 秒，较前测再提速 1.2 秒，距离破 1 分钟大关仅差 3.0 秒！
                 </div>
               </div>
 
