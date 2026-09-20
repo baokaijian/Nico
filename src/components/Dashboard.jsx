@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
-import { TrendingUp, Ruler, Scale, Activity, Sparkles, Award, ShieldCheck, Target, Clock } from 'lucide-react';
+import { TrendingUp, Ruler, Scale, Activity, Sparkles, Award, ShieldCheck, Target, Clock, Zap } from 'lucide-react';
 
 export default function Dashboard({ growthRecords, swimRecords, trainings, fitnessRecords, nutritionRecords, goals }) {
   const [selectedStroke, setSelectedStroke] = useState('自由泳');
@@ -53,15 +53,24 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
   const diffTime = targetDate - today;
   const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  // 50m Freestyle 2nd Tier Benchmark
-  const LEVEL_2_FREE_50M = 31.50; // seconds
+  // 50m Freestyle Benchmarks
+  const LEVEL_2_FREE_50M = 31.50; // seconds (National 2nd Tier)
+  const TIER_2_SELECTION_50M = 40.00; // seconds (Daguan Tier 2 Selection Standard)
   const INITIAL_FREE_50M = 74.00; // Nico's starting time (1:14.00)
 
   const current50mFreeRecord = (swimRecords || [])
     .filter(r => r.stroke === '自由泳' && r.distance === '50m')
     .sort((a, b) => (a.seconds || 999) - (b.seconds || 999))[0];
 
-  const currentBestSeconds = current50mFreeRecord ? current50mFreeRecord.seconds : 64.20;
+  const currentBestSeconds = current50mFreeRecord ? current50mFreeRecord.seconds : 56.17;
+  
+  // Gap to Daguan Tier 2 (< 40.00s)
+  const deltaToTier2 = Math.max(0, currentBestSeconds - TIER_2_SELECTION_50M).toFixed(2);
+  const totalGapToTier2 = INITIAL_FREE_50M - TIER_2_SELECTION_50M; // 34.00s
+  const gapClosedTier2 = Math.max(0, INITIAL_FREE_50M - currentBestSeconds);
+  const progressPercentTier2 = Math.min(100, Math.max(0, Math.round((gapClosedTier2 / totalGapToTier2) * 100)));
+
+  // Gap to National Level 2 (31.50s)
   const deltaToLevel2 = Math.max(0, currentBestSeconds - LEVEL_2_FREE_50M).toFixed(2);
   const totalGapToClose = INITIAL_FREE_50M - LEVEL_2_FREE_50M; // 42.50s
   const gapClosed = Math.max(0, INITIAL_FREE_50M - currentBestSeconds);
@@ -174,7 +183,9 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
         const latest = free50Records[free50Records.length - 1];
         const diff = (first.seconds - latest.seconds).toFixed(2);
         if (diff > 0) {
-          swimProgression.push(`⚡ <strong>50米自由泳从初测 ${first.time} 跃升至最新实测 ${latest.time}，累计缩短 ${diff} 秒！</strong> 较入队前测再提速 1.2 秒，距离打破 1 分钟（60秒）大关仅差 3.0 秒，动作流线感与打腿动力持续提升！`);
+          swimProgression.push(`⚡ <strong>50米自由泳突破 1 分钟大关，实测斩获 ${latest.time}（56.17s）个人新 PB！</strong> 从初测 ${first.time} 累计大幅缩短 ${diff} 秒！小候鸟比赛首秀发挥惊艳，较两周前（63.00s）再提速 6.83 秒，展现出极佳的比赛爆发力与动作定型效果。`);
+          swimProgression.push(`🎯 <strong>核心战役目标对齐：距离大关二线队选拔标准（50自 < 40.00s）尚差 ${deltaToTier2} 秒！</strong> 目标完成度已达 ${progressPercentTier2}%，已成功跨越最艰苦的启蒙破分阶段，正式进入 16.17 秒时间账本技术攻坚期！`);
+          swimProgression.push(`🏁 <strong>终极目标追踪：距离 2027 市长杯国家二级标准（31.50s）尚差 ${deltaToLevel2} 秒。</strong> 进入大关二线将解锁出发台跳水与 1.5~2 小时集训资源，是达成二级的决定性战略支点。`);
         }
       } else if (free50Records.length === 1) {
         swimProgression.push(`⏱️ <strong>50米自由泳基准成绩为 ${free50Records[0].time}</strong>，展现出优秀的大关三线水动力雏形。`);
@@ -193,7 +204,25 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
           </p>
           <p style="margin: 0;">
             <strong>• 对标当代超新星 于子迪（世青赛/全国冠军，7-8岁向二级迈进）：</strong><br />
-            于子迪 6~7 岁时踝关节背屈与跟腱极度柔韧，踢水推进率极高。Nico 具备同样的天生脚蹼特征。只要严格遵循大关三线走训纪律，在 2027 年底市长杯决赛突破 31.50 秒达标国家二级运动员具有极高可行性。
+            于子迪 6~7 岁时踝关节背屈与跟腱极度柔韧，踢水推进率极高。Nico 具备同样的天生脚蹼特征。只要严格遵循大关走训纪律，先在 2027 年中冲入 40 秒内晋升大关二线，在 2027 年底市长杯决赛突破 31.50 秒达标国家二级运动员具有极高可行性。
+          </p>
+        </div>
+      </div>
+
+      <div style="background: rgba(255, 149, 0, 0.04); border-left: 4px solid #ff9500; padding: 14px 16px; border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-top: 12px;">
+        <h5 style="color: #d35400; margin-bottom: 6px; font-size: 0.95rem; font-weight: 700;">
+          📹 小候鸟 56.17s 比赛实况视频复盘与进二线（< 40s）技术攻坚：
+        </h5>
+        <div style="font-size: 0.88rem; line-height: 1.6; color: var(--primary-color);">
+          <p style="margin-bottom: 6px;">
+            <strong>【实况亮点】</strong> Nico 出发反应敏锐，入水后前程 25 米划幅舒展，侧向单镜贴水（咬苹果式换气）非常稳定，头部没有明显抬头阻力，展现了走训中优秀的肌肉记忆；后程最后 10 米体能意志坚定，打腿未见停滞。
+          </p>
+          <p style="margin: 0;">
+            <strong>【16.17 秒时间账本攻坚空间】</strong><br />
+            ① <strong>半程转身与蹬壁水下腿（挖潜 2.0~2.5s）：</strong> 触壁转身动作需更紧凑，脚蹬池壁反弹后保持绝对流线型并加打 3~4 次水下海豚腿；<br />
+            ② <strong>途中游高肘抱水压腕（挖潜 6.0~8.0s）：</strong> 彻底激活 14.2cm 大手掌的抱水力矩，从前交叉直臂逐步进化为高肘屈臂抓水，减少 50 米划水总次数；<br />
+            ③ <strong>池边出发俯冲反应（挖潜 1.5~2.0s）：</strong> 结合陆上立定跳远爆发力，强化发令声起跳蹬壁合力，入水滑行更深更远；<br />
+            ④ <strong>高频六次腿耐力（挖潜 4.0~5.0s）：</strong> 保持后程 15 米腿部高浮水体位，全力冲刺不减速。
           </p>
         </div>
       </div>
@@ -234,7 +263,22 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
                 gap: '4px'
               }}>
                 <Target size={13} />
-                终极战役战略目标
+                终极战略：2027 市长杯二级 (31.50s)
+              </span>
+              <span style={{ 
+                background: 'linear-gradient(135deg, #ff9500 0%, #ff5e3a 100%)', 
+                color: '#fff', 
+                fontSize: '0.75rem', 
+                padding: '4px 12px', 
+                borderRadius: '20px', 
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 2px 8px rgba(255, 149, 0, 0.3)'
+              }}>
+                <Zap size={13} />
+                核心攻坚战：进大关二线队 (50自 &lt; 40.00s)
               </span>
               <span style={{ 
                 background: 'rgba(0, 113, 227, 0.12)', 
@@ -244,7 +288,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
                 borderRadius: '20px', 
                 fontWeight: 700 
               }}>
-                大关走训实况：一周五练 · 每练1小时 (1:15大组)
+                大关走训实况：一周五练 · 1小时 (1:15大组)
               </span>
               <span style={{ 
                 background: 'rgba(52, 199, 89, 0.18)', 
@@ -254,15 +298,15 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
                 borderRadius: '20px', 
                 fontWeight: 700 
               }}>
-                当前：自由泳精雕 + 仰泳启蒙
+                最新实战：小候鸟 56.17s PB (破分大关)
               </span>
             </div>
             
             <h2 style={{ fontSize: '1.95rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, color: 'var(--primary-color)' }}>
-              2027 市长杯决赛 · 国家二级运动员冲刺工程
+              大关二线队伍选拔冲刺（&lt; 40s）· 2027 市长杯二级进阶工程
             </h2>
             <p style={{ color: 'var(--secondary-color)', fontSize: '0.92rem', marginTop: '6px' }}>
-              立足当前 <strong>一周五练 · 每次1小时 · 15人大组</strong> 实况，不盲目堆量，把 60 分钟自由泳转体与仰泳打腿质量拉满，稳扎稳打向 2027 年底市长杯二级标准（31.50s）推进！
+              基于小候鸟比赛 <strong>56.17s 个人新 PB</strong>（较初测累计提升 17.83s），锁定<strong>进大关二线队伍（50自 &lt; 40.00s，尚差 16.17s）</strong>核心攻坚战，解锁出发台跳水与 1.5~2h 专业训练，直通 2027 市长杯二级！
             </p>
           </div>
 
@@ -289,36 +333,69 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
           </div>
         </div>
 
-        {/* Delta Gap & Progress Bar */}
-        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(0, 113, 227, 0.15)' }}>
-          <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.85rem' }}>
-            <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>
-              50米自由泳达标差距闭合进度：
-              <span style={{ color: 'var(--accent-color)', marginLeft: '4px' }}>
-                当前最好 {currentBestSeconds.toFixed(2)}s ➔ 终极目标 {LEVEL_2_FREE_50M.toFixed(2)}s
+        {/* Dual Progress: Tier 2 (40.00s) & National Level 2 (31.50s) */}
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(0, 113, 227, 0.15)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Progress 1: Tier 2 selection (<40s) */}
+          <div>
+            <div className="flex-between" style={{ marginBottom: '6px', fontSize: '0.85rem' }}>
+              <span style={{ fontWeight: 700, color: '#d35400', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Zap size={14} style={{ color: '#ff9500' }} />
+                【核心攻坚】大关二线选拔达标进度（50米自由泳 &lt; 40.00s）：
+                <span style={{ color: 'var(--accent-color)', marginLeft: '4px', fontWeight: 600 }}>
+                  当前最好 {currentBestSeconds.toFixed(2)}s ➔ 二线门槛 40.00s
+                </span>
               </span>
-            </span>
-            <span style={{ fontWeight: 700, color: '#34c759' }}>
-              距国家二级相差 {deltaToLevel2} 秒 (已攻坚缩短 {gapClosed.toFixed(2)}s / 推进 {progressPercent}%)
-            </span>
+              <span style={{ fontWeight: 700, color: '#d35400' }}>
+                距进二线尚差 {deltaToTier2} 秒 (已攻坚缩短 {gapClosedTier2.toFixed(2)}s / 进度 {progressPercentTier2}%)
+              </span>
+            </div>
+            <div style={{ 
+              width: '100%', 
+              height: '14px', 
+              background: 'rgba(0, 0, 0, 0.06)', 
+              borderRadius: '20px', 
+              overflow: 'hidden',
+              position: 'relative' 
+            }}>
+              <div style={{ 
+                width: `${Math.max(10, progressPercentTier2)}%`, 
+                height: '100%', 
+                background: 'linear-gradient(90deg, #ff9500 0%, #ff5e3a 70%, #34c759 100%)', 
+                borderRadius: '20px',
+                transition: 'width 0.6s ease'
+              }} />
+            </div>
           </div>
 
-          {/* Progress Bar Visual */}
-          <div style={{ 
-            width: '100%', 
-            height: '14px', 
-            background: 'rgba(0, 0, 0, 0.06)', 
-            borderRadius: '20px', 
-            overflow: 'hidden',
-            position: 'relative' 
-          }}>
+          {/* Progress 2: Level 2 Athlete (31.50s) */}
+          <div>
+            <div className="flex-between" style={{ marginBottom: '6px', fontSize: '0.82rem' }}>
+              <span style={{ fontWeight: 600, color: 'var(--secondary-color)' }}>
+                【终极战略】2027 市长杯国家二级达标总进度（50米自由泳 ≤ 31.50s）：
+                <span style={{ color: 'var(--accent-color)', marginLeft: '4px' }}>
+                  当前最好 {currentBestSeconds.toFixed(2)}s ➔ 二级标准 {LEVEL_2_FREE_50M.toFixed(2)}s
+                </span>
+              </span>
+              <span style={{ fontWeight: 700, color: '#248a3d' }}>
+                距国家二级尚差 {deltaToLevel2} 秒 (推进 {progressPercent}%)
+              </span>
+            </div>
             <div style={{ 
-              width: `${Math.max(10, progressPercent)}%`, 
-              height: '100%', 
-              background: 'linear-gradient(90deg, #34c759 0%, #0071e3 100%)', 
-              borderRadius: '20px',
-              transition: 'width 0.6s ease'
-            }} />
+              width: '100%', 
+              height: '10px', 
+              background: 'rgba(0, 0, 0, 0.04)', 
+              borderRadius: '20px', 
+              overflow: 'hidden',
+              position: 'relative' 
+            }}>
+              <div style={{ 
+                width: `${Math.max(8, progressPercent)}%`, 
+                height: '100%', 
+                background: 'linear-gradient(90deg, #34c759 0%, #0071e3 100%)', 
+                borderRadius: '20px',
+                transition: 'width 0.6s ease'
+              }} />
+            </div>
           </div>
         </div>
 
@@ -338,12 +415,12 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
             boxShadow: '0 2px 8px rgba(0, 113, 227, 0.1)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)' }}>阶段一：自仰动作精雕</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)' }}>阶段一：破分巩固与自仰中轴</span>
               <span style={{ fontSize: '0.68rem', background: 'rgba(0, 113, 227, 0.1)', color: 'var(--accent-color)', padding: '2px 6px', borderRadius: '8px', fontWeight: 600 }}>当前攻坚</span>
             </div>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>破 1 分钟 ➔ 冲 54-56 秒</div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>稳扎 50-52 秒</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              最新实测 63.00s (距破分仅3s) | 自由泳转体侧向换气 + 仰泳平躺打腿
+              小候鸟首秀 56.17s (破1分大关) | 咬苹果侧向换气潜意识化 + 侧身蹬壁滑行
             </div>
           </div>
 
@@ -355,29 +432,30 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
             border: '1px solid rgba(0,0,0,0.08)' 
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff9500' }}>阶段二：迎春杯破三级</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff9500' }}>阶段二：迎春杯实战与提频</span>
               <span style={{ fontSize: '0.68rem', background: 'rgba(255, 149, 0, 0.1)', color: '#d35400', padding: '2px 6px', borderRadius: '8px', fontWeight: 600 }}>2027春</span>
             </div>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>突破 39.50 秒</div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>突破 43-45 秒</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              2027.01 - 2027.04 | 自仰双项兼修与斩获国家三级
+              2027.01 - 2027.04 | 杭州迎春杯大赛实战 | 高肘抱水长划幅 + 段落无氧冲刺
             </div>
           </div>
 
           {/* Phase 3 */}
           <div style={{ 
-            background: 'rgba(255, 255, 255, 0.7)', 
+            background: 'rgba(255, 245, 235, 0.95)', 
             padding: '12px', 
             borderRadius: '12px', 
-            border: '1px solid rgba(0,0,0,0.08)' 
+            border: '1.5px solid #ff9500',
+            boxShadow: '0 2px 8px rgba(255, 149, 0, 0.12)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#af52de' }}>阶段三：暑期逼近二级</span>
-              <span style={{ fontSize: '0.68rem', background: 'rgba(175, 82, 222, 0.1)', color: '#af52de', padding: '2px 6px', borderRadius: '8px', fontWeight: 600 }}>2027夏</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#d35400' }}>阶段三：【决战二线】突破40秒</span>
+              <span style={{ fontSize: '0.68rem', background: 'rgba(255, 149, 0, 0.2)', color: '#d35400', padding: '2px 6px', borderRadius: '8px', fontWeight: 700 }}>核心攻坚</span>
             </div>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary-color)' }}>突破 35.00 秒</div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#d35400' }}>突破 &lt; 40.00 秒 · 进二线！</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              2027.05 - 2027.08 | 大关暑期双训与自仰蛙三项融合
+              2027.05 - 2027.08 | 大关二线选拔大考 | 达标国家三级(39.50s) | 晋升二线队伍
             </div>
           </div>
 
@@ -389,12 +467,12 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
             border: '1px solid rgba(52, 199, 89, 0.3)' 
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#248a3d' }}>阶段四：市长杯决战</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#248a3d' }}>阶段四：市长杯决战二级</span>
               <span style={{ fontSize: '0.68rem', background: 'rgba(52, 199, 89, 0.15)', color: '#248a3d', padding: '2px 6px', borderRadius: '8px', fontWeight: 600 }}>2027冬</span>
             </div>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#248a3d' }}>突破 31.50 秒</div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#248a3d' }}>突破 ≤ 31.50 秒</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--secondary-color)', marginTop: '2px' }}>
-              2027.09 - 2027.12 | 决战市长杯并斩获国家二级证书！
+              2027.09 - 2027.12 | 依托二线跳台出发与大强度，市长杯决赛斩获国家二级！
             </div>
           </div>
         </div>
@@ -502,15 +580,18 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
         {/* Latest Achievement */}
         <div className="glass-card metrics-card">
           <div className="flex-between">
-            <span className="metrics-title">50米自由泳基准与差值</span>
+            <span className="metrics-title">50米自由泳基准与核心差值</span>
             <Activity size={18} style={{ color: '#34c759' }} />
           </div>
           <div className="metrics-value" style={{ fontSize: '1.75rem' }}>
             {latestSwim ? latestSwim.time : '--:--.--'}
           </div>
-          <div className="text-secondary" style={{ fontSize: '0.85rem' }}>
-            <span style={{ color: '#ff9500', fontWeight: 600 }}>
-              距离国家二级(31.50s) 尚差 {deltaToLevel2} 秒
+          <div className="text-secondary" style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ color: '#d35400', fontWeight: 700 }}>
+              距大关二线(&lt;40.00s) 尚差 {deltaToTier2} 秒 (进度 {progressPercentTier2}%)
+            </span>
+            <span style={{ color: 'var(--secondary-color)', fontSize: '0.78rem' }}>
+              距国家二级(31.50s) 尚差 {deltaToLevel2} 秒
             </span>
           </div>
         </div>
@@ -749,7 +830,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
         }}>
           <h3 className="mb-md flex-gap-sm" style={{ color: 'var(--accent-color)', fontWeight: 700 }}>
             <Sparkles size={20} fill="rgba(0, 113, 227, 0.2)" />
-            AI 智能教练战备研判 (冲刺 2027 市长杯决赛 · 国家二级运动员 15 个月演进分析)
+            AI 智能教练战备研判 (小候鸟实战复盘 · 冲刺大关二线 &lt; 40s 与 2027 市长杯二级)
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
@@ -771,7 +852,7 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
             {/* Swim performance */}
             <div>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '8px' }}>
-                🏊 大关三线水上速度跃迁与二级差距
+                🏊 大关三线水上速度跃迁与二线/二级差距追踪
               </h4>
               {analysis.swimProgression.length > 0 && (
                 <ul style={{ paddingLeft: '20px', fontSize: '0.9rem', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '6px', color: 'var(--primary-color)' }}>

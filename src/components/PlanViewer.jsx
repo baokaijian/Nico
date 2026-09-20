@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Waves, Apple, Printer, Zap, Flag, Users } from 'lucide-react';
+import { Waves, Apple, Printer, Zap, Flag, Users, Target, CheckCircle2 } from 'lucide-react';
 
 export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
-  const [activeSubTab, setActiveSubTab] = useState('water');
+  const [activeSubTab, setActiveSubTab] = useState('tier2_blueprint');
 
   const latestGrowth = growthRecords && growthRecords.length > 0 ? growthRecords[growthRecords.length - 1] : null;
   const latestSwim = swimRecords && swimRecords.length > 0 ? swimRecords[swimRecords.length - 1] : null;
@@ -31,6 +31,17 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
                 杭州大关三线走训队
               </span>
               <span style={{ 
+                background: 'linear-gradient(135deg, #ff9500 0%, #ff5e3a 100%)', 
+                color: '#fff', 
+                fontSize: '0.75rem', 
+                padding: '4px 12px', 
+                borderRadius: '20px', 
+                fontWeight: 700,
+                boxShadow: '0 2px 8px rgba(255, 149, 0, 0.3)'
+              }}>
+                核心攻坚：晋升大关二线队伍 (50自 &lt; 40.00s)
+              </span>
+              <span style={{ 
                 background: 'rgba(0, 113, 227, 0.12)', 
                 color: '#0071e3', 
                 fontSize: '0.75rem', 
@@ -48,14 +59,14 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
                 borderRadius: '20px', 
                 fontWeight: 700 
               }}>
-                自由泳精雕 + 仰泳启蒙
+                最新实战：小候鸟 56.17s 个人新 PB
               </span>
             </div>
             <h2 style={{ fontSize: '1.95rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, color: 'var(--primary-color)' }}>
-              Nico 竞技成长方案 · 1小时走训实效与市长杯二级进阶
+              Nico 竞技成长方案 · 冲刺大关二线（&lt; 40s）与 2027 市长杯二级进阶
             </h2>
             <p style={{ color: 'var(--secondary-color)', fontSize: '0.92rem', marginTop: '6px' }}>
-              紧密结合当前<strong>“一周五练、每次 1 小时、2 名教练各带 15 名学生、自由泳动作深入精雕 + 仰泳启蒙初学”</strong>的真实训练环境，定制最接地气的高效培养全案。
+              基于 2026-09-19 小候鸟比赛 <strong>56.17 秒</strong>（较初测累计提速 17.83s）最新战报与比赛录像，锁定<strong>“50米自由泳突破 40 秒以内 · 入选大关二线队”</strong>核心战略目标，制定 16.17 秒时间账本与系统提速方案。
             </p>
           </div>
 
@@ -79,21 +90,21 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
           gap: '12px' 
         }}>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>走训骨骼与水动力:</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>走训骨骼与水动力形态:</span>
             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--primary-color)' }}>
-              身高 {latestGrowth?.height || 129.6} cm | 臂展 {latestGrowth?.armSpan || 129.5} cm
+              身高 {latestGrowth?.height || 128.5} cm | 手长 14.2cm | 脚长 19.3cm (天生大蹼面)
             </div>
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>50m自当前PB:</span>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-color)' }}>
-              {latestSwim?.time || '01:04.20'} ➔ 终极目标 ≤ 31.50s
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>50m自当前PB与梯队差距:</span>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#d35400' }}>
+              实测 {latestSwim?.time || '00:56.17'} ➔ 二线门槛 &lt; 40.00s (相差 16.17s)
             </div>
           </div>
           <div>
             <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>走训累计总游程:</span>
             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#248a3d' }}>
-              {totalWaterMeters.toLocaleString()} 米 (打腿占比 ~42%)
+              {totalWaterMeters.toLocaleString()} 米 (专项打腿占比 ~42%)
             </div>
           </div>
         </div>
@@ -107,6 +118,15 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
         paddingBottom: '12px',
         overflowX: 'auto'
       }}>
+        <button 
+          className={`tab-btn ${activeSubTab === 'tier2_blueprint' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('tier2_blueprint')}
+          style={{ whiteSpace: 'nowrap', fontWeight: activeSubTab === 'tier2_blueprint' ? 700 : 500 }}
+        >
+          <Target size={16} />
+          <span>二线达标（&lt;40s）攻坚专项拆解</span>
+        </button>
+
         <button 
           className={`tab-btn ${activeSubTab === 'water' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('water')}
@@ -140,7 +160,7 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
           style={{ whiteSpace: 'nowrap' }}
         >
           <Apple size={16} />
-          <span>轻负荷日常营养与深睡</span>
+          <span>日常营养与体能自律</span>
         </button>
 
         <button 
@@ -149,9 +169,171 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
           style={{ whiteSpace: 'nowrap' }}
         >
           <Flag size={16} />
-          <span>市长杯二级稳步演进表</span>
+          <span>二线达标与市长杯演进表</span>
         </button>
       </div>
+
+      {/* Tab 0: Tier 2 (<40s) Selection Blueprint */}
+      {activeSubTab === 'tier2_blueprint' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          {/* Why Tier 2 Matters Hero */}
+          <div className="glass-card" style={{ 
+            background: 'linear-gradient(135deg, rgba(255, 149, 0, 0.08) 0%, rgba(0, 113, 227, 0.08) 100%)',
+            border: '1.5px solid rgba(255, 149, 0, 0.3)'
+          }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ 
+                  background: 'linear-gradient(135deg, #ff9500 0%, #ff5e3a 100%)', 
+                  color: '#fff', 
+                  fontSize: '0.75rem', 
+                  padding: '3px 10px', 
+                  borderRadius: '12px', 
+                  fontWeight: 700 
+                }}>
+                  核心目标解构
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary-color)' }}>
+                  为什么“进大关二线（&lt;40s）”是通往“二级运动员（31.50s）”的必经生命线？
+                </h3>
+              </div>
+              <span style={{ fontSize: '0.85rem', color: '#d35400', fontWeight: 700 }}>
+                当前差距：16.17 秒 (56.17s ➔ &lt; 40.00s)
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--primary-color)', lineHeight: 1.6, marginBottom: '14px' }}>
+              很多家长误以为从 56 秒提升到二级 31.50 秒只需要一直游下去，但在体制内竞技体育中，<strong>三线走训只是“选苗与动作塑形池”</strong>。若想冲击国家二级，必须在 7 岁半前攻入 <strong>40 秒以内成功晋升大关二线</strong>，获得精英级训练资源！
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.7)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div style={{ fontWeight: 700, color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '6px' }}>
+                  🏊 当前：大关三线走训队 (1小时/天)
+                </div>
+                <ul style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, paddingLeft: '16px', margin: 0 }}>
+                  <li><strong>课时与组别：</strong> 每次 60 分钟，2 名教练各带 15 名学员，单道人数拥挤</li>
+                  <li><strong>技术定位：</strong> 基础泳姿成型、水感游戏、自由泳咬苹果换气与仰泳平躺打腿</li>
+                  <li><strong>限制瓶颈：</strong> 无法系统练专业跳台出发与滚翻转身，缺乏高负荷乳酸耐受冲刺</li>
+                </ul>
+              </div>
+
+              <div style={{ background: 'rgba(255, 245, 235, 0.9)', padding: '14px', borderRadius: '10px', border: '1.5px solid #ff9500' }}>
+                <div style={{ fontWeight: 800, color: '#d35400', fontSize: '0.9rem', marginBottom: '6px' }}>
+                  🚀 跃迁：大关二线精英队伍 (&lt;40s 准入标准)
+                </div>
+                <ul style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, paddingLeft: '16px', margin: 0 }}>
+                  <li><strong>课时与组别：</strong> 训练增加至 <strong>每次 1.5~2 小时</strong>，单道 3~5 人，专属快道</li>
+                  <li><strong>高阶技术解禁：</strong> <strong>专业出发台跳水（Dive Start）</strong> 与 <strong>前滚翻转身（Flip Turn）</strong>，直接提速 3~4 秒！</li>
+                  <li><strong>终极赋能：</strong> 具备代表大关体校出征市级、省级达级赛的固定名额，直通市长杯！</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* 16.17 Seconds Time Budget Breakdown Card */}
+          <div className="glass-card">
+            <h3 className="mb-sm flex-gap-sm">
+              <Zap size={20} style={{ color: '#ff9500' }} />
+              16.17 秒时间账本科学拆解：从 56.17s 进击至 39.50s 的提速路径
+            </h3>
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.88rem', marginBottom: '16px' }}>
+              结合 Nico 手长 14.2cm（占身高 11.05%）、脚长 19.3cm（占身高 15.02%）的天赋形态，将 16.17 秒差距精确切片到 4 个关键技术模块中：
+            </p>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table className="history-table" style={{ fontSize: '0.85rem' }}>
+                <thead>
+                  <tr>
+                    <th>攻坚技术模块</th>
+                    <th>当前 56.17s 实测状态</th>
+                    <th>二线达标 &lt;40s 技术标准</th>
+                    <th>预期可挖潜提速</th>
+                    <th>日常落地训练方法</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#0071e3' }}>
+                      1. 出发起跳与入水滑行
+                    </td>
+                    <td>池边平缓蹬边入水，水下滑行仅约 3.5~4 米</td>
+                    <td>池边微屈俯冲爆发起跳，流线型打腿滑行至 6~7 米</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>省 1.5 ~ 2.0 秒</td>
+                    <td>立定跳远强化弹跳（冲145cm+），发令口令反应起跳训练</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#ff9500' }}>
+                      2. 半程转身与蹬壁水下腿
+                    </td>
+                    <td>手碰壁平转，蹬壁后无水下海豚腿直接划水</td>
+                    <td>快速侧身触壁 / 引入前滚翻，水下加打 3~4 次蝶泳腿出水</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>省 2.0 ~ 2.5 秒</td>
+                    <td>练习水下快速缩身收膝触壁，蹬壁后保持绝对流线型射出</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#af52de' }}>
+                      3. 途中游高肘抱水压腕
+                    </td>
+                    <td>前交叉直臂抢划，手长天赋未完全转化（划次约 48 次）</td>
+                    <td>高肘抱水锁住水层，利用 14.2cm 手掌抓满水，划次降至 38 次</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>省 6.0 ~ 8.0 秒</td>
+                    <td>单臂扶板分解划手、陆上弹力带高肘引臂划水、数划次长滑行</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#248a3d' }}>
+                      4. 高频六次腿耐力冲刺
+                    </td>
+                    <td>前程打腿有力，后程 15 米频率略有下降，脚踝轻微泛水</td>
+                    <td>全程鞭状六次腿不衰减，大脚蹼推水，最后 15 米全力无氧冲刺</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>省 4.0 ~ 5.0 秒</td>
+                    <td>25米段落冲刺打腿（25m × 6组，间歇20s），脚背踝柔韧压脚背</td>
+                  </tr>
+                  <tr style={{ background: 'rgba(52, 199, 89, 0.08)' }}>
+                    <td colSpan={3} style={{ fontWeight: 800, textAlign: 'right', color: 'var(--primary-color)' }}>
+                      合计可挖潜总提速空间：
+                    </td>
+                    <td colSpan={2} style={{ fontWeight: 800, color: '#248a3d', fontSize: '0.95rem' }}>
+                      预计缩短 13.5 ~ 17.5 秒 ➔ 目标实战成绩达到 38.60s ~ 39.80s（稳入二线！）
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Three Core Pillars for Nico */}
+          <div className="glass-card">
+            <h3 className="mb-sm flex-gap-sm" style={{ color: 'var(--primary-color)' }}>
+              <CheckCircle2 size={20} style={{ color: '#248a3d' }} />
+              结合 Nico 天赋形态的“进二线三大突围法则”
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+              <div style={{ background: 'rgba(0, 113, 227, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #0071e3' }}>
+                <strong style={{ color: '#0071e3', fontSize: '0.9rem' }}>法则一：大手掌变现“少划臂、长滑行”</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, marginTop: '6px', margin: 0 }}>
+                  Nico 手长 14.2cm（占身高 11.05%），天生抓水面积超前。在 1 小时走训课中，<strong>杜绝盲目高频摇橹式乱划</strong>。前手入水后保持前交叉“等待滑行”，手腕微屈形成厚实的抱水勺面，把每划前进距离由 0.95 米提升到 1.15 米。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(52, 199, 89, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #34c759' }}>
+                <strong style={{ color: '#248a3d', fontSize: '0.9rem' }}>法则二：大脚蹼保持“高浮水流线型”</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, marginTop: '6px', margin: 0 }}>
+                  脚长 19.3cm（占身高 15.02%）配合极优的脚踝柔韧性。打腿时大腿发力带小腿，脚背内旋下压像海豚摆尾，让下半身始终高浮于水面最高阻力层上方，将 50 米后半程的降速压到最低。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255, 149, 0, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #ff9500' }}>
+                <strong style={{ color: '#d35400', fontSize: '0.9rem' }}>法则三：15人大组坚决“领游不跟游”</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, marginTop: '6px', margin: 0 }}>
+                  小候鸟比赛游出 56.17s 证明 Nico 在组内处于绝对前列。在 15 人走训课中，务必让 Nico 排在<strong>前 1~2 名出发</strong>，全程游在平静水域，避免跟在别人身后吃涡流脏水，保护水感和划水动作标准度。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab 1: 60-Minute Efficient Water Sessions */}
       {activeSubTab === 'water' && (
@@ -362,54 +544,54 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
           <div className="glass-card">
             <h3 className="mb-sm flex-gap-sm">
               <Flag size={20} style={{ color: '#248a3d' }} />
-              稳扎稳打走向 2027 市长杯二级运动员的真实演进路径
+              二线队伍选拔达标（&lt;40s）与市长杯二级真实演进全景表
             </h3>
             <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '16px' }}>
-              为什么现阶段“每天 1 小时精雕动作”是通向 2027 年底国家二级运动员（31.50s）最科学的路径？因为优秀的流线型动作能将水阻降低 30%，比过早死堆体能更具爆发力！
+              基于小候鸟比赛 <strong>56.17 秒</strong> 破分突破，梯队晋升逻辑非常明确：<strong>在三线 1 小时课中把 50 米自提升至 40 秒内 ➔ 晋升大关二线队伍 ➔ 借助二线跳台出发与 1.5~2 小时大负荷 ➔ 冲击 2027 年底市长杯国家二级（31.50s）！</strong>
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Step 1 */}
               <div style={{ background: 'rgba(0, 113, 227, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #0071e3' }}>
                 <div className="flex-between" style={{ marginBottom: '4px' }}>
-                  <strong style={{ color: '#0071e3', fontSize: '0.95rem' }}>2026 秋冬季 (当前 6.5岁)：自仰动作规范定型</strong>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary-color)' }}>实测 63.00s ➔ 破1分钟 ➔ 冲 54-56秒</span>
+                  <strong style={{ color: '#0071e3', fontSize: '0.95rem' }}>阶段一：2026 秋冬季 (当前 6.5岁) · 破分巩固与稳扎 50 秒关口</strong>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary-color)' }}>实测 56.17s ➔ 冲击 50-52 秒 (距二线差 ~10s)</span>
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', lineHeight: 1.5 }}>
-                  在每天 1 小时的 15 人走训课中，把自由泳咬苹果侧向换气和仰泳平躺打腿彻底定型。最新实测达 63.00 秒，较前测再提速 1.2 秒，距离破 1 分钟大关仅差 3.0 秒！
+                  小候鸟比赛斩获 56.17 秒，较前测大幅提速 6.83 秒并击穿 1 分钟大关。当前核心是将“咬苹果侧向换气”完全形成潜意识肌肉记忆，严防抬头水阻；强化池壁快速侧身蹬壁滑行；仰泳 50 自摸底进入 1 分钟以内。
                 </div>
               </div>
 
               {/* Step 2 */}
               <div style={{ background: 'rgba(255, 149, 0, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #ff9500' }}>
                 <div className="flex-between" style={{ marginBottom: '4px' }}>
-                  <strong style={{ color: '#d35400', fontSize: '0.95rem' }}>2027 春季 (7.0岁)：迎春杯实战与突破国家三级</strong>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary-color)' }}>50自突破 39.50 秒 (国家三级)</span>
+                  <strong style={{ color: '#d35400', fontSize: '0.95rem' }}>阶段二：2027 春季 (7.0岁) · 迎春杯实战与提频突破 45 秒</strong>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary-color)' }}>50自突破 43-45 秒 (距二线差 3-5s)</span>
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', lineHeight: 1.5 }}>
-                  自仰双项兼备，动作阻力减小后单课游程自然提升至 1100m。通过迎春杯比赛正式跨过国家三级运动员门槛。
+                  自仰双项兼备，动作阻力减小后单课游程自然提升至 1100m。通过出战杭州迎春杯少儿赛，开始抓出发池边俯冲反应与途中高肘抱水压腕，大幅拉开划幅。
                 </div>
               </div>
 
               {/* Step 3 */}
-              <div style={{ background: 'rgba(175, 82, 222, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #af52de' }}>
+              <div style={{ background: 'rgba(255, 245, 235, 0.95)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #ff9500' }}>
                 <div className="flex-between" style={{ marginBottom: '4px' }}>
-                  <strong style={{ color: '#af52de', fontSize: '0.95rem' }}>2027 暑期 (7.5岁)：暑期大关特训突破 35 秒</strong>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary-color)' }}>50自逼近 33~35 秒</span>
+                  <strong style={{ color: '#d35400', fontSize: '0.95rem' }}>阶段三：2027 夏季 (7.5岁) · 【决战二线】突破 40 秒大关 · 成功晋升二线队！</strong>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#d35400' }}>50自突破 &lt; 40.00 秒 (冲 38-39s) · 跨过国家三级</span>
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', lineHeight: 1.5 }}>
-                  暑期集中强化蛙泳与蝶泳波浪腿，四式均衡发展，提升段落冲刺耐力，逼近二级门槛。
+                  大关二线梯队夏季考核选拔！通过滚翻转身（单次省 1.5~2s）与全程六次腿无衰减冲刺，成功跨过 40 秒二线硬指标（同步达标国家三级 39.50s），正式跨入大关二线队伍，开启每天 1.5~2 小时、专属跳台的高阶集训轨道！
                 </div>
               </div>
 
               {/* Step 4 */}
               <div style={{ background: 'rgba(52, 199, 89, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #34c759' }}>
                 <div className="flex-between" style={{ marginBottom: '4px' }}>
-                  <strong style={{ color: '#248a3d', fontSize: '0.95rem' }}>2027 年底市长杯决赛 (7.8岁)：斩获国家二级运动员！</strong>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#248a3d' }}>50自突破 ≤ 31.50 秒</span>
+                  <strong style={{ color: '#248a3d', fontSize: '0.95rem' }}>阶段四：2027 年底市长杯决赛 (7.8岁) · 二线专业平台爆发 · 斩获国家二级！</strong>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#248a3d' }}>50自突破 ≤ 31.50 秒 (国家二级)</span>
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', lineHeight: 1.5 }}>
-                  经过 15 个月的系统积淀，以完美的出发爆发力（0.65s）与超长划幅，在市长杯决赛中破壁达标国家二级运动员！
+                  在二线精英团队中历练半年，依托专业跳台出发（0.65s 爆发力）、精湛水下腿与超长划幅，在市长杯决赛中破壁达标国家二级运动员！
                 </div>
               </div>
             </div>
