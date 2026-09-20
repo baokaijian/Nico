@@ -292,21 +292,26 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
             </button>
           )}
 
-          {/* National Athlete Standards Reference Strip */}
+          {/* National Athlete Standards & Tier 2 Reference Strip */}
           <div style={{ marginTop: '16px', padding: '14px', background: 'rgba(0, 113, 227, 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 113, 227, 0.18)', fontSize: '0.82rem', lineHeight: 1.5 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
               <span style={{ fontWeight: 700, color: 'var(--accent-color)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                🎯 2027年底市长杯决战 · 国家女子游泳技术等级标准对照 (50米标准池)：
+                🎯 大关二线选拔标准与国家运动员等级对照 (50米标准池)：
               </span>
-              <span style={{ fontSize: '0.72rem', background: '#0071e3', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
-                终极目标：二级运动员
-              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <span style={{ fontSize: '0.72rem', background: '#ff9500', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                  核心门槛：进二线 ≤ 40.00s
+                </span>
+                <span style={{ fontSize: '0.72rem', background: '#0071e3', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                  终极荣誉：二级 ≤ 31.50s
+                </span>
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px', color: 'var(--primary-color)' }}>
-              <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--secondary-color)', fontSize: '0.75rem' }}>50m 自由泳 (主项)</span>
-                <div style={{ fontWeight: 700, color: '#0071e3' }}>二级 ≤ 31.50s</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>三级 39.5s | 健将 26.5s</div>
+              <div style={{ background: 'rgba(255,255,255,0.85)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,149,0,0.25)' }}>
+                <span style={{ color: '#d35400', fontSize: '0.75rem', fontWeight: 700 }}>50m 自由泳 (主项 · 进二线核心)</span>
+                <div style={{ fontWeight: 800, color: '#d35400' }}>二线门槛 ≤ 40.00s</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>二级 ≤ 31.50s | 三级 ≤ 39.50s</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px' }}>
                 <span style={{ color: 'var(--secondary-color)', fontSize: '0.75rem' }}>50m 仰泳 (兼项)</span>
@@ -362,7 +367,7 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
                   <th>日期</th>
                   <th>项目</th>
                   <th>成绩时间</th>
-                  <th>市长杯二级差距</th>
+                  <th>二线 / 二级差距</th>
                   <th>泳池</th>
                   <th style={{ textAlign: 'right' }}>操作</th>
                 </tr>
@@ -388,7 +393,35 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
                     <td>
                       {r.distance === '50m' && r.seconds ? (
                         (() => {
-                          const standards = { '自由泳': 31.50, '仰泳': 36.50, '蝶泳': 34.00, '蛙泳': 40.50 };
+                          if (r.stroke === '自由泳') {
+                            const diffTier2 = (r.seconds - 40.00).toFixed(2);
+                            const diffLevel2 = (r.seconds - 31.50).toFixed(2);
+                            if (r.seconds <= 31.50) {
+                              return (
+                                <span style={{ fontSize: '0.75rem', background: 'rgba(52,199,89,0.15)', color: '#248a3d', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                                  🎉 已达二级
+                                </span>
+                              );
+                            }
+                            if (r.seconds <= 40.00) {
+                              return (
+                                <span style={{ fontSize: '0.75rem', background: 'rgba(52,199,89,0.15)', color: '#248a3d', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                                  ✅ 达二线标 (距二级差 {diffLevel2}s)
+                                </span>
+                              );
+                            }
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '0.75rem', background: 'rgba(255,149,0,0.15)', color: '#d35400', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                                  距二线差 {diffTier2} 秒
+                                </span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>
+                                  距二级差 {diffLevel2} 秒
+                                </span>
+                              </div>
+                            );
+                          }
+                          const standards = { '仰泳': 36.50, '蝶泳': 34.00, '蛙泳': 40.50 };
                           const target = standards[r.stroke];
                           if (!target) return <span style={{ color: 'var(--secondary-color)', fontSize: '0.8rem' }}>--</span>;
                           const diff = (r.seconds - target).toFixed(2);
