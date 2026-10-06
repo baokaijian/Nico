@@ -54,6 +54,17 @@ export default function MediaGallery({ mediaList, onAddMedia, onDeleteMedia, ser
     }
   };
 
+  const getMediaUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const base = import.meta.env.BASE_URL || '/';
+    const cleanBase = base.endsWith('/') ? base : base + '/';
+    if (window.location.protocol === 'https:' || !serverUrl) {
+      return `${cleanBase}${url.replace(/^\//, '')}`;
+    }
+    return `${serverUrl}${url}`;
+  };
+
   return (
     <div>
       <div className="flex-between mb-lg">
@@ -74,7 +85,7 @@ export default function MediaGallery({ mediaList, onAddMedia, onDeleteMedia, ser
       {mediaList.length > 0 ? (
         <div className="media-grid">
           {mediaList.map((m) => {
-            const fileUrl = m.url.startsWith('http') ? m.url : `${serverUrl}${m.url}`;
+            const fileUrl = getMediaUrl(m.url);
             return (
               <div key={m.id} className="glass-card media-card">
                 <div 
@@ -252,14 +263,14 @@ export default function MediaGallery({ mediaList, onAddMedia, onDeleteMedia, ser
                 style={{ width: '100%', maxWidth: '800px', borderRadius: '12px' }}
               >
                 <source 
-                  src={activeMedia.url.startsWith('http') ? activeMedia.url : `${serverUrl}${activeMedia.url}`} 
+                  src={getMediaUrl(activeMedia.url)} 
                   type="video/mp4" 
                 />
                 您的浏览器不支持视频播放标签。
               </video>
             ) : (
               <img 
-                src={activeMedia.url.startsWith('http') ? activeMedia.url : `${serverUrl}${activeMedia.url}`} 
+                src={getMediaUrl(activeMedia.url)} 
                 alt={activeMedia.title} 
                 className="lightbox-content" 
                 style={{ borderRadius: '12px' }}
