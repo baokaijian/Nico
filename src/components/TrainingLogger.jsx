@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Waves, Plus, Calendar, Trash2, Edit2, X, Activity, Award } from 'lucide-react';
 
-export default function TrainingLogger({ trainings, onAddTraining, onUpdateTraining, onDeleteTraining }) {
+export default function TrainingLogger({ 
+  trainings, 
+  onAddTraining, 
+  onUpdateTraining, 
+  onDeleteTraining,
+  isReadOnly = false
+}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [session, setSession] = useState('走训课 (1小时 · 15人组)');
   const [trainingType, setTrainingType] = useState('自由泳动作精雕');
@@ -186,150 +192,152 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
         </div>
       </div>
 
-      <div className="grid-2">
-        {/* Entry Form */}
-        <div className="glass-card">
-          <h3 className="mb-md flex-gap-sm">
-            <Plus size={20} style={{ color: editingId ? '#af52de' : 'var(--accent-color)' }} />
-            {editingId ? '修改水上训练日志' : '记录今日水上训练课'}
-          </h3>
+      <div className={isReadOnly ? '' : 'grid-2'}>
+        {/* Entry Form - hidden in read-only mode */}
+        {!isReadOnly && (
+          <div className="glass-card">
+            <h3 className="mb-md flex-gap-sm">
+              <Plus size={20} style={{ color: editingId ? '#af52de' : 'var(--accent-color)' }} />
+              {editingId ? '修改水上训练日志' : '记录今日水上训练课'}
+            </h3>
 
-          {error && (
-            <div style={{ color: 'rgb(255, 59, 48)', padding: '12px', background: 'rgba(255, 59, 48, 0.08)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)', fontSize: '0.9rem' }}>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div className="grid-2" style={{ gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">训练日期</label>
-                <input 
-                  type="date" 
-                  className="apple-input" 
-                  value={date} 
-                  onChange={(e) => setDate(e.target.value)} 
-                  required 
-                />
+            {error && (
+              <div style={{ color: 'rgb(255, 59, 48)', padding: '12px', background: 'rgba(255, 59, 48, 0.08)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)', fontSize: '0.9rem' }}>
+                {error}
               </div>
-              <div className="form-group">
-                <label className="form-label">课次时段 (实况)</label>
-                <select className="apple-select" value={session} onChange={(e) => setSession(e.target.value)}>
-                  <option value="走训课 (1小时 · 15人组)">走训主课 (16:30-17:30 · 1小时 · 15人大组)</option>
-                  <option value="周末走训课 (1小时)">周末走训课 (1小时)</option>
-                  <option value="早训/加练 (1小时)">早训/加练 (1小时)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid-2" style={{ gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">训练类型</label>
-                <select className="apple-select" value={trainingType} onChange={(e) => setTrainingType(e.target.value)}>
-                  {trainingTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">强度区间</label>
-                <select className="apple-select" value={intensity} onChange={(e) => setIntensity(e.target.value)}>
-                  {intensityLevels.map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid-2" style={{ gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">单课总泳程 (米)</label>
-                <input 
-                  type="number" 
-                  step="50" 
-                  placeholder="例如 900" 
-                  className="apple-input" 
-                  value={totalMeters} 
-                  onChange={(e) => setTotalMeters(e.target.value)} 
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">其中打腿量 (米)</label>
-                <input 
-                  type="number" 
-                  step="50" 
-                  placeholder="例如 500" 
-                  className="apple-input" 
-                  value={kickMeters} 
-                  onChange={(e) => setKickMeters(e.target.value)} 
-                />
-              </div>
-            </div>
-
-            <div className="grid-2" style={{ gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">主观疲劳 RPE (1-10分)</label>
-                <select className="apple-select" value={rpe} onChange={(e) => setRpe(e.target.value)}>
-                  <option value="5">5分 - 轻松游 (呼吸顺畅)</option>
-                  <option value="6">6分 - 轻度有氧 (轻微气喘)</option>
-                  <option value="7">7分 - 中度有氧 (心率上升但能坚持)</option>
-                  <option value="8">8分 - 较吃力 (后程肌肉发酸)</option>
-                  <option value="9">9分 - 极吃力 (全力以赴极度疲劳)</option>
-                  <option value="10">10分 - 极限竭尽 (比赛冲刺状态)</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">计划完成度 (%)</label>
-                <input 
-                  type="number" 
-                  min="50" 
-                  max="100" 
-                  className="apple-input" 
-                  value={completionRate} 
-                  onChange={(e) => setCompletionRate(e.target.value)} 
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">攻坚技能重点</label>
-              <input 
-                type="text" 
-                placeholder="例如：高肘抱水深度、转身海豚打腿5米线、划频与划幅平衡..." 
-                className="apple-input" 
-                value={focusSkills} 
-                onChange={(e) => setFocusSkills(e.target.value)} 
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">大关教练现场点评与指导</label>
-              <textarea 
-                placeholder="例如：今天划水抱水厚度有长进，继续强化后程打腿频次，出水不要抬头..." 
-                className="apple-textarea" 
-                value={coachNotes} 
-                onChange={(e) => setCoachNotes(e.target.value)} 
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              className="apple-btn apple-btn-primary mt-sm" 
-              style={{ width: '100%', background: editingId ? '#af52de' : 'var(--accent-color)' }}
-              disabled={loading}
-            >
-              {loading ? '正在保存...' : editingId ? '保存修改' : '保存训练日志'}
-            </button>
-
-            {editingId && (
-              <button 
-                type="button" 
-                className="apple-btn apple-btn-secondary mt-xs" 
-                style={{ width: '100%', display: 'flex', gap: '4px', marginTop: '8px' }}
-                onClick={handleCancelEdit}
-              >
-                <X size={15} />
-                取消修改
-              </button>
             )}
-          </form>
-        </div>
+
+            <form onSubmit={handleSubmit}>
+              <div className="grid-2" style={{ gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">训练日期</label>
+                  <input 
+                    type="date" 
+                    className="apple-input" 
+                    value={date} 
+                    onChange={(e) => setDate(e.target.value)} 
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">课次时段 (实况)</label>
+                  <select className="apple-select" value={session} onChange={(e) => setSession(e.target.value)}>
+                    <option value="走训课 (1小时 · 15人组)">走训主课 (16:30-17:30 · 1小时 · 15人大组)</option>
+                    <option value="周末走训课 (1小时)">周末走训课 (1小时)</option>
+                    <option value="早训/加练 (1小时)">早训/加练 (1小时)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid-2" style={{ gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">训练类型</label>
+                  <select className="apple-select" value={trainingType} onChange={(e) => setTrainingType(e.target.value)}>
+                    {trainingTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">强度区间</label>
+                  <select className="apple-select" value={intensity} onChange={(e) => setIntensity(e.target.value)}>
+                    {intensityLevels.map(i => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid-2" style={{ gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">单课总泳程 (米)</label>
+                  <input 
+                    type="number" 
+                    step="50" 
+                    placeholder="例如 900" 
+                    className="apple-input" 
+                    value={totalMeters} 
+                    onChange={(e) => setTotalMeters(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">其中打腿量 (米)</label>
+                  <input 
+                    type="number" 
+                    step="50" 
+                    placeholder="例如 500" 
+                    className="apple-input" 
+                    value={kickMeters} 
+                    onChange={(e) => setKickMeters(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="grid-2" style={{ gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">主观疲劳 RPE (1-10分)</label>
+                  <select className="apple-select" value={rpe} onChange={(e) => setRpe(e.target.value)}>
+                    <option value="5">5分 - 轻松游 (呼吸顺畅)</option>
+                    <option value="6">6分 - 轻度有氧 (轻微气喘)</option>
+                    <option value="7">7分 - 中度有氧 (心率上升但能坚持)</option>
+                    <option value="8">8分 - 较吃力 (后程肌肉发酸)</option>
+                    <option value="9">9分 - 极吃力 (全力以赴极度疲劳)</option>
+                    <option value="10">10分 - 极限竭尽 (比赛冲刺状态)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">计划完成度 (%)</label>
+                  <input 
+                    type="number" 
+                    min="50" 
+                    max="100" 
+                    className="apple-input" 
+                    value={completionRate} 
+                    onChange={(e) => setCompletionRate(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">攻坚技能重点</label>
+                <input 
+                  type="text" 
+                  placeholder="例如：高肘抱水深度、转身海豚打腿5米线、划频与划幅平衡..." 
+                  className="apple-input" 
+                  value={focusSkills} 
+                  onChange={(e) => setFocusSkills(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">大关教练现场点评与指导</label>
+                <textarea 
+                  placeholder="例如：今天划水抱水厚度有长进，继续强化后程打腿频次，出水不要抬头..." 
+                  className="apple-textarea" 
+                  value={coachNotes} 
+                  onChange={(e) => setCoachNotes(e.target.value)} 
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                className="apple-btn apple-btn-primary mt-sm" 
+                style={{ width: '100%', background: editingId ? '#af52de' : 'var(--accent-color)' }}
+                disabled={loading}
+              >
+                {loading ? '正在保存...' : editingId ? '保存修改' : '保存训练日志'}
+              </button>
+
+              {editingId && (
+                <button 
+                  type="button" 
+                  className="apple-btn apple-btn-secondary mt-xs" 
+                  style={{ width: '100%', display: 'flex', gap: '4px', marginTop: '8px' }}
+                  onClick={handleCancelEdit}
+                >
+                  <X size={15} />
+                  取消修改
+                </button>
+              )}
+            </form>
+          </div>
+        )}
 
         {/* History Logs */}
         <div className="glass-card">
@@ -360,7 +368,7 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
                     <th>类型/强度</th>
                     <th>泳程/打腿</th>
                     <th>RPE/重点</th>
-                    <th style={{ textAlign: 'right' }}>操作</th>
+                    {!isReadOnly && <th style={{ textAlign: 'right' }}>操作</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -402,26 +410,28 @@ export default function TrainingLogger({ trainings, onAddTraining, onUpdateTrain
                           </div>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                          <button 
-                            onClick={() => handleStartEdit(t)} 
-                            className="apple-btn apple-btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
-                            title="修改"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button 
-                            onClick={() => onDeleteTraining(t.id)} 
-                            className="apple-btn apple-btn-danger"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px' }}
-                            title="删除"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
+                      {!isReadOnly && (
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                            <button 
+                              onClick={() => handleStartEdit(t)} 
+                              className="apple-btn apple-btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
+                              title="修改"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button 
+                              onClick={() => onDeleteTraining(t.id)} 
+                              className="apple-btn apple-btn-danger"
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px' }}
+                              title="删除"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

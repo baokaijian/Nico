@@ -1,7 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { Image as ImageIcon, Video as VideoIcon, Plus, Play, X, Trash2, Upload } from 'lucide-react';
 
-export default function MediaGallery({ mediaList, onAddMedia, onDeleteMedia, serverUrl }) {
+export default function MediaGallery({ 
+  mediaList, 
+  onAddMedia, 
+  onDeleteMedia, 
+  serverUrl,
+  isReadOnly = false 
+}) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -71,14 +77,16 @@ export default function MediaGallery({ mediaList, onAddMedia, onDeleteMedia, ser
         <h2 style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
           相册与视频
         </h2>
-        <button 
-          onClick={() => setShowUploadModal(true)} 
-          className="apple-btn apple-btn-primary"
-          style={{ background: 'var(--accent-color)' }}
-        >
-          <Plus size={18} />
-          上传照片/视频
-        </button>
+        {!isReadOnly && (
+          <button 
+            onClick={() => setShowUploadModal(true)} 
+            className="apple-btn apple-btn-primary"
+            style={{ background: 'var(--accent-color)' }}
+          >
+            <Plus size={18} />
+            上传照片/视频
+          </button>
+        )}
       </div>
 
       {/* Media Grid */}
@@ -111,14 +119,16 @@ export default function MediaGallery({ mediaList, onAddMedia, onDeleteMedia, ser
                 <div className="media-body">
                   <div className="flex-between">
                     <span className="media-meta">{m.date}</span>
-                    <button 
-                      onClick={() => onDeleteMedia(m.id)}
-                      className="apple-btn apple-btn-danger"
-                      style={{ padding: '4px 8px', borderRadius: '8px' }}
-                      title="删除媒体"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {!isReadOnly && (
+                      <button 
+                        onClick={() => onDeleteMedia(m.id)}
+                        className="apple-btn apple-btn-danger"
+                        style={{ padding: '4px 8px', borderRadius: '8px' }}
+                        title="删除媒体"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                   <div className="media-title flex-gap-sm" onClick={() => setActiveMedia(m)} style={{ cursor: 'pointer' }}>
                     {m.type === 'video' ? <VideoIcon size={16} className="text-secondary" /> : <ImageIcon size={16} className="text-secondary" />}
@@ -134,17 +144,19 @@ export default function MediaGallery({ mediaList, onAddMedia, onDeleteMedia, ser
         <div className="glass-card text-center" style={{ padding: 'var(--space-xxl) 0' }}>
           <ImageIcon size={48} className="text-secondary mb-sm" />
           <p style={{ color: 'var(--secondary-color)', fontSize: '1.1rem' }}>相册中暂无照片或视频。</p>
-          <button 
-            onClick={() => setShowUploadModal(true)} 
-            className="apple-btn apple-btn-secondary mt-md"
-          >
-            上传第一张训练影像
-          </button>
+          {!isReadOnly && (
+            <button 
+              onClick={() => setShowUploadModal(true)} 
+              className="apple-btn apple-btn-secondary mt-md"
+            >
+              上传第一张训练影像
+            </button>
+          )}
         </div>
       )}
 
       {/* Upload Modal Drawer */}
-      {showUploadModal && (
+      {!isReadOnly && showUploadModal && (
         <div className="lightbox" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(20px)' }}>
           <div className="glass-card" style={{ width: '100%', maxWidth: '500px', background: '#ffffff', color: 'var(--primary-color)' }}>
             <div className="flex-between mb-md">
