@@ -24,6 +24,8 @@ export default function App() {
 
   const isStaticHost = isReadOnly || (typeof window !== 'undefined' && window.location.protocol === 'https:');
 
+  const DATA_VERSION = '20261006_real_data_v1';
+
   const getInitial = (key, fallback) => {
     // In read-only mode, always use the authoritative static dataset bundled from db.json
     // to prevent local storage pollution or altered data.
@@ -31,10 +33,13 @@ export default function App() {
       return fallback || [];
     }
     try {
-      const cached = localStorage.getItem(`nico_${key}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      const ver = localStorage.getItem('nico_data_version');
+      if (ver === DATA_VERSION) {
+        const cached = localStorage.getItem(`nico_${key}`);
+        if (cached !== null) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) return parsed;
+        }
       }
     } catch (e) {
       console.warn('LocalStorage read error:', e);
@@ -59,6 +64,7 @@ export default function App() {
     if (isReadOnly) return;
     setter(data);
     try {
+      localStorage.setItem('nico_data_version', DATA_VERSION);
       localStorage.setItem(`nico_${key}`, JSON.stringify(data));
     } catch (e) {
       console.warn('LocalStorage save error:', e);
@@ -135,6 +141,16 @@ export default function App() {
   };
 
   useEffect(() => {
+    try {
+      if (localStorage.getItem('nico_data_version') !== DATA_VERSION) {
+        ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'media'].forEach(k => {
+          localStorage.removeItem(`nico_${k}`);
+        });
+        localStorage.setItem('nico_data_version', DATA_VERSION);
+      }
+    } catch (e) {
+      console.warn('LocalStorage version clear error:', e);
+    }
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
