@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Ruler, Plus, Calendar, Trash2, Edit2, X } from 'lucide-react';
 
-export default function GrowthLogger({ records, onAddRecord, onDeleteRecord, onUpdateRecord }) {
+export default function GrowthLogger({ 
+  records, 
+  onAddRecord, 
+  onDeleteRecord, 
+  onUpdateRecord,
+  isReadOnly = false 
+}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [height, setHeight] = useState('');
   const [armSpan, setArmSpan] = useState('');
@@ -85,9 +91,10 @@ export default function GrowthLogger({ records, onAddRecord, onDeleteRecord, onU
   const sortedRecords = [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   return (
-    <div className="grid-2">
-      {/* Logger Form */}
-      <div className="glass-card">
+      <div className={isReadOnly ? '' : 'grid-2'}>
+        {/* Logger Form - hidden in read-only mode */}
+        {!isReadOnly && (
+          <div className="glass-card">
         <h3 className="mb-md flex-gap-sm">
           <Plus size={20} style={{ color: editingId ? '#af52de' : 'var(--accent-color)' }} />
           {editingId ? '修改身体成长数据' : '身体成长数据录入'}
@@ -209,8 +216,9 @@ export default function GrowthLogger({ records, onAddRecord, onDeleteRecord, onU
               取消修改
             </button>
           )}
-        </form>
-      </div>
+          </form>
+        </div>
+      )}
 
       {/* History Log */}
       <div className="glass-card">
@@ -229,7 +237,7 @@ export default function GrowthLogger({ records, onAddRecord, onDeleteRecord, onU
                   <th>体重</th>
                   <th>手长/宽</th>
                   <th>脚长</th>
-                  <th style={{ textAlign: 'right' }}>操作</th>
+                  {!isReadOnly && <th style={{ textAlign: 'right' }}>操作</th>}
                 </tr>
               </thead>
               <tbody>
@@ -251,26 +259,28 @@ export default function GrowthLogger({ records, onAddRecord, onDeleteRecord, onU
                       <div style={{ fontSize: '0.85rem', color: 'var(--secondary-color)' }}>宽: {r.handWidth ? `${r.handWidth} cm` : '--'}</div>
                     </td>
                     <td>{r.footLength ? `${r.footLength} cm` : '--'}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                        <button 
-                          onClick={() => handleStartEdit(r)} 
-                          className="apple-btn apple-btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
-                          title="修改记录"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button 
-                          onClick={() => onDeleteRecord(r.id)} 
-                          className="apple-btn apple-btn-danger"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px' }}
-                          title="删除记录"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
+                    {!isReadOnly && (
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                          <button 
+                            onClick={() => handleStartEdit(r)} 
+                            className="apple-btn apple-btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
+                            title="修改记录"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button 
+                            onClick={() => onDeleteRecord(r.id)} 
+                            className="apple-btn apple-btn-danger"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px' }}
+                            title="删除记录"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

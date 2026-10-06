@@ -17,12 +17,19 @@ import initialDb from '../server/db.json';
 const SERVER_URL = 'http://localhost:3001';
 
 export default function App() {
-  const isStaticHost = typeof window !== 'undefined' && (
+  const isReadOnly = typeof window !== 'undefined' && (
     window.location.hostname.includes('github.io') ||
-    window.location.protocol === 'https:'
+    (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
   );
 
+  const isStaticHost = isReadOnly || (typeof window !== 'undefined' && window.location.protocol === 'https:');
+
   const getInitial = (key, fallback) => {
+    // In read-only mode, always use the authoritative static dataset bundled from db.json
+    // to prevent local storage pollution or altered data.
+    if (isReadOnly) {
+      return fallback || [];
+    }
     try {
       const cached = localStorage.getItem(`nico_${key}`);
       if (cached) {
@@ -49,6 +56,7 @@ export default function App() {
   const [error, setError] = useState('');
 
   const saveAndSync = (key, data, setter) => {
+    if (isReadOnly) return;
     setter(data);
     try {
       localStorage.setItem(`nico_${key}`, JSON.stringify(data));
@@ -133,6 +141,7 @@ export default function App() {
 
   // Growth record callbacks
   const handleAddGrowth = async (record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -152,6 +161,7 @@ export default function App() {
   };
 
   const handleDeleteGrowth = async (id) => {
+    if (isReadOnly) return;
     if (!window.confirm('您确定要删除此条身体数据记录吗？')) return;
     try {
       if (!isStaticHost) {
@@ -165,6 +175,7 @@ export default function App() {
   };
 
   const handleUpdateGrowth = async (id, record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -185,6 +196,7 @@ export default function App() {
 
   // Swim record callbacks
   const handleAddSwim = async (record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -204,6 +216,7 @@ export default function App() {
   };
 
   const handleDeleteSwim = async (id) => {
+    if (isReadOnly) return;
     if (!window.confirm('您确定要删除此条成绩记录吗？')) return;
     try {
       if (!isStaticHost) {
@@ -217,6 +230,7 @@ export default function App() {
   };
 
   const handleUpdateSwim = async (id, record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -237,6 +251,7 @@ export default function App() {
 
   // Training record callbacks
   const handleAddTraining = async (record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -256,6 +271,7 @@ export default function App() {
   };
 
   const handleDeleteTraining = async (id) => {
+    if (isReadOnly) return;
     if (!window.confirm('您确定要删除此条水上训练记录吗？')) return;
     try {
       if (!isStaticHost) {
@@ -269,6 +285,7 @@ export default function App() {
   };
 
   const handleUpdateTraining = async (id, record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -283,12 +300,13 @@ export default function App() {
       console.warn('Remote update failed, updating locally:', e);
     }
     const updatedRecord = saved || { ...record, id };
-    const updated = trainings.map(t => t.id === id ? updatedRecord : r).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const updated = trainings.map(t => t.id === id ? updatedRecord : t).sort((a, b) => new Date(a.date) - new Date(b.date));
     saveAndSync('trainings', updated, setTrainings);
   };
 
   // Fitness record callbacks
   const handleAddFitness = async (record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -308,6 +326,7 @@ export default function App() {
   };
 
   const handleDeleteFitness = async (id) => {
+    if (isReadOnly) return;
     if (!window.confirm('您确定要删除此条陆上体能记录吗？')) return;
     try {
       if (!isStaticHost) {
@@ -321,6 +340,7 @@ export default function App() {
   };
 
   const handleUpdateFitness = async (id, record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -341,6 +361,7 @@ export default function App() {
 
   // Nutrition record callbacks
   const handleAddNutrition = async (record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -360,6 +381,7 @@ export default function App() {
   };
 
   const handleDeleteNutrition = async (id) => {
+    if (isReadOnly) return;
     if (!window.confirm('您确定要删除此条营养恢复记录吗？')) return;
     try {
       if (!isStaticHost) {
@@ -373,6 +395,7 @@ export default function App() {
   };
 
   const handleUpdateNutrition = async (id, record) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -393,6 +416,7 @@ export default function App() {
 
   // Media record callbacks
   const handleAddMedia = async (formData) => {
+    if (isReadOnly) return;
     let saved = null;
     try {
       if (!isStaticHost) {
@@ -412,6 +436,7 @@ export default function App() {
   };
 
   const handleDeleteMedia = async (id) => {
+    if (isReadOnly) return;
     if (!window.confirm('您确定要删除这个相册文件吗？')) return;
     try {
       if (!isStaticHost) {
@@ -446,19 +471,23 @@ export default function App() {
             <span style={{ fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
               Nico 竞技游泳成长系统
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.68rem', color: 'var(--secondary-color)', fontWeight: 500 }}>
                 杭州大关三线运动员 · 梯队档案
               </span>
               <span style={{ 
-                fontSize: '0.62rem', 
-                padding: '1px 6px', 
-                borderRadius: '6px', 
-                background: isStaticHost ? 'rgba(52, 199, 89, 0.12)' : 'rgba(0, 113, 227, 0.12)',
-                color: isStaticHost ? '#248a3d' : '#0071e3',
-                fontWeight: 600
+                fontSize: '0.64rem', 
+                padding: '2px 8px', 
+                borderRadius: '8px', 
+                background: isReadOnly ? 'rgba(0, 113, 227, 0.1)' : 'rgba(52, 199, 89, 0.12)',
+                color: isReadOnly ? '#0071e3' : '#248a3d',
+                border: isReadOnly ? '1px solid rgba(0, 113, 227, 0.25)' : '1px solid rgba(52, 199, 89, 0.25)',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
               }}>
-                {isStaticHost ? '● 云端静态' : '● 本地联机'}
+                {isReadOnly ? '🔒 官方公开档案 · 只读安全模式' : '🟢 本地管理环境 · 可提交上传'}
               </span>
             </div>
           </div>
@@ -533,6 +562,40 @@ export default function App() {
 
       {/* Main Container */}
       <div className="container">
+        {/* Read-Only Safety Banner */}
+        {isReadOnly && (
+          <div className="glass-card mb-md" style={{
+            background: 'linear-gradient(135deg, rgba(0, 113, 227, 0.05) 0%, rgba(52, 199, 89, 0.04) 100%)',
+            border: '1px solid rgba(0, 113, 227, 0.18)',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            borderRadius: 'var(--radius-md)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ 
+                background: '#0071e3', 
+                color: '#fff', 
+                fontSize: '0.72rem', 
+                padding: '2px 8px', 
+                borderRadius: '8px', 
+                fontWeight: 600 
+              }}>
+                只读保护
+              </span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--primary-color)', fontWeight: 500 }}>
+                当前为官方公开档案展示版本。为杜绝脏数据污染，已锁定为只读模式；新数据仅支持本地管理环境录入后统一同步上传。
+              </span>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--secondary-color)', fontWeight: 500 }}>
+              已载入最新权威档案 · 防篡改已启用
+            </span>
+          </div>
+        )}
+
         {error && !isStaticHost && (
           <div className="glass-card" style={{ borderLeft: '4px solid rgb(255, 59, 48)', marginBottom: 'var(--space-lg)' }}>
             <h3 style={{ color: 'rgb(255, 59, 48)', marginBottom: '8px' }}>本地服务连接失败</h3>
@@ -576,6 +639,7 @@ export default function App() {
                 onAddTraining={handleAddTraining} 
                 onUpdateTraining={handleUpdateTraining} 
                 onDeleteTraining={handleDeleteTraining} 
+                isReadOnly={isReadOnly}
               />
             )}
             
@@ -585,6 +649,7 @@ export default function App() {
                 onAddRecord={handleAddSwim} 
                 onDeleteRecord={handleDeleteSwim} 
                 onUpdateRecord={handleUpdateSwim} 
+                isReadOnly={isReadOnly}
               />
             )}
 
@@ -594,6 +659,7 @@ export default function App() {
                 onAddFitness={handleAddFitness} 
                 onUpdateFitness={handleUpdateFitness} 
                 onDeleteFitness={handleDeleteFitness} 
+                isReadOnly={isReadOnly}
               />
             )}
 
@@ -603,6 +669,7 @@ export default function App() {
                 onAddNutrition={handleAddNutrition} 
                 onUpdateNutrition={handleUpdateNutrition} 
                 onDeleteNutrition={handleDeleteNutrition} 
+                isReadOnly={isReadOnly}
               />
             )}
             
@@ -612,6 +679,7 @@ export default function App() {
                 onAddRecord={handleAddGrowth} 
                 onDeleteRecord={handleDeleteGrowth} 
                 onUpdateRecord={handleUpdateGrowth} 
+                isReadOnly={isReadOnly}
               />
             )}
 
@@ -629,6 +697,7 @@ export default function App() {
                 onAddMedia={handleAddMedia} 
                 onDeleteMedia={handleDeleteMedia} 
                 serverUrl={SERVER_URL}
+                isReadOnly={isReadOnly}
               />
             )}
             

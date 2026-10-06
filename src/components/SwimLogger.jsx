@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Plus, Calendar, Activity, Trash2, Edit2, X } from 'lucide-react';
 
-export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpdateRecord }) {
+export default function SwimLogger({ 
+  records, 
+  onAddRecord, 
+  onDeleteRecord, 
+  onUpdateRecord,
+  isReadOnly = false 
+}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [distance, setDistance] = useState('25m');
   const [customDistance, setCustomDistance] = useState('');
@@ -137,9 +143,56 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
   const distances = ['25m', '50m', '100m', '200m', '400m'];
 
   return (
-    <div className="grid-2">
-      {/* Logger Form */}
-      <div className="glass-card">
+    <div>
+      {/* National Athlete Standards & Tier 2 Reference Strip */}
+      <div className="glass-card mb-lg" style={{ 
+        background: 'rgba(0, 113, 227, 0.04)', 
+        border: '1px solid rgba(0, 113, 227, 0.18)', 
+        padding: '14px 18px',
+        fontSize: '0.82rem', 
+        lineHeight: 1.5 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+          <span style={{ fontWeight: 700, color: 'var(--accent-color)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            🎯 大关二线选拔标准与国家运动员等级对照 (50米标准池)：
+          </span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <span style={{ fontSize: '0.72rem', background: '#ff9500', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+              核心门槛：进二线 ≤ 40.00s
+            </span>
+            <span style={{ fontSize: '0.72rem', background: '#0071e3', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+              终极荣誉：二级 ≤ 31.50s
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px', color: 'var(--primary-color)' }}>
+          <div style={{ background: 'rgba(255,255,255,0.85)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,149,0,0.25)' }}>
+            <span style={{ color: '#d35400', fontSize: '0.75rem', fontWeight: 700 }}>50m 自由泳 (主项 · 进二线核心)</span>
+            <div style={{ fontWeight: 800, color: '#d35400' }}>二线门槛 ≤ 40.00s</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>二级 ≤ 31.50s | 三级 ≤ 39.50s</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px' }}>
+            <span style={{ color: 'var(--secondary-color)', fontSize: '0.75rem' }}>50m 仰泳 (兼项)</span>
+            <div style={{ fontWeight: 700, color: '#0071e3' }}>二级 ≤ 36.50s</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>三级 45.0s | 健将 29.8s</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px' }}>
+            <span style={{ color: 'var(--secondary-color)', fontSize: '0.75rem' }}>50m 蝶泳 / 蛙泳</span>
+            <div style={{ fontWeight: 600, color: 'var(--primary-color)' }}>蝶 34.0s | 蛙 40.5s</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>200混: 二级 ≤ 2:50.0</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,113,227,0.2)' }}>
+            <span style={{ color: '#0071e3', fontSize: '0.75rem', fontWeight: 700 }}>25m 自由泳 (速度链)</span>
+            <div style={{ fontWeight: 700, color: '#0071e3' }}>二线段落标 ≤ 20.0s</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>10/06 考核 28.0s | PB 26.5s</div>
+          </div>
+        </div>
+      </div>
+
+      <div className={isReadOnly ? '' : 'grid-2'}>
+        {/* Logger Form - hidden in read-only mode */}
+        {!isReadOnly && (
+          <div className="glass-card">
         <h3 className="mb-md flex-gap-sm">
           <Plus size={20} style={{ color: editingId ? '#af52de' : '#34c759' }} />
           {editingId ? '修改游泳训练成绩' : '游泳训练成绩录入'}
@@ -292,46 +345,9 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
             </button>
           )}
 
-          {/* National Athlete Standards & Tier 2 Reference Strip */}
-          <div style={{ marginTop: '16px', padding: '14px', background: 'rgba(0, 113, 227, 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 113, 227, 0.18)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
-              <span style={{ fontWeight: 700, color: 'var(--accent-color)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                🎯 大关二线选拔标准与国家运动员等级对照 (50米标准池)：
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <span style={{ fontSize: '0.72rem', background: '#ff9500', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
-                  核心门槛：进二线 ≤ 40.00s
-                </span>
-                <span style={{ fontSize: '0.72rem', background: '#0071e3', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
-                  终极荣誉：二级 ≤ 31.50s
-                </span>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px', color: 'var(--primary-color)' }}>
-              <div style={{ background: 'rgba(255,255,255,0.85)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,149,0,0.25)' }}>
-                <span style={{ color: '#d35400', fontSize: '0.75rem', fontWeight: 700 }}>50m 自由泳 (主项 · 进二线核心)</span>
-                <div style={{ fontWeight: 800, color: '#d35400' }}>二线门槛 ≤ 40.00s</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>二级 ≤ 31.50s | 三级 ≤ 39.50s</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--secondary-color)', fontSize: '0.75rem' }}>50m 仰泳 (兼项)</span>
-                <div style={{ fontWeight: 700, color: '#0071e3' }}>二级 ≤ 36.50s</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>三级 45.0s | 健将 29.8s</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--secondary-color)', fontSize: '0.75rem' }}>50m 蝶泳 / 蛙泳</span>
-                <div style={{ fontWeight: 600, color: 'var(--primary-color)' }}>蝶 34.0s | 蛙 40.5s</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>200混: 二级 ≤ 2:50.0</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,113,227,0.2)' }}>
-                <span style={{ color: '#0071e3', fontSize: '0.75rem', fontWeight: 700 }}>25m 自由泳 (速度链)</span>
-                <div style={{ fontWeight: 700, color: '#0071e3' }}>二线段落标 ≤ 20.0s</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>10/06 考核 28.0s | PB 26.5s</div>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
+          </form>
+        </div>
+      )}
 
       {/* History Log Table */}
       <div className="glass-card">
@@ -374,7 +390,7 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
                   <th>成绩时间</th>
                   <th>二线 / 二级差距</th>
                   <th>泳池</th>
-                  <th style={{ textAlign: 'right' }}>操作</th>
+                  {!isReadOnly && <th style={{ textAlign: 'right' }}>操作</th>}
                 </tr>
               </thead>
               <tbody>
@@ -465,26 +481,28 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
                       ))}
                     </td>
                     <td>{r.poolLength === '25m' ? '25米' : '50米'}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                        <button 
-                          onClick={() => handleStartEdit(r)} 
-                          className="apple-btn apple-btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
-                          title="修改记录"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button 
-                          onClick={() => onDeleteRecord(r.id)} 
-                          className="apple-btn apple-btn-danger"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px' }}
-                          title="删除记录"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
+                    {!isReadOnly && (
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                          <button 
+                            onClick={() => handleStartEdit(r)} 
+                            className="apple-btn apple-btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
+                            title="修改记录"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button 
+                            onClick={() => onDeleteRecord(r.id)} 
+                            className="apple-btn apple-btn-danger"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '10px' }}
+                            title="删除记录"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -497,5 +515,6 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
         )}
       </div>
     </div>
-  );
+  </div>
+);
 }

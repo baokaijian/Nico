@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Apple, Plus, Calendar, Trash2, Edit2, X, CheckSquare, Square } from 'lucide-react';
 
-export default function NutritionLogger({ nutritionRecords, onAddNutrition, onUpdateNutrition, onDeleteNutrition }) {
+export default function NutritionLogger({ 
+  nutritionRecords, 
+  onAddNutrition, 
+  onUpdateNutrition, 
+  onDeleteNutrition,
+  isReadOnly = false 
+}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [preMeal, setPreMeal] = useState('全麦吐司1片 + 香蕉半根 + 温开水150ml (课前1小时)');
   const [postMeal, setPostMeal] = useState('温纯牛奶250ml + 水煮土鸡蛋1个 + 蓝莓一把 (课后30分内)');
@@ -111,9 +117,10 @@ export default function NutritionLogger({ nutritionRecords, onAddNutrition, onUp
         </div>
       </div>
 
-      <div className="grid-2">
-        {/* Entry Form */}
-        <div className="glass-card">
+      <div className={isReadOnly ? '' : 'grid-2'}>
+        {/* Entry Form - hidden in read-only mode */}
+        {!isReadOnly && (
+          <div className="glass-card">
           <h3 className="mb-md flex-gap-sm">
             <Plus size={20} style={{ color: editingId ? '#af52de' : '#248a3d' }} />
             {editingId ? '修改营养与恢复打卡' : '记录今日饮食营养与恢复'}
@@ -307,6 +314,7 @@ export default function NutritionLogger({ nutritionRecords, onAddNutrition, onUp
             )}
           </form>
         </div>
+      )}
 
         {/* History Table */}
         <div className="glass-card">
@@ -324,7 +332,7 @@ export default function NutritionLogger({ nutritionRecords, onAddNutrition, onUp
                     <th>课前/课后加餐</th>
                     <th>微量元素/水</th>
                     <th>睡眠/恢复</th>
-                    <th style={{ textAlign: 'right' }}>操作</th>
+                    {!isReadOnly && <th style={{ textAlign: 'right' }}>操作</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -360,26 +368,28 @@ export default function NutritionLogger({ nutritionRecords, onAddNutrition, onUp
                           晨脉: {n.morningPulse ? `${n.morningPulse}次` : '--'} | {'★'.repeat(n.recoveryScore || 5)}
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                          <button 
-                            onClick={() => handleStartEdit(n)} 
-                            className="apple-btn apple-btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
-                            title="修改"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button 
-                            onClick={() => onDeleteNutrition(n.id)} 
-                            className="apple-btn apple-btn-danger"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px' }}
-                            title="删除"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
+                      {!isReadOnly && (
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                            <button 
+                              onClick={() => handleStartEdit(n)} 
+                              className="apple-btn apple-btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
+                              title="修改"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button 
+                              onClick={() => onDeleteNutrition(n.id)} 
+                              className="apple-btn apple-btn-danger"
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px' }}
+                              title="删除"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

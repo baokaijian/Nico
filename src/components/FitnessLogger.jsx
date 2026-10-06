@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { HeartPulse, Plus, Calendar, Trash2, Edit2, X, ShieldAlert } from 'lucide-react';
 
-export default function FitnessLogger({ fitnessRecords, onAddFitness, onUpdateFitness, onDeleteFitness }) {
+export default function FitnessLogger({ 
+  fitnessRecords, 
+  onAddFitness, 
+  onUpdateFitness, 
+  onDeleteFitness,
+  isReadOnly = false 
+}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [standingJump, setStandingJump] = useState('135.0');
   const [plankSeconds, setPlankSeconds] = useState('60');
@@ -99,9 +105,10 @@ export default function FitnessLogger({ fitnessRecords, onAddFitness, onUpdateFi
         </div>
       </div>
 
-      <div className="grid-2">
-        {/* Entry Form */}
-        <div className="glass-card">
+      <div className={isReadOnly ? '' : 'grid-2'}>
+        {/* Entry Form - hidden in read-only mode */}
+        {!isReadOnly && (
+          <div className="glass-card">
           <h3 className="mb-md flex-gap-sm">
             <Plus size={20} style={{ color: editingId ? '#af52de' : '#ff9500' }} />
             {editingId ? '修改体能与柔韧记录' : '录入体能与柔韧评估测试'}
@@ -232,6 +239,7 @@ export default function FitnessLogger({ fitnessRecords, onAddFitness, onUpdateFi
             )}
           </form>
         </div>
+      )}
 
         {/* History Table */}
         <div className="glass-card">
@@ -249,7 +257,7 @@ export default function FitnessLogger({ fitnessRecords, onAddFitness, onUpdateFi
                     <th>立定跳远/30m</th>
                     <th>平板支撑/体前屈</th>
                     <th>肩踝柔韧特质</th>
-                    <th style={{ textAlign: 'right' }}>操作</th>
+                    {!isReadOnly && <th style={{ textAlign: 'right' }}>操作</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -281,26 +289,28 @@ export default function FitnessLogger({ fitnessRecords, onAddFitness, onUpdateFi
                           {f.ankleFlex?.slice(0, 12)}
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                          <button 
-                            onClick={() => handleStartEdit(f)} 
-                            className="apple-btn apple-btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
-                            title="修改"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button 
-                            onClick={() => onDeleteFitness(f.id)} 
-                            className="apple-btn apple-btn-danger"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px' }}
-                            title="删除"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
+                      {!isReadOnly && (
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                            <button 
+                              onClick={() => handleStartEdit(f)} 
+                              className="apple-btn apple-btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px', color: '#af52de' }}
+                              title="修改"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button 
+                              onClick={() => onDeleteFitness(f.id)} 
+                              className="apple-btn apple-btn-danger"
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '10px' }}
+                              title="删除"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
