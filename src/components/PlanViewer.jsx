@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Waves, Apple, Printer, Zap, Flag, Users, Target, CheckCircle2 } from 'lucide-react';
+import { Waves, Apple, Printer, Zap, Flag, Users, Target, CheckCircle2, Activity } from 'lucide-react';
 
 export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
   const [activeSubTab, setActiveSubTab] = useState('tier2_blueprint');
@@ -125,6 +125,21 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
         >
           <Target size={16} />
           <span>二线达标（&lt;40s）攻坚专项拆解</span>
+        </button>
+
+        <button 
+          className={`tab-btn ${activeSubTab === 'explosive' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('explosive')}
+          style={{ 
+            whiteSpace: 'nowrap', 
+            fontWeight: activeSubTab === 'explosive' ? 700 : 500,
+            color: activeSubTab === 'explosive' ? '#d70015' : 'inherit',
+            background: activeSubTab === 'explosive' ? 'rgba(255, 59, 48, 0.12)' : 'transparent',
+            border: activeSubTab === 'explosive' ? '1px solid rgba(255, 59, 48, 0.3)' : '1px solid transparent'
+          }}
+        >
+          <Zap size={16} style={{ color: activeSubTab === 'explosive' ? '#d70015' : '#ff9500' }} />
+          <span>⚡ 爆发力攻坚专项（解决体力好爆发弱）</span>
         </button>
 
         <button 
@@ -382,6 +397,231 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
         </div>
       )}
 
+      {/* Tab: Explosive Power Breakthrough Special */}
+      {activeSubTab === 'explosive' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          {/* Hero Diagnosis Card */}
+          <div className="glass-card" style={{ 
+            background: 'linear-gradient(135deg, rgba(255, 59, 48, 0.08) 0%, rgba(255, 149, 0, 0.08) 100%)',
+            border: '1.5px solid rgba(255, 59, 48, 0.3)'
+          }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ 
+                  background: 'linear-gradient(135deg, #ff3b30 0%, #ff9500 100%)', 
+                  color: '#fff', 
+                  fontSize: '0.75rem', 
+                  padding: '3px 10px', 
+                  borderRadius: '12px', 
+                  fontWeight: 700 
+                }}>
+                  教练诊断专项攻坚
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary-color)' }}>
+                  为什么“体力耐力良好”却“爆发力不足”？少儿运动生理学剖析与黄金解法
+                </h3>
+              </div>
+              <span style={{ fontSize: '0.85rem', color: '#d70015', fontWeight: 700 }}>
+                核心突破：唤醒快肌纤维 (Type II) · 告别匀速巡航
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--primary-color)', lineHeight: 1.6, marginBottom: '14px' }}>
+              10月6日巡线考核实测 28.00 秒后，大关三线教练组明确评价：<strong>“体力不错但是爆发力不行”</strong>。Nico 能够轻松游满 950 米保持体态不塌腰，但起步、蹬壁与冲刺缺乏瞬间“杀伤力”。这是 6.5 岁低龄运动员最典型的发展瓶颈——<strong>有氧底盘优秀，但快肌运动神经单位处于“休眠巡航态”</strong>。
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.7)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                <div style={{ fontWeight: 700, color: 'var(--secondary-color)', fontSize: '0.9rem', marginBottom: '6px' }}>
+                  🚫 少儿爆发力两大绝对安全红线
+                </div>
+                <ul style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, paddingLeft: '16px', margin: 0 }}>
+                  <li><strong>严禁负重抗阻压脊柱：</strong> 绝不可使用哑铃、杠铃负重深蹲，保护 6.5 岁幼嫩脊柱与骨骺软骨板；</li>
+                  <li><strong>严禁高乳酸疲劳破坏游：</strong> 少儿体内糖酵解酶活性低，高乳酸耐受训练会导致肌肉僵硬、动作变形并产生厌训心理。</li>
+                </ul>
+              </div>
+
+              <div style={{ background: 'rgba(255, 245, 235, 0.95)', padding: '14px', borderRadius: '10px', border: '1.5px solid #ff9500' }}>
+                <div style={{ fontWeight: 800, color: '#d35400', fontSize: '0.9rem', marginBottom: '6px' }}>
+                  ⚡ 少儿黄金解法：ATP-CP 纯磷酸原超短冲刺法
+                </div>
+                <ul style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, paddingLeft: '16px', margin: 0 }}>
+                  <li><strong>超短冲刺（6 ~ 10 秒）：</strong> 水上仅冲 10~15 米，陆上仅冲 5~8 米，不给身体产生乳酸的机会；</li>
+                  <li><strong>100% 全全力爆发：</strong> 每组以逃离危险般的最高神经兴奋度瞬间榨干能量；</li>
+                  <li><strong>超长间歇（30 ~ 45 秒）：</strong> 1:4~1:5 休息比，待磷酸原完全再合成、心率平复才冲下一组。“坚决不带疲劳冲”！</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Water 4-Pillar Explosive Power System */}
+          <div className="glass-card">
+            <h3 className="mb-sm flex-gap-sm">
+              <Waves size={20} style={{ color: '#0071e3' }} />
+              水上 60 分钟走训课“爆发力四维重构”（紧密契合 1:15 走训现实）
+            </h3>
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.88rem', marginBottom: '16px' }}>
+              无需教练额外开小灶，在每日 60 分钟大组走训中植入四个“爆发开关”，把巡航划水升级为动力澎湃的爆发推进：
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+              <div style={{ background: 'rgba(0, 113, 227, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #0071e3' }}>
+                <strong style={{ color: '#0071e3', fontSize: '0.92rem' }}>1. 蹬壁“压缩弹簧”弹射（初速 1.2 ➔ 2.0m/s）</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, marginTop: '6px', margin: 0 }}>
+                  <strong>痛点：</strong> 触壁转身脚掌轻轻贴壁、软绵绵推开。<br />
+                  <strong>改造：</strong> 到壁前双膝收拢呈 90~100 度紧贴池壁，双手在头顶死死夹紧双耳，双脚像钢制压缩弹簧瞬间炸裂蹬出！蹬壁后 5 米绝对流线型射出，不急于划水，榨干反弹初速度。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255, 59, 48, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #ff3b30' }}>
+                <strong style={{ color: '#d70015', fontSize: '0.92rem' }}>2. 10米无呼吸“极速沸腾”短冲（10m Blast Drill）</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, marginTop: '6px', margin: 0 }}>
+                  <strong>痛点：</strong> 出发 2 划就急着转头换气，吸走全部起步冲劲。<br />
+                  <strong>改造：</strong> 课末 10 分钟执行 <strong>10m 短冲 × 4~6 组（间歇 40s）</strong>。出发蹬壁后前 10 米坚决不换气，双腿打出“沸腾开水花”，手臂以最高划频向前抓水，10米后立刻停下慢漂放松，激活神经突触。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255, 149, 0, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #ff9500' }}>
+                <strong style={{ color: '#d35400', fontSize: '0.92rem' }}>3. 短脚蹼超速神经募集（Overspeed Kick）</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, marginTop: '6px', margin: 0 }}>
+                  <strong>痛点：</strong> 大脑中枢未体验过超高速破水感，打腿频率有天花板。<br />
+                  <strong>改造：</strong> 穿戴少儿小短脚蹼打腿 4×15m。借助脚蹼体验 1.5 倍的超常航速，让大脑和前庭神经适应极速水流冲击，强迫快肌纤维以超高频发放冲动。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(52, 199, 89, 0.04)', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #34c759' }}>
+                <strong style={{ color: '#248a3d', fontSize: '0.92rem' }}>4. 划水“慢抱快推”（Accelerated Finish）</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, marginTop: '6px', margin: 0 }}>
+                  <strong>痛点：</strong> 全程划水匀速，推水到腰腹就软绵绵出水。<br />
+                  <strong>改造：</strong> 口令“入水送肩稳稳抱、推水过脐瞬间暴”！抱水阶段稳稳锁住水阻，推水过肚脐瞬间，利用 14.2cm 大手掌向大腿外侧暴击推水，产生强烈的“喷气推背感”。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dryland Home 10-Min Agility Plyometric Routine */}
+          <div className="glass-card">
+            <h3 className="mb-sm flex-gap-sm">
+              <Activity size={20} style={{ color: '#af52de' }} />
+              家庭 10 分钟自重弹震敏捷爆发力库（睡前/放学后 · 安全无器械）
+            </h3>
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.88rem', marginBottom: '16px' }}>
+              无需复杂器材，在家中瑜伽垫上每天只需 10 分钟趣味练习，从神经底层激活下肢反弹与上肢抽打爆发力：
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+              <div style={{ background: 'rgba(175, 82, 222, 0.04)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(175, 82, 222, 0.2)' }}>
+                <div className="flex-between" style={{ marginBottom: '6px' }}>
+                  <strong style={{ color: '#af52de', fontSize: '0.9rem' }}>① 弹簧双脚连跳 (Pogo Jumps)</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#af52de', fontWeight: 600 }}>2组 × 15次 · 踝刚度蓄能</span>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, margin: 0 }}>
+                  双脚并拢微屈，双手叉腰，只用脚踝与前脚掌像紧绷的弹簧一样快速弹性跳离地面（离地 10~15cm）。<strong>触地时间越短越好</strong>，锻炼跟腱与踝关节弹性回弹，直接强化蹬壁起射与打腿抽水威力。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255, 149, 0, 0.04)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 149, 0, 0.2)' }}>
+                <div className="flex-between" style={{ marginBottom: '6px' }}>
+                  <strong style={{ color: '#d35400', fontSize: '0.9rem' }}>② 立定跳远接“流线型锁定”</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#d35400', fontWeight: 600 }}>目标: 138 ➔ 145cm+</span>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, margin: 0 }}>
+                  半蹲摆臂瞬间向前上方爆发跃出。<strong>核心重点：落地瞬间双臂立刻在头顶上方双手重叠锁紧双耳</strong>，全身紧绷成一根钢条（流线型锁定），坚持 3 秒。完美复刻池边俯冲出发与入水破水控制。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(0, 113, 227, 0.04)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(0, 113, 227, 0.2)' }}>
+                <div className="flex-between" style={{ marginBottom: '6px' }}>
+                  <strong style={{ color: '#0071e3', fontSize: '0.9rem' }}>③ 弹力带快速后推爆发</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#0071e3', fontWeight: 600 }}>2组 × 8次 · 激活背阔肱三头</span>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, margin: 0 }}>
+                  轻阻力弹力带固定在门把手，俯身微屈，手臂从屈肘抱水位向后方大腿侧瞬间“闪电推水”，推到顶点停顿半秒，慢放回位。专项激活推水末端的爆发性神经抽动。
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(52, 199, 89, 0.04)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(52, 199, 89, 0.2)' }}>
+                <div className="flex-between" style={{ marginBottom: '6px' }}>
+                  <strong style={{ color: '#248a3d', fontSize: '0.9rem' }}>④ 声控 0~5 米听号反应冲刺</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#248a3d', fontWeight: 600 }}>5次 · 缩短出发反应至 0.65s</span>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--primary-color)', lineHeight: 1.6, margin: 0 }}>
+                  Nico 在垫子上做好预备姿势（或俯卧），听到家长突然击掌或口令“跳”，瞬间启动冲刺 5 米触碰玩具或标记物。通过趣味刺激，缩短听觉传导到下肢爆发的神经潜伏期。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Explosive Power Metrics Ladder Table */}
+          <div className="glass-card">
+            <h3 className="mb-sm flex-gap-sm">
+              <Zap size={20} style={{ color: '#ff9500' }} />
+              爆发力突破阶梯量化指标追踪表（从三线走训到二线达标）
+            </h3>
+            <p style={{ color: 'var(--secondary-color)', fontSize: '0.88rem', marginBottom: '16px' }}>
+              通过数据量化追踪，见证 Nico 从“匀速耐力型”蜕变为“爆发突击型”竞技选手的完整历程：
+            </p>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table className="history-table" style={{ fontSize: '0.85rem' }}>
+                <thead>
+                  <tr>
+                    <th>爆发力监测项目</th>
+                    <th>当前实测基准 (10/06)</th>
+                    <th>第一阶梯目标 (2026.11)</th>
+                    <th>二线达标指标 (2027.05)</th>
+                    <th>2027市长杯二级标</th>
+                    <th>专项技术对应收益</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#0071e3' }}>陆上立定跳远</td>
+                    <td>138 cm (良好)</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>142 ~ 145 cm</td>
+                    <td style={{ fontWeight: 700, color: '#ff9500' }}>150 ~ 155 cm</td>
+                    <td style={{ fontWeight: 800, color: '#d70015' }}>≥ 160 cm</td>
+                    <td>直接决定池边出发俯冲远度与蹬壁反弹初速度</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#ff9500' }}>水上 10m 无呼吸极速短冲</td>
+                    <td>约 8.2 ~ 8.5 秒</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>7.2 ~ 7.5 秒</td>
+                    <td style={{ fontWeight: 700, color: '#ff9500' }}>6.2 ~ 6.5 秒</td>
+                    <td style={{ fontWeight: 800, color: '#d70015' }}>&lt; 5.6 秒</td>
+                    <td>检验纯 ATP-CP 磷酸原快肌爆发力输出峰值</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#af52de' }}>出发蹬壁初速度</td>
+                    <td>约 1.2 m/s (偏软)</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>1.5 ~ 1.6 m/s</td>
+                    <td style={{ fontWeight: 700, color: '#ff9500' }}>1.8 ~ 2.0 m/s</td>
+                    <td style={{ fontWeight: 800, color: '#d70015' }}>≥ 2.2 m/s</td>
+                    <td>压缩弹簧蹬壁，前 5 米直接破水领先半个身位</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#248a3d' }}>25米自由泳冲刺</td>
+                    <td>28.00 秒 (考核)</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>24.50 秒</td>
+                    <td style={{ fontWeight: 700, color: '#ff9500' }}>&lt; 20.00 秒</td>
+                    <td style={{ fontWeight: 800, color: '#d70015' }}>&lt; 15.5 秒</td>
+                    <td>打通 50 米破 40 秒进二线（两个 25m 段落速度链）</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#d70015' }}>50米自由泳总成绩</td>
+                    <td>56.17 秒 (小候鸟PB)</td>
+                    <td style={{ fontWeight: 700, color: '#34c759' }}>50.00 ~ 52.00 秒</td>
+                    <td style={{ fontWeight: 700, color: '#ff9500' }}>&lt; 40.00 秒 (进二线)</td>
+                    <td style={{ fontWeight: 800, color: '#d70015' }}>≤ 31.50 秒 (国家二级)</td>
+                    <td>体能耐力底盘 + 爆发力激活后的全面竞技跃迁</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab 1: 60-Minute Efficient Water Sessions */}
       {activeSubTab === 'water' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
@@ -408,20 +648,25 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
                     • 水下慢吐气与水面快吸气节奏预热
                   </div>
                   <div style={{ borderLeft: '3px solid #34c759', paddingLeft: '10px' }}>
-                    <strong>10 ~ 30 min | 专项打腿核心板块 (350m - 400m)：</strong><br />
+                    <strong>10 ~ 28 min | 专项打腿核心板块 (350m - 400m)：</strong><br />
                     • 自由泳扶板打腿 6×25m（大腿发力、脚背绷直切水）<br />
                     • 仰泳平躺双手贴体打腿 4×25m（腹部贴水、脚尖踢出细密沸水花）<br />
                     • 徒手水下海豚腿练习 4×15m
                   </div>
                   <div style={{ borderLeft: '3px solid #ff9500', paddingLeft: '10px' }}>
-                    <strong>30 ~ 52 min | 动作精雕与配合游 (300m - 350m)：</strong><br />
+                    <strong>28 ~ 48 min | 动作精雕与配合游 (300m)：</strong><br />
                     • 自由泳单臂分解 + 侧向咬苹果呼吸练习 4×25m<br />
                     • 仰泳单臂直臂提手与身体中轴转动 4×25m<br />
-                    • 50m 自由泳完整配合长滑行 2~3 组（长划幅少划水）
+                    • 50m 自由泳配合长滑行 2 组（长划幅少划水，体验前交叉）
+                  </div>
+                  <div style={{ borderLeft: '3px solid #ff3b30', paddingLeft: '10px' }}>
+                    <strong>48 ~ 56 min | ⚡ ATP-CP 爆发力与短段落神经激活 (150m)：</strong><br />
+                    • <strong>10m 无呼吸极速短冲 4 组：</strong>每组全力 6~7 秒，充分间歇 40 秒，绝不带疲劳冲！<br />
+                    • <strong>短脚蹼超频打腿 2×15m：</strong>体验 1.5 倍航速，打开神经快肌频率天花板
                   </div>
                   <div style={{ borderLeft: '3px solid #af52de', paddingLeft: '10px' }}>
-                    <strong>52 ~ 60 min | 趣味速度冲刺与放松 (100m)：</strong><br />
-                    • 15米极速冲刺小对抗 2 组（激发兴奋度）+ 50m 轻松慢游排酸
+                    <strong>56 ~ 60 min | 轻松排酸游与柔韧拉伸 (50m)：</strong><br />
+                    • 50m 慢速漂浮放松排酸，池边压肩与踝背屈放松
                   </div>
                 </div>
               </div>
