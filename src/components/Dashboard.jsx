@@ -213,19 +213,42 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
         </div>
       </div>
 
+      <div style="background: linear-gradient(135deg, rgba(255, 59, 48, 0.06) 0%, rgba(255, 149, 0, 0.07) 100%); border-left: 4px solid #ff3b30; padding: 14px 16px; border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-top: 12px; box-shadow: 0 2px 8px rgba(255, 59, 48, 0.05);">
+        <h5 style="color: #d70015; margin-bottom: 8px; font-size: 0.98rem; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+          ⚡ 教练最新核心定性研判：【体力耐力优秀，但爆发力欠缺】深度病因剖析与破局方案
+        </h5>
+        <div style="font-size: 0.88rem; line-height: 1.6; color: var(--primary-color);">
+          <p style="margin-bottom: 8px;">
+            <strong>【为什么“体力耐力好”？】</strong> Nico 具备出色的有氧氧化代谢底盘（Aerobic Base）与中轴抗疲劳稳定性。走训 950m 全程游完体态不散、不塌腰；25m 巡线考核 28.00s 与 50m 比赛均速 28.08s 紧密吻合。这是名将苗子极难得的“高稳续航底盘”。
+          </p>
+          <p style="margin-bottom: 8px;">
+            <strong>【为什么“爆发力不行”？】</strong> 6.5 岁儿童快肌纤维（Type II）运动单位的瞬时高频募集尚未唤醒，平时习惯舒适的“巡航节能模式”，动作缺乏瞬时加速峰值：<br />
+            ① <strong>蹬壁软（损失 1.0~1.5s）：</strong> 未能形成像压缩弹簧一样的瞬间爆炸式蹬射；<br />
+            ② <strong>前10米过早换气（损失 1.5s）：</strong> 入水初速度被过早抬头呼吸打破；<br />
+            ③ <strong>划水全程匀速（损失 2.0~3.0s）：</strong> 缺少推水过肚脐向大腿侧爆发加速的“慢抱快推（Accelerated Finish）”；<br />
+            ④ <strong>打腿缺少超频水花（损失 1.5~2.0s）：</strong> 巡航腿很稳，但缺乏 10 秒内将频率拉满至极限的沸腾爆发腿。
+          </p>
+          <p style="margin: 0; background: rgba(255, 255, 255, 0.7); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255, 59, 48, 0.15);">
+            <strong>🛡️ 少儿科学破局原则（安全红线）：</strong><br />
+            • <strong>绝对红线：</strong> 严禁大重量器械压迫脊柱骨骺板，严禁高乳酸耐受力疲劳游！<br />
+            • <strong>黄金疗法（少儿 ATP-CP 纯磷酸原短冲）：</strong> <strong>短冲 6~10 秒（水上 10~15m） + 充分间歇 30~45 秒（1:4~1:5 间歇比）</strong>。每组以 100% 逃离鲨鱼般的兴奋度全力爆发，神经完全恢复才冲下一组。“宁可少冲一组，坚决不带疲劳冲”，只练快肌神经募集！
+          </p>
+        </div>
+      </div>
+
       <div style="background: rgba(52, 199, 89, 0.04); border-left: 4px solid #34c759; padding: 14px 16px; border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-top: 12px;">
         <h5 style="color: #248a3d; margin-bottom: 6px; font-size: 0.95rem; font-weight: 700;">
-          🏊 今日 10/06 三线巡线考核复盘与“25米短段落爆发力”进阶指引：
+          🏊 25米短段落爆发力与“速度链（Speed Chain）”阶梯突破：
         </h5>
         <div style="font-size: 0.88rem; line-height: 1.6; color: var(--primary-color);">
           <p style="margin-bottom: 6px;">
-            <strong>【考核成效】</strong> 25米实测 28.00 秒。教练组重点肯定动作规范度：前交叉侧向咬苹果换气完全贴水无抬头，身体流线型保持平直，手掌与脚蹼的水感协同优良。
+            <strong>【考核成效】</strong> 25米实测 28.00 秒。动作规范度优秀（咬苹果换气平贴、流线型平直），但巡航模式必须向速度爆发模式跃迁。
           </p>
           <p style="margin: 0;">
-            <strong>【从 28s 冲向 20s 的三大突破点】</strong><br />
-            ① <strong>前 10 米无呼吸爆发起步：</strong> 出发蹬壁后流线型水下蝶泳腿 3 次出水，前 4~5 划坚决不换气，迅速将航速提到最高点（可省 1.5s）；<br />
-            ② <strong>高肘抱水压腕抓水点：</strong> 强化前臂内旋与 14.2cm 大手掌的对水阻水截面，把划水从“推水滑行”升级为“深层抓水加速”（可省 1.5~2.0s）；<br />
-            ③ <strong>后程 5 米强力打腿冲刺触壁：</strong> 冲向到壁池边时最后 2 划不吸气，头顶平扎，手掌直拍计时板，全力抢触壁瞬间（可省 1.0s）。
+            <strong>【从 28s 冲向 20s 的三大爆发抓手】</strong><br />
+            ① <strong>前 10 米无呼吸爆发起步：</strong> 压缩弹簧蹬壁后打 3 次水下蝶泳腿，前 4~5 划坚决不换气，迅速将航速提到最高点（省 1.5s）；<br />
+            ② <strong>高肘抱水 + 闪电推水：</strong> 强化前臂内旋与 14.2cm 大手掌抓水厚度，过脐瞬间暴击推向大腿侧（省 1.5~2.0s）；<br />
+            ③ <strong>后程 5 米强力打腿冲刺触壁：</strong> 冲向到壁池边时最后 2 划不吸气，头顶平扎，手掌直拍计时板，全力抢触壁瞬间（省 1.0s）。
           </p>
         </div>
       </div>
