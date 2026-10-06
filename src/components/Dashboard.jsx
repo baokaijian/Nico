@@ -177,15 +177,19 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
     // Swim analysis
     let swimProgression = [];
     if (swimRecords && swimRecords.length > 0) {
+      const latest = swimRecords[swimRecords.length - 1];
+      if (latest && latest.date === '2026-10-06' && latest.distance === '25m') {
+        swimProgression.push(`⏱️ <strong>【今日最新实测】10月6日大关三线巡线技术考核：25米自由泳实测 28.00 秒！</strong> 该成绩紧密咬合小候鸟 50 米均速节奏（56.17s / 2 = 28.08s），展现出极其稳定的途中游巡航动作一致性。侧向转头咬苹果换气平稳，身体中轴不晃动。`);
+        swimProgression.push(`⚡ <strong>【进二线 25m 段落速度链拆解】</strong> 要实现 50 米自破 40 秒进二线（冲 38~39s），25 米单程速度必须率先突破至 <strong>19.5 ~ 20.0 秒</strong>！当前 28.00s 考核属于“动作规范型巡航”，下一步核心是将 25 米短段落速度分步打通：<strong>28.00s ➔ 24.50s ➔ 21.00s ➔ &lt; 20.00s</strong>！`);
+      }
+
       const free50Records = swimRecords.filter(r => r.stroke === '自由泳' && r.distance === '50m');
       if (free50Records.length >= 2) {
         const first = free50Records[0];
-        const latest = free50Records[free50Records.length - 1];
-        const diff = (first.seconds - latest.seconds).toFixed(2);
+        const best50 = free50Records.reduce((min, r) => (r.seconds < min.seconds ? r : min), free50Records[0]);
+        const diff = (first.seconds - best50.seconds).toFixed(2);
         if (diff > 0) {
-          swimProgression.push(`⚡ <strong>50米自由泳突破 1 分钟大关，实测斩获 ${latest.time}（56.17s）个人新 PB！</strong> 从初测 ${first.time} 累计大幅缩短 ${diff} 秒！小候鸟比赛首秀发挥惊艳，较两周前（63.00s）再提速 6.83 秒，展现出极佳的比赛爆发力与动作定型效果。`);
-          swimProgression.push(`🎯 <strong>核心战役目标对齐：距离大关二线队选拔标准（50自 < 40.00s）尚差 ${deltaToTier2} 秒！</strong> 目标完成度已达 ${progressPercentTier2}%，已成功跨越最艰苦的启蒙破分阶段，正式进入 16.17 秒时间账本技术攻坚期！`);
-          swimProgression.push(`🏁 <strong>终极目标追踪：距离 2027 市长杯国家二级标准（31.50s）尚差 ${deltaToLevel2} 秒。</strong> 进入大关二线将解锁出发台跳水与 1.5~2 小时集训资源，是达成二级的决定性战略支点。`);
+          swimProgression.push(`🎯 <strong>50米自由泳基准纪录：56.17 秒</strong>（较初测累计提速 ${diff} 秒），距离大关二线队标准（&lt; 40.00s）相差 <strong>${deltaToTier2} 秒</strong>，整体推进进度已达 <strong>${progressPercentTier2}%</strong>！进入大关二线将解锁出发台跳水与 1.5~2 小时集训资源，是直通 2027 市长杯国家二级（31.50s）的决定性支点。`);
         }
       } else if (free50Records.length === 1) {
         swimProgression.push(`⏱️ <strong>50米自由泳基准成绩为 ${free50Records[0].time}</strong>，展现出优秀的大关三线水动力雏形。`);
@@ -209,9 +213,26 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
         </div>
       </div>
 
+      <div style="background: rgba(52, 199, 89, 0.04); border-left: 4px solid #34c759; padding: 14px 16px; border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-top: 12px;">
+        <h5 style="color: #248a3d; margin-bottom: 6px; font-size: 0.95rem; font-weight: 700;">
+          🏊 今日 10/06 三线巡线考核复盘与“25米短段落爆发力”进阶指引：
+        </h5>
+        <div style="font-size: 0.88rem; line-height: 1.6; color: var(--primary-color);">
+          <p style="margin-bottom: 6px;">
+            <strong>【考核成效】</strong> 25米实测 28.00 秒。教练组重点肯定动作规范度：前交叉侧向咬苹果换气完全贴水无抬头，身体流线型保持平直，手掌与脚蹼的水感协同优良。
+          </p>
+          <p style="margin: 0;">
+            <strong>【从 28s 冲向 20s 的三大突破点】</strong><br />
+            ① <strong>前 10 米无呼吸爆发起步：</strong> 出发蹬壁后流线型水下蝶泳腿 3 次出水，前 4~5 划坚决不换气，迅速将航速提到最高点（可省 1.5s）；<br />
+            ② <strong>高肘抱水压腕抓水点：</strong> 强化前臂内旋与 14.2cm 大手掌的对水阻水截面，把划水从“推水滑行”升级为“深层抓水加速”（可省 1.5~2.0s）；<br />
+            ③ <strong>后程 5 米强力打腿冲刺触壁：</strong> 冲向到壁池边时最后 2 划不吸气，头顶平扎，手掌直拍计时板，全力抢触壁瞬间（可省 1.0s）。
+          </p>
+        </div>
+      </div>
+
       <div style="background: rgba(255, 149, 0, 0.04); border-left: 4px solid #ff9500; padding: 14px 16px; border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-top: 12px;">
         <h5 style="color: #d35400; margin-bottom: 6px; font-size: 0.95rem; font-weight: 700;">
-          📹 小候鸟 56.17s 比赛实况视频复盘与进二线（< 40s）技术攻坚：
+          📹 小候鸟 56.17s 比赛实况视频复盘与进二线（&lt; 40s）技术攻坚：
         </h5>
         <div style="font-size: 0.88rem; line-height: 1.6; color: var(--primary-color);">
           <p style="margin-bottom: 6px;">
@@ -580,13 +601,18 @@ export default function Dashboard({ growthRecords, swimRecords, trainings, fitne
         {/* Latest Achievement */}
         <div className="glass-card metrics-card">
           <div className="flex-between">
-            <span className="metrics-title">50米自由泳基准与核心差值</span>
+            <span className="metrics-title">50米自最好成绩与近期考核</span>
             <Activity size={18} style={{ color: '#34c759' }} />
           </div>
           <div className="metrics-value" style={{ fontSize: '1.75rem' }}>
-            {latestSwim ? latestSwim.time : '--:--.--'}
+            {current50mFreeRecord ? current50mFreeRecord.time : (latestSwim ? latestSwim.time : '--:--.--')}
           </div>
-          <div className="text-secondary" style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div className="text-secondary" style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            {latestSwim && latestSwim.distance === '25m' && (
+              <span style={{ color: '#0071e3', fontWeight: 600 }}>
+                10/06 巡线考核：25米自 {latestSwim.time} (均速对标 56s)
+              </span>
+            )}
             <span style={{ color: '#d35400', fontWeight: 700 }}>
               距大关二线(&lt;40.00s) 尚差 {deltaToTier2} 秒 (进度 {progressPercentTier2}%)
             </span>

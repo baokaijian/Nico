@@ -323,6 +323,11 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
                 <div style={{ fontWeight: 600, color: 'var(--primary-color)' }}>蝶 34.0s | 蛙 40.5s</div>
                 <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>200混: 二级 ≤ 2:50.0</div>
               </div>
+              <div style={{ background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,113,227,0.2)' }}>
+                <span style={{ color: '#0071e3', fontSize: '0.75rem', fontWeight: 700 }}>25m 自由泳 (速度链)</span>
+                <div style={{ fontWeight: 700, color: '#0071e3' }}>二线段落标 ≤ 20.0s</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--secondary-color)' }}>10/06 考核 28.0s | PB 26.5s</div>
+              </div>
             </div>
           </div>
         </form>
@@ -438,9 +443,26 @@ export default function SwimLogger({ records, onAddRecord, onDeleteRecord, onUpd
                             </span>
                           );
                         })()
+                      ) : (r.distance === '25m' && r.seconds && r.stroke === '自由泳' ? (
+                        (() => {
+                          const target25 = 20.00;
+                          const diff = (r.seconds - target25).toFixed(2);
+                          if (diff <= 0) {
+                            return (
+                              <span style={{ fontSize: '0.75rem', background: 'rgba(52,199,89,0.15)', color: '#248a3d', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                                🎉 达二线段落标
+                              </span>
+                            );
+                          }
+                          return (
+                            <span style={{ fontSize: '0.75rem', background: 'rgba(0,113,227,0.12)', color: '#0071e3', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                              距20s二线标差 {diff}s
+                            </span>
+                          );
+                        })()
                       ) : (
                         <span style={{ color: 'var(--secondary-color)', fontSize: '0.8rem' }}>--</span>
-                      )}
+                      ))}
                     </td>
                     <td>{r.poolLength === '25m' ? '25米' : '50米'}</td>
                     <td style={{ textAlign: 'right' }}>

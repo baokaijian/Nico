@@ -302,6 +302,53 @@ export default function PlanViewer({ growthRecords, swimRecords, trainings }) {
             </div>
           </div>
 
+          {/* 25m Speed Chain Velocity Ladder Card */}
+          <div className="glass-card" style={{ borderLeft: '4px solid #0071e3' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: '#0071e3', color: '#fff', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                  最新考核衔接
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-color)' }}>
+                  25米段落速度链阶梯突破：从 28.00s 考核到 20.00s 二线准入
+                </h3>
+              </div>
+              <span style={{ fontSize: '0.82rem', color: '#0071e3', fontWeight: 600 }}>
+                10/06 巡线实测：28.00s ➔ 历史最好：26.50s ➔ 二线标杆：&lt; 20.00s
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--secondary-color)', marginBottom: '12px', lineHeight: 1.5 }}>
+              <strong>50米破 40 秒的本质是两个 25 米段落的叠加</strong>：前 25 米（带出发）需达到 18.5~19.5 秒，后 25 米（带转身）需达到 20.0~20.5 秒。10月6日巡线考核 28.00 秒印证了途中游巡航动作的稳定性，下一步训练方案全面引入“25米短段落阶梯提速包”：
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px' }}>
+              <div style={{ background: 'rgba(0, 113, 227, 0.05)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(0, 113, 227, 0.2)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0071e3' }}>第一阶梯 (2026.10-11)</span>
+                <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--primary-color)', margin: '3px 0' }}>28.00s ➔ 24.50s</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>
+                  出发后前 10 米坚决不换气，保持绝对流线型穿透水流，减少无谓呼吸阻力。
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(255, 149, 0, 0.05)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 149, 0, 0.2)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff9500' }}>第二阶梯 (2026.12-2027.02)</span>
+                <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--primary-color)', margin: '3px 0' }}>24.50s ➔ 22.00s</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>
+                  高肘抱水压腕抓水点变现，单臂划水深度增加，25米划水次数降至 16 次以内。
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(52, 199, 89, 0.05)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(52, 199, 89, 0.2)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#248a3d' }}>第三阶梯 (2027.03-05)</span>
+                <div style={{ fontWeight: 800, fontSize: '1rem', color: '#248a3d', margin: '3px 0' }}>22.00s ➔ &lt; 20.00s</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-color)' }}>
+                  引入池边俯冲起跳爆发力，最后 5 米高频腿强行拍壁，50米速度自然打通进入 38~39s！
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Three Core Pillars for Nico */}
           <div className="glass-card">
             <h3 className="mb-sm flex-gap-sm" style={{ color: 'var(--primary-color)' }}>
