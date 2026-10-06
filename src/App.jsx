@@ -12,27 +12,64 @@ import GrowthLogger from './components/GrowthLogger';
 import PlanViewer from './components/PlanViewer';
 import MediaGallery from './components/MediaGallery';
 
+import initialDb from '../server/db.json';
+
 const SERVER_URL = 'http://localhost:3001';
 
 export default function App() {
+  const isStaticHost = typeof window !== 'undefined' && (
+    window.location.hostname.includes('github.io') ||
+    window.location.protocol === 'https:'
+  );
+
+  const getInitial = (key, fallback) => {
+    try {
+      const cached = localStorage.getItem(`nico_${key}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('LocalStorage read error:', e);
+    }
+    return fallback || [];
+  };
+
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [growthRecords, setGrowthRecords] = useState([]);
-  const [swimRecords, setSwimRecords] = useState([]);
-  const [trainings, setTrainings] = useState([]);
-  const [fitnessRecords, setFitnessRecords] = useState([]);
-  const [nutritionRecords, setNutritionRecords] = useState([]);
-  const [goals, setGoals] = useState([]);
-  const [mediaList, setMediaList] = useState([]);
+  const [growthRecords, setGrowthRecords] = useState(() => getInitial('growth', initialDb.growth));
+  const [swimRecords, setSwimRecords] = useState(() => getInitial('swim', initialDb.swim));
+  const [trainings, setTrainings] = useState(() => getInitial('trainings', initialDb.trainings));
+  const [fitnessRecords, setFitnessRecords] = useState(() => getInitial('fitness', initialDb.fitness));
+  const [nutritionRecords, setNutritionRecords] = useState(() => getInitial('nutrition', initialDb.nutrition));
+  const [goals, setGoals] = useState(() => getInitial('goals', initialDb.goals));
+  const [mediaList, setMediaList] = useState(() => getInitial('media', initialDb.media));
   
   // Loading and Error statuses
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch all data from backend
+  const saveAndSync = (key, data, setter) => {
+    setter(data);
+    try {
+      localStorage.setItem(`nico_${key}`, JSON.stringify(data));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+  };
+
+  // Fetch all data from backend (in local development mode)
   const fetchData = async () => {
+    if (isStaticHost) {
+      setLoading(false);
+      setError('');
+      return;
+    }
+
     try {
       setLoading(true);
-      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
       const [
         growthRes, 
         swimRes, 
@@ -42,14 +79,15 @@ export default function App() {
         nutritionRes, 
         goalsRes
       ] = await Promise.all([
-        fetch(`${SERVER_URL}/api/growth`),
-        fetch(`${SERVER_URL}/api/swim`),
-        fetch(`${SERVER_URL}/api/media`),
-        fetch(`${SERVER_URL}/api/trainings`),
-        fetch(`${SERVER_URL}/api/fitness`),
-        fetch(`${SERVER_URL}/api/nutrition`),
-        fetch(`${SERVER_URL}/api/goals`)
+        fetch(`${SERVER_URL}/api/growth`, { signal: controller.signal }),
+        fetch(`${SERVER_URL}/api/swim`, { signal: controller.signal }),
+        fetch(`${SERVER_URL}/api/media`, { signal: controller.signal }),
+        fetch(`${SERVER_URL}/api/trainings`, { signal: controller.signal }),
+        fetch(`${SERVER_URL}/api/fitness`, { signal: controller.signal }),
+        fetch(`${SERVER_URL}/api/nutrition`, { signal: controller.signal }),
+        fetch(`${SERVER_URL}/api/goals`, { signal: controller.signal })
       ]);
+      clearTimeout(timeoutId);
 
       if (!growthRes.ok || !swimRes.ok || !mediaRes.ok) {
         throw new Error('基础接口服务响应异常');
@@ -58,22 +96,31 @@ export default function App() {
       const growthData = await growthRes.json();
       const swimData = await swimRes.json();
       const mediaData = await mediaRes.json();
-      const trainingsData = trainingsRes.ok ? await trainingsRes.json() : [];
-      const fitnessData = fitnessRes.ok ? await fitnessRes.json() : [];
-      const nutritionData = nutritionRes.ok ? await nutritionRes.json() : [];
-      const goalsData = goalsRes.ok ? await goalsRes.json() : [];
+      const trainingsData = trainingsRes.ok ? await trainingsRes.json() : (initialDb.trainings || []);
+      const fitnessData = fitnessRes.ok ? await fitnessRes.json() : (initialDb.fitness || []);
+      const nutritionData = nutritionRes.ok ? await nutritionRes.json() : (initialDb.nutrition || []);
+      const goalsData = goalsRes.ok ? await goalsRes.json() : (initialDb.goals || []);
 
-      setGrowthRecords(growthData);
-      setSwimRecords(swimData);
-      setMediaList(mediaData);
-      setTrainings(trainingsData);
-      setFitnessRecords(fitnessData);
-      setNutritionRecords(nutritionData);
-      setGoals(goalsData);
+      saveAndSync('growth', growthData, setGrowthRecords);
+      saveAndSync('swim', swimData, setSwimRecords);
+      saveAndSync('media', mediaData, setMediaList);
+      saveAndSync('trainings', trainingsData, setTrainings);
+      saveAndSync('fitness', fitnessData, setFitnessRecords);
+      saveAndSync('nutrition', nutritionData, setNutritionRecords);
+      saveAndSync('goals', goalsData, setGoals);
       setError('');
     } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('无法连接到本地后端服务。请确保 Express 服务已在 3001 端口正常启动。');
+      console.warn('Backend sync failed, using static dataset:', err);
+      // Fallback cleanly to embedded dataset if state is empty
+      if (!growthRecords.length) {
+        setGrowthRecords(initialDb.growth || []);
+        setSwimRecords(initialDb.swim || []);
+        setTrainings(initialDb.trainings || []);
+        setFitnessRecords(initialDb.fitness || []);
+        setNutritionRecords(initialDb.nutrition || []);
+        setGoals(initialDb.goals || []);
+        setMediaList(initialDb.media || []);
+      }
     } finally {
       setLoading(false);
     }
@@ -81,174 +128,300 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Growth record callbacks
   const handleAddGrowth = async (record) => {
-    const res = await fetch(`${SERVER_URL}/api/growth`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('保存身体记录失败');
-    const newRecord = await res.json();
-    setGrowthRecords(prev => [...prev, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/growth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote save failed, saving locally:', e);
+    }
+    const newRecord = saved || { ...record, id: `g-${Date.now()}` };
+    const updated = [...growthRecords, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('growth', updated, setGrowthRecords);
   };
 
   const handleDeleteGrowth = async (id) => {
     if (!window.confirm('您确定要删除此条身体数据记录吗？')) return;
-    const res = await fetch(`${SERVER_URL}/api/growth/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('删除身体记录失败');
-    setGrowthRecords(prev => prev.filter(r => r.id !== id));
+    try {
+      if (!isStaticHost) {
+        await fetch(`${SERVER_URL}/api/growth/${id}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn('Remote delete failed, deleting locally:', e);
+    }
+    const updated = growthRecords.filter(r => r.id !== id);
+    saveAndSync('growth', updated, setGrowthRecords);
   };
 
   const handleUpdateGrowth = async (id, record) => {
-    const res = await fetch(`${SERVER_URL}/api/growth/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('更新身体记录失败');
-    const updated = await res.json();
-    setGrowthRecords(prev => prev.map(r => r.id === id ? updated : r).sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/growth/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote update failed, updating locally:', e);
+    }
+    const updatedRecord = saved || { ...record, id };
+    const updated = growthRecords.map(r => r.id === id ? updatedRecord : r).sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('growth', updated, setGrowthRecords);
   };
 
   // Swim record callbacks
   const handleAddSwim = async (record) => {
-    const res = await fetch(`${SERVER_URL}/api/swim`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('保存成绩记录失败');
-    const newRecord = await res.json();
-    setSwimRecords(prev => [...prev, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/swim`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote save failed, saving locally:', e);
+    }
+    const newRecord = saved || { ...record, id: `s-${Date.now()}` };
+    const updated = [...swimRecords, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('swim', updated, setSwimRecords);
   };
 
   const handleDeleteSwim = async (id) => {
     if (!window.confirm('您确定要删除此条成绩记录吗？')) return;
-    const res = await fetch(`${SERVER_URL}/api/swim/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('删除成绩记录失败');
-    setSwimRecords(prev => prev.filter(r => r.id !== id));
+    try {
+      if (!isStaticHost) {
+        await fetch(`${SERVER_URL}/api/swim/${id}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn('Remote delete failed, deleting locally:', e);
+    }
+    const updated = swimRecords.filter(r => r.id !== id);
+    saveAndSync('swim', updated, setSwimRecords);
   };
 
   const handleUpdateSwim = async (id, record) => {
-    const res = await fetch(`${SERVER_URL}/api/swim/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('更新成绩记录失败');
-    const updated = await res.json();
-    setSwimRecords(prev => prev.map(r => r.id === id ? updated : r).sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/swim/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote update failed, updating locally:', e);
+    }
+    const updatedRecord = saved || { ...record, id };
+    const updated = swimRecords.map(r => r.id === id ? updatedRecord : r).sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('swim', updated, setSwimRecords);
   };
 
   // Training record callbacks
   const handleAddTraining = async (record) => {
-    const res = await fetch(`${SERVER_URL}/api/trainings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('保存水上训练记录失败');
-    const newRecord = await res.json();
-    setTrainings(prev => [...prev, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/trainings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote save failed, saving locally:', e);
+    }
+    const newRecord = saved || { ...record, id: `t-${Date.now()}` };
+    const updated = [...trainings, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('trainings', updated, setTrainings);
   };
 
   const handleDeleteTraining = async (id) => {
     if (!window.confirm('您确定要删除此条水上训练记录吗？')) return;
-    const res = await fetch(`${SERVER_URL}/api/trainings/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('删除水上训练记录失败');
-    setTrainings(prev => prev.filter(t => t.id !== id));
+    try {
+      if (!isStaticHost) {
+        await fetch(`${SERVER_URL}/api/trainings/${id}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn('Remote delete failed, deleting locally:', e);
+    }
+    const updated = trainings.filter(t => t.id !== id);
+    saveAndSync('trainings', updated, setTrainings);
   };
 
   const handleUpdateTraining = async (id, record) => {
-    const res = await fetch(`${SERVER_URL}/api/trainings/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('更新水上训练记录失败');
-    const updated = await res.json();
-    setTrainings(prev => prev.map(t => t.id === id ? updated : t).sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/trainings/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote update failed, updating locally:', e);
+    }
+    const updatedRecord = saved || { ...record, id };
+    const updated = trainings.map(t => t.id === id ? updatedRecord : r).sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('trainings', updated, setTrainings);
   };
 
   // Fitness record callbacks
   const handleAddFitness = async (record) => {
-    const res = await fetch(`${SERVER_URL}/api/fitness`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('保存陆上体能记录失败');
-    const newRecord = await res.json();
-    setFitnessRecords(prev => [...prev, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/fitness`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote save failed, saving locally:', e);
+    }
+    const newRecord = saved || { ...record, id: `f-${Date.now()}` };
+    const updated = [...fitnessRecords, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('fitness', updated, setFitnessRecords);
   };
 
   const handleDeleteFitness = async (id) => {
     if (!window.confirm('您确定要删除此条陆上体能记录吗？')) return;
-    const res = await fetch(`${SERVER_URL}/api/fitness/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('删除陆上体能记录失败');
-    setFitnessRecords(prev => prev.filter(f => f.id !== id));
+    try {
+      if (!isStaticHost) {
+        await fetch(`${SERVER_URL}/api/fitness/${id}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn('Remote delete failed, deleting locally:', e);
+    }
+    const updated = fitnessRecords.filter(f => f.id !== id);
+    saveAndSync('fitness', updated, setFitnessRecords);
   };
 
   const handleUpdateFitness = async (id, record) => {
-    const res = await fetch(`${SERVER_URL}/api/fitness/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('更新陆上体能记录失败');
-    const updated = await res.json();
-    setFitnessRecords(prev => prev.map(f => f.id === id ? updated : f).sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/fitness/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote update failed, updating locally:', e);
+    }
+    const updatedRecord = saved || { ...record, id };
+    const updated = fitnessRecords.map(f => f.id === id ? updatedRecord : f).sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('fitness', updated, setFitnessRecords);
   };
 
   // Nutrition record callbacks
   const handleAddNutrition = async (record) => {
-    const res = await fetch(`${SERVER_URL}/api/nutrition`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('保存营养恢复记录失败');
-    const newRecord = await res.json();
-    setNutritionRecords(prev => [...prev, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/nutrition`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote save failed, saving locally:', e);
+    }
+    const newRecord = saved || { ...record, id: `n-${Date.now()}` };
+    const updated = [...nutritionRecords, newRecord].sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('nutrition', updated, setNutritionRecords);
   };
 
   const handleDeleteNutrition = async (id) => {
     if (!window.confirm('您确定要删除此条营养恢复记录吗？')) return;
-    const res = await fetch(`${SERVER_URL}/api/nutrition/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('删除营养恢复记录失败');
-    setNutritionRecords(prev => prev.filter(n => n.id !== id));
+    try {
+      if (!isStaticHost) {
+        await fetch(`${SERVER_URL}/api/nutrition/${id}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn('Remote delete failed, deleting locally:', e);
+    }
+    const updated = nutritionRecords.filter(n => n.id !== id);
+    saveAndSync('nutrition', updated, setNutritionRecords);
   };
 
   const handleUpdateNutrition = async (id, record) => {
-    const res = await fetch(`${SERVER_URL}/api/nutrition/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (!res.ok) throw new Error('更新营养恢复记录失败');
-    const updated = await res.json();
-    setNutritionRecords(prev => prev.map(n => n.id === id ? updated : n).sort((a, b) => new Date(a.date) - new Date(b.date)));
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/nutrition/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote update failed, updating locally:', e);
+    }
+    const updatedRecord = saved || { ...record, id };
+    const updated = nutritionRecords.map(n => n.id === id ? updatedRecord : n).sort((a, b) => new Date(a.date) - new Date(b.date));
+    saveAndSync('nutrition', updated, setNutritionRecords);
   };
 
   // Media record callbacks
   const handleAddMedia = async (formData) => {
-    const res = await fetch(`${SERVER_URL}/api/media`, {
-      method: 'POST',
-      body: formData
-    });
-    if (!res.ok) throw new Error('上传相册文件失败');
-    const newMedia = await res.json();
-    setMediaList(prev => [newMedia, ...prev]);
+    let saved = null;
+    try {
+      if (!isStaticHost) {
+        const res = await fetch(`${SERVER_URL}/api/media`, {
+          method: 'POST',
+          body: formData
+        });
+        if (res.ok) saved = await res.json();
+      }
+    } catch (e) {
+      console.warn('Remote media save failed:', e);
+    }
+    if (saved) {
+      const updated = [saved, ...mediaList];
+      saveAndSync('media', updated, setMediaList);
+    }
   };
 
   const handleDeleteMedia = async (id) => {
     if (!window.confirm('您确定要删除这个相册文件吗？')) return;
-    const res = await fetch(`${SERVER_URL}/api/media/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('删除相册文件失败');
-    setMediaList(prev => prev.filter(m => m.id !== id));
+    try {
+      if (!isStaticHost) {
+        await fetch(`${SERVER_URL}/api/media/${id}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn('Remote media delete failed:', e);
+    }
+    const updated = mediaList.filter(m => m.id !== id);
+    saveAndSync('media', updated, setMediaList);
   };
 
   return (
@@ -273,9 +446,21 @@ export default function App() {
             <span style={{ fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
               Nico 竞技游泳成长系统
             </span>
-            <span style={{ fontSize: '0.68rem', color: 'var(--secondary-color)', fontWeight: 500 }}>
-              杭州大关三线运动员 · 梯队档案
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--secondary-color)', fontWeight: 500 }}>
+                杭州大关三线运动员 · 梯队档案
+              </span>
+              <span style={{ 
+                fontSize: '0.62rem', 
+                padding: '1px 6px', 
+                borderRadius: '6px', 
+                background: isStaticHost ? 'rgba(52, 199, 89, 0.12)' : 'rgba(0, 113, 227, 0.12)',
+                color: isStaticHost ? '#248a3d' : '#0071e3',
+                fontWeight: 600
+              }}>
+                {isStaticHost ? '● 云端静态' : '● 本地联机'}
+              </span>
+            </div>
           </div>
         </div>
         
@@ -348,7 +533,7 @@ export default function App() {
 
       {/* Main Container */}
       <div className="container">
-        {error && (
+        {error && !isStaticHost && (
           <div className="glass-card" style={{ borderLeft: '4px solid rgb(255, 59, 48)', marginBottom: 'var(--space-lg)' }}>
             <h3 style={{ color: 'rgb(255, 59, 48)', marginBottom: '8px' }}>本地服务连接失败</h3>
             <p style={{ color: 'var(--secondary-color)', fontSize: '0.95rem' }}>{error}</p>
