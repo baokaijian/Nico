@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Image as ImageIcon, Video as VideoIcon, Plus, Play, X, Trash2, Upload } from 'lucide-react';
 
 export default function MediaGallery({ 
@@ -21,6 +21,17 @@ export default function MediaGallery({
   // Lightbox view state
   const [activeMedia, setActiveMedia] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Close lightbox on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActiveMedia(null);
+    };
+    if (activeMedia) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [activeMedia]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -65,18 +76,34 @@ export default function MediaGallery({
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     const base = import.meta.env.BASE_URL || '/';
     const cleanBase = base.endsWith('/') ? base : base + '/';
-    if (window.location.protocol === 'https:' || !serverUrl) {
+    if (isReadOnly || window.location.protocol === 'https:' || !serverUrl) {
       return `${cleanBase}${url.replace(/^\//, '')}`;
+    }
+    return `${serverUrl}${url}`;
+  };
+
+  const getMediaFallbackUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const base = import.meta.env.BASE_URL || '/';
+    const cleanBase = base.endsWith('/') ? base : base + '/';
+    if (isReadOnly || window.location.protocol === 'https:' || !serverUrl) {
+      return `${cleanBase}docs/${url.replace(/^\//, '')}`;
     }
     return `${serverUrl}${url}`;
   };
 
   return (
     <div>
-      <div className="flex-between mb-lg">
-        <h2 style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-          相册与视频
-        </h2>
+      <div className="flex-between mb-md">
+        <div>
+          <h2 style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+            相册与视频
+          </h2>
+          <p style={{ color: 'var(--secondary-color)', fontSize: '0.9rem', marginTop: '4px' }}>
+            记录 Nico 在大关三线队的真实训练影像与比赛高光时刻
+          </p>
+        </div>
         {!isReadOnly && (
           <button 
             onClick={() => setShowUploadModal(true)} 
@@ -88,6 +115,25 @@ export default function MediaGallery({
           </button>
         )}
       </div>
+
+      {isReadOnly && (
+        <div className="glass-card mb-md" style={{ 
+          background: 'linear-gradient(135deg, rgba(0, 113, 227, 0.05) 0%, rgba(52, 199, 89, 0.05) 100%)',
+          border: '1px solid rgba(0, 113, 227, 0.18)',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          borderRadius: 'var(--radius-md)'
+        }}>
+          <span style={{ background: '#0071e3', color: '#fff', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>
+            只读在线播放
+          </span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--primary-color)', fontWeight: 500 }}>
+            支持视频与图片直接在线高清浏览与播放，无需下载任何源文件；新相册影像仅在本地管理环境提交。
+          </span>
+        </div>
+      )}
 
       {/* Media Grid */}
       {mediaList.length > 0 ? (
@@ -103,15 +149,35 @@ export default function MediaGallery({
                 >
                   {m.type === 'video' ? (
                     <>
-                      <video className="media-thumbnail" preload="metadata">
-                        <source src={fileUrl} type="video/mp4" />
-                      </video>
-                      <div className="media-play-btn">
-                        <Play size={20} fill="var(--accent-color)" />
+                      <video 
+                        className="media-thumbnail" 
+                        preload="metadata"
+                        muted
+                        playsInline
+                        src={`${fileUrl}#t=0.001`}
+                        onError={(e) => {
+                          const fallback = `${getMediaFallbackUrl(m.url)}#t=0.001`;
+                          if (e.currentTarget.src !== fallback) {
+                            e.currentTarget.src = fallback;
+                          }
+                        }}
+                      />
+                      <div className="media-play-btn" title="点击在线播放">
+                        <Play size={22} fill="var(--accent-color)" style={{ marginLeft: '2px' }} />
                       </div>
                     </>
                   ) : (
-                    <img src={fileUrl} alt={m.title} className="media-thumbnail" />
+                    <img 
+                      src={fileUrl} 
+                      alt={m.title} 
+                      className="media-thumbnail" 
+                      onError={(e) => {
+                        const fallback = getMediaFallbackUrl(m.url);
+                        if (e.currentTarget.src !== fallback) {
+                          e.currentTarget.src = fallback;
+                        }
+                      }}
+                    />
                   )}
                   <span className="media-badge">{m.category}</span>
                 </div>
@@ -262,37 +328,54 @@ export default function MediaGallery({
       {/* Lightbox / Video Player Modal */}
       {activeMedia && (
         <div className="lightbox" onClick={() => setActiveMedia(null)}>
-          <button className="lightbox-close" onClick={() => setActiveMedia(null)}>
+          <button className="lightbox-close" onClick={() => setActiveMedia(null)} title="关闭 (Esc)">
             <X size={24} />
           </button>
           
           <div className="lightbox-content-wrapper" onClick={(e) => e.stopPropagation()}>
             {activeMedia.type === 'video' ? (
               <video 
+                key={activeMedia.id}
                 className="lightbox-content" 
                 controls 
                 autoPlay 
-                style={{ width: '100%', maxWidth: '800px', borderRadius: '12px' }}
+                playsInline
+                controlsList="nodownload"
+                style={{ width: '100%', maxWidth: '900px', maxHeight: '72vh', borderRadius: '12px', background: '#000' }}
+                onError={(e) => {
+                  const video = e.currentTarget;
+                  const fallback = getMediaFallbackUrl(activeMedia.url);
+                  if (video.src !== fallback) {
+                    video.src = fallback;
+                    video.load();
+                    video.play().catch(() => {});
+                  }
+                }}
               >
-                <source 
-                  src={getMediaUrl(activeMedia.url)} 
-                  type="video/mp4" 
-                />
-                您的浏览器不支持视频播放标签。
+                <source src={getMediaUrl(activeMedia.url)} type="video/mp4" />
+                <source src={getMediaFallbackUrl(activeMedia.url)} type="video/mp4" />
+                您的浏览器暂不支持此视频在线播放。
               </video>
             ) : (
               <img 
+                key={activeMedia.id}
                 src={getMediaUrl(activeMedia.url)} 
                 alt={activeMedia.title} 
                 className="lightbox-content" 
-                style={{ borderRadius: '12px' }}
+                style={{ borderRadius: '12px', maxHeight: '75vh', objectFit: 'contain' }}
+                onError={(e) => {
+                  const fallback = getMediaFallbackUrl(activeMedia.url);
+                  if (e.currentTarget.src !== fallback) {
+                    e.currentTarget.src = fallback;
+                  }
+                }}
               />
             )}
             
             <div className="lightbox-caption">
               <h3>{activeMedia.title}</h3>
               <p>{activeMedia.date} • {activeMedia.category}</p>
-              {activeMedia.description && <p style={{ marginTop: '8px', color: '#e5e5ea' }}>{activeMedia.description}</p>}
+              {activeMedia.description && <p style={{ marginTop: '8px', color: '#e5e5ea', lineHeight: 1.5 }}>{activeMedia.description}</p>}
             </div>
           </div>
         </div>
