@@ -1,0 +1,71 @@
+{
+  "publishedAt": "2026-10-07",
+  "story": "公开展示已录入的游泳成绩与影像。",
+  "swim": [
+    {
+      "id": "s-1782488023314",
+      "date": "2026-06-25",
+      "distance": "50m",
+      "stroke": "自由泳",
+      "poolLength": "50m",
+      "time": "01:14.00",
+      "seconds": 74
+    },
+    {
+      "id": "s-1787000000006",
+      "date": "2026-09-06",
+      "distance": "50m",
+      "stroke": "自由泳",
+      "poolLength": "50m",
+      "time": "01:03.00",
+      "seconds": 63
+    },
+    {
+      "id": "s-1789892549317",
+      "date": "2026-09-19",
+      "distance": "50m",
+      "stroke": "自由泳",
+      "poolLength": "50m",
+      "time": "00:56.17",
+      "seconds": 56.17
+    },
+    {
+      "id": "s-1791289351204",
+      "date": "2026-10-06",
+      "distance": "25m",
+      "stroke": "自由泳",
+      "poolLength": "25m",
+      "time": "00:28.00",
+      "seconds": 28
+    }
+  ],
+  "media": [
+    {
+      "id": "m-1789893938322",
+      "date": "2026-09-19",
+      "title": "小候鸟50米自由泳比赛",
+      "type": "video",
+      "url": "/uploads/file-1789893938254-176345168-720p.mp4",
+      "posterUrl": "/uploads/file-1789893938254-176345168-poster.jpg",
+      "duration": 62.638333
+    },
+    {
+      "id": "m-1782489250829",
+      "date": "2026-06-26",
+      "title": "日常训练",
+      "type": "video",
+      "url": "/uploads/file-1782489250807-29167927-720p.mp4",
+      "posterUrl": "/uploads/file-1782489250807-29167927-poster.jpg",
+      "duration": 42.050292
+    },
+    {
+      "id": "m-1782489259103",
+      "date": "2026-06-26",
+      "title": "日常训练",
+      "type": "video",
+      "url": "/uploads/file-1782489259090-516342653-720p.mp4",
+      "posterUrl": "/uploads/file-1782489259090-516342653-poster.jpg",
+      "duration": 21.803875
+    }
+  ]
+}

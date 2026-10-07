@@ -1,58 +1,47 @@
-name: Deploy Nico to GitHub Pages
-
+name: Publish selected Nico summary
 on:
   push:
     branches: [master]
   workflow_dispatch:
-
+  pull_request:
+    branches: [master]
 permissions:
-  contents: write
-  pages: write
-  id-token: write
-
+  contents: read
 concurrency:
-  group: 'pages'
+  group: pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'publish' }}
   cancel-in-progress: true
-
 jobs:
-  build-and-deploy:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VITE_APP_MODE: public
+      NICO_TEST_PROTOCOL_ONLY: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Refuse an empty replacement for the existing public site
+        run: node scripts/check-public-release.mjs
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: dist
+  deploy:
+    if: github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+      url: ${{ steps.publish.outputs.page_url }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build production bundle
-        run: npm run build
-
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v5
-        continue-on-error: true
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        continue-on-error: true
-        with:
-          path: './dist'
-
-      - name: Deploy to GitHub Pages (Actions Mode)
-        id: deployment
-        continue-on-error: true
+      - id: publish
         uses: actions/deploy-pages@v4

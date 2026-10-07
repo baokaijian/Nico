@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { normalizeState } from '../shared/domain.mjs';
+const root = path.resolve(import.meta.dirname, '..');
+const destination = path.join(root, 'data/original-input.json');
+if (fs.existsSync(destination) || fs.existsSync(path.join(root, 'data/nico.sqlite'))) throw new Error('已存在真实数据，拒绝重新初始化或覆盖');
+const input = process.argv[2];
+if (!input) throw new Error('请明确指定原始JSON路径；仅全新空档案可显式使用--empty');
+const source = input === '--empty' ? path.join(root, 'server/db.example.json') : path.resolve(input);
+const bytes = fs.readFileSync(source);
+normalizeState(JSON.parse(bytes.toString()));
+fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
+fs.writeFileSync(destination, bytes, { flag: 'wx', mode: 0o600 });
+console.log(input === '--empty' ? '已显式初始化空档案，没有生成实测数据。' : '已按原字节导入输入文件，没有生成或改写实测数据。');
