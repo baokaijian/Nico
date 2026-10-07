@@ -1,16 +1,95 @@
-# React + Vite
+# Nico 游泳成长记录
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+围绕计划、实际记录、录像复盘和周期报告管理单个儿童的游泳成长。分析是可追溯的规则汇总，训练建议是待教练确认的草稿；没有随机生成的成绩、体能、恢复评分、天赋分或达级预测。
 
-Currently, two official plugins are available:
+## 数据与运行方式
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `data/original-input.json` 是原始录入档案。首次启动完整导入 SQLite，之后不改写该文件（本次迁移前为server/db.json，原字节保留）；旧成绩、身体测量、目标和素材原字段保留。
+- `data/nico.sqlite` 是新的私有事实库。每次修改前将旧版本备份到 `data/backups`，目录不参与版本管理。
+- `data/uploads` 是唯一原片来源。兼容播放副本和封面在同目录生成，原片不改写。删除记录是移入回收站，不删除原片。
+- 页面通过接口读取实际记录；连接失败不伪装成空数据或保存成功。浏览器仅暂存未提交表单，不充当第二份事实库，不自动合并旧版本的 `nico_*` 缓存。
+- 成绩按距离、泳姿、池长区分；出发、计时、测试任务、赛事条件未知时明确标注未知。性别和生日不猜测。
 
-## React Compiler
+## 本机启动
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+需要 Node.js 24 或更高版本，以及 FFmpeg / FFprobe（处理素材时使用）。本次验证使用 Node.js 26.10.0；使用 Node 内置 SQLite，无新增数据库服务。
 
-## Expanding the Oxlint configuration
+```sh
+npm ci
+# 当前工作目录已保留你的原始输入，无需初始化。
+# 新安装才使用 npm run init:data -- /你的原始档案.json
+# 仅明确创建全新空档案时使用 npm run init:data -- --empty
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+访问 `http://127.0.0.1:5173/Nico/`。前端与服务端默认只监听本机，前端通过代理访问 `/api`。
+
+已有素材的兼容副本：
+
+```sh
+npm run media:prepare
+```
+
+生成最高720p、30fps、H.264/AAC的播放版本与封面；原片用于需要更高细节的复盘。上传后异步处理，在复盘页刷新状态。格式不符或处理工具不可用时返回明确错误/保留原片，不能将失败称为已处理。
+
+## 使用流程
+
+1. **今日**：已录入PB、数据覆盖、当前重点及带来源的分析。缺少测量显示未评估。
+2. **本周**：根据当前数据生成的四周建议；手动填写教练安排的周期、课次、组表和休息日。保存计划有版本和审核人，来源数据改变后提示复核。
+3. **记录**：简版课后/恢复记录与详细字段；成绩、体能、身体数据只填实测。0与留空不同。
+4. **复盘**：完整七章报告、独立HTML下载、浏览器打印为PDF；录像批注明确运动员/泳道、起止时间、证据限制、关联记录和审核状态。
+5. **档案**：确认基础档案，保留个人目标原文，查看官方标准，选择公开范围，导出/恢复完整备份及回收站恢复。
+
+原始目标中的未核实规则、旧标准和确定性承诺只作为历史录入原文，不作为已确认训练指令。女子50米自由泳现行参考：长池二级31.50秒/三级36.00秒，短池二级30.50秒/三级34.00秒；其他泳姿已复核的50米二级线统一配置。其他项目和男子标准未内置时直接查官方完整表，不猜测。达参考线、满足授级赛事条件与获得证书分别判断。
+
+官方来源：https://www.sport.gov.cn/rlzx/n5633/c28294142/part/28294152.pdf
+
+## 可靠保存与冲突
+
+- 所有修改需带最新读取版本，服务端事务写入；其他设备先修改时返回409，输入保留。
+- 记录和计划编辑保留其开始编辑的版本。遇到冲突，先刷新查看最新记录，再明确采用已核对的新版本重试。
+- 网络中断可能发生在写入前或确认响应丢失之后。因此先刷新核对是否已有该记录，再重试；页面不会声称未收到响应就一定没写入。
+- 错误响应不清空表单、不从列表删除记录。草稿仅在此设备，可单独导出。
+- 完整备份包含私有记录。恢复前自动备份现有版本；素材原文件需连同 `data/uploads` 保管，JSON备份不包含视频字节。
+- 停服务后整体复制 `data` 可保留全部数据/素材。只复制正在写入的 SQLite 主文件不完整，需连同WAL文件或先停服务。
+
+## 公开摘要与 GitHub Pages
+
+按最新要求，公网保留开放展示，无需登录，只读，不允许新增、修改、删除、上传或恢复数据。公开端只有成长故事、所选成绩与所选影像，不加载完整私有数据库；数据维护在本机完成。
+
+1. 在档案页勾选允许公开的成绩/素材，核对其他儿童素材范围，填写确认人和日期，保存白名单。
+2. 点击“生成本地公开发布包”，得到 `release/public-summary.json` 与所选播放文件。此动作只生成本地文件，不上传网站。
+3. 检查发布包，执行 `VITE_APP_MODE=public npm run build` 和 `npm run verify:public`；构建只读取 `release`，不读取私有事实库或原始档案。公网构建输出 `dist`，私有维护构建输出 `dist-private`，不能互相替代。
+4. 将已确认的发布包及代码提交到现有源仓库后，GitHub Actions使用唯一Pages artifact流程发布。仓库Pages设置应选择GitHub Actions；PR只检查，合入master后才发布。PR检查与正式发布使用不同并发组。
+
+没有确认公开内容时，默认发布包为空。这是发布范围未选择，不表示私有记录被删除。`public/uploads`、`docs`、根`assets`不再作为发布来源；旧生成文件已移至忽略的 `legacy-archive`，一致素材副本清理记录见 `review/RESOURCE_MIGRATION.json`。旧目录可从原片和该清单恢复。
+
+现网继续开放。自动部署与正式容器构建检查发布包是否已确认且非空；未选择展示内容时停止部署，不用空页面覆盖现网。该检查不阻止本机预览空的展示包。不要将开发预览、私有数据库、上传目录或本机维护接口代理到公开域名。
+
+如不用Pages，可在完成公开构建后执行 `npm run serve:public`，预览 `http://127.0.0.1:8080/Nico/`。该独立进程只提供展示包，不打开数据库，不读取维护密钥，不安装写入或上传路由；所有非GET/HEAD请求返回405，私有API返回404。部署到自己的服务器时设置 `NICO_PUBLIC_HOST=0.0.0.0`，由HTTPS入口代理到该进程。
+
+默认Dockerfile也是公开只读服务：运行阶段只复制公开构建、只读入口与校验模块，不复制私有维护后端或data。运行时不挂载私有数据，可使用只读容器文件系统。当前环境没有Docker运行程序，容器构建与真实HTTPS部署尚未验收。
+
+原始录入文件与原片仍包含家庭资料；家庭原始档案、素材、review报告已移到忽略目录，不再进入后续代码提交；源仓库历史中的旧数据需要单独处理。公开容器只打包代码与确认过的展示包，不挂载私有data目录；完整备份按私有资料管理。Pages发布产物与源仓库是不同范围。
+
+## 本机维护与私有服务
+
+当前公网方案只提供展示；本机维护服务默认只监听回环地址。登录认证公网方案保留为历史备选，本次不切换公网展示为登录制。
+
+- 私有维护服务误设 `NICO_HOST=0.0.0.0` 或其他非回环地址时，强制身份验证和只读；即使管理者密钥有效也不能写入。缺少管理者密钥则拒绝启动。本机也可使用 `NICO_READ_ONLY=true` 禁止修改。
+- 配置 `NICO_OWNER_TOKEN`、可选 `NICO_COACH_TOKEN`、`NICO_VIEWER_TOKEN`，每个至少32字符，分别用于家长管理、教练协作、授权只读访问。不要写进源码、Vite变量或公开包。
+- `NICO_ALLOWED_ORIGINS` 用逗号分隔允许的实际页面来源；不要用通配符。一个服务只提供Nico这一份档案，凭据权限限于该档案。
+- 本机维护中的教练角色可维护成绩、水上训练、计划与批注；身体、恢复、发布和备份操作限管理者。非回环监听时所有角色均不可写入。现有私有读取接口仍面向同一个完整档案，不能作为远程角色隔离服务上线。
+- 私有前端构建使用 `VITE_APP_MODE=private npm run build`；API同源时不用设置地址，否则配置 `VITE_API_URL`。用 `NICO_WEB_DIR` 指向该构建目录，服务可在 `/Nico/` 提供登录页面。
+- `.env.example` 提供字段说明。Node不自动读取`.env`，由部署环境注入变量，或使用 `node --env-file=.env server/server.js`。
+- 默认Dockerfile提供公网只读构建，不提供私有数据维护接口。本次未部署远程服务，也未运行容器构建。
+
+## 验证
+
+```sh
+npm run check
+```
+
+包含静态检查、基于原始输入的分析/报告检查、临时环境API验证、生产构建与公开白名单检查。接口测试使用明确标识的临时记录与确定性非法请求，不写入真实档案、不生成随机实测数据。真实家长录入用时、教练审核和远程服务运维是上线后的实际流程，不由自动测试冒充。
+
+评审、任务清单与本次验收记录位于 `review`。
