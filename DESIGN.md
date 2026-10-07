@@ -1,71 +1,25 @@
----
-version: alpha
-name: Apple-Minimalist-Swimming
-description: Apple design system principles with high-contrast slate colors, frosted glass interfaces, and clean typography.
-colors:
-  primary: "#1d1d1f"
-  secondary: "#86868b"
-  accent: "#0071e3"
-  accent-hover: "#0077ed"
-  background-light: "#f5f5f7"
-  background-dark: "#000000"
-  card-bg: "rgba(255, 255, 255, 0.72)"
-  card-border: "rgba(0, 0, 0, 0.08)"
-  shadow-color: "rgba(0, 0, 0, 0.04)"
-typography:
-  fontFamily: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif
-  h1:
-    fontSize: 2.5rem
-    fontWeight: 700
-    lineHeight: 1.15
-    letterSpacing: "-0.021em"
-  h2:
-    fontSize: 1.75rem
-    fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: "-0.011em"
-  body:
-    fontSize: 1rem
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: "-0.007em"
-rounded:
-  sm: 8px
-  md: 12px
-  lg: 20px
-  round: 9999px
-spacing:
-  xs: 4px
-  sm: 8px
-  md: 16px
-  lg: 24px
-  xl: 32px
-  xxl: 48px
----
+# Nico 界面与内容规范
 
-# Design System: Apple Minimalist
+## 信息优先级
 
-## 1. Overview
-The visual system is designed to look clean, polished, and premium—drawing inspiration from Apple's operating systems (iOS and macOS). It features clean grids, generous whitespace, card structures, and frosted glass (glassmorphism) elements that allow backgrounds to subtly bleed through.
+当前行动、已录入事实、数据缺口、可追溯分析、长期愿景。首页首屏能找到记录入口、当前重点与同项目PB。本机维护导航为今日、本周、记录、复盘、档案；公网无需登录，沿用故事、精选成绩、精选影像，仅展示已确认发布包。公网没有录入、修改、删除、上传、恢复或管理密钥入口；写请求由服务入口拒绝，不仅隐藏按钮。
 
-## 2. Color System
-- **Backgrounds:** Clean off-white `#f5f5f7` for light mode to create structure without being blindingly bright.
-- **Text:** Slate black `#1d1d1f` for strong readability, slate grey `#86868b` for secondary labels, metadata, and hints.
-- **Accents:** High-fidelity Apple blue `#0071e3` to draw attention to primary call-to-actions, toggles, and metrics.
-- **Cards:** White translucent base `rgba(255, 255, 255, 0.72)` combined with a thin border `rgba(0, 0, 0, 0.08)` and back-drop blur filters.
+## 数据与文字
 
-## 3. Typography
-Use system-native fonts (`-apple-system`, `BlinkMacSystemFont`) to feel integrated with the user's OS. Avoid heavy decoration, let the font weights and sizes establish clear reading order.
+实测、计算、原始意见、待验证建议分开标注。未填写不是0，0不是默认满分。所有表单测量值默认空白，示例不作为输入值。未知出发/计时条件不猜测。个人目标不是已确认赛事公告，参考达线不是证书。语气中性、具体，鼓励关注过程；不用战力、天赋、攻坚保证和无证据精确预测。
 
-## 4. Components & Glassmorphism
-- **Cards:** All content sections must be enclosed in rounded glass cards.
-- **Blurs:** Use `backdrop-filter: blur(20px)` on card structures.
-- **Form Inputs:** Soft, light gray inputs with a subtle inner border, which glow blue on focus.
-- **Buttons:**
-  - Primary: Filled blue with white text.
-  - Secondary: Soft grey background with blue or charcoal text.
+## 状态
 
-## 5. Micro-Animations
-- Hover states must use smooth transitions (`transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)`).
-- Cards should lift slightly (`transform: translateY(-2px)`) on hover.
-- Modal dialogs should animate upwards from the bottom of the screen with a scaling effect.
+加载中、成功读取、首次读取失败、保留上次成功数据、保存确认、提交未确认、版本冲突、未提交草稿、素材待处理/已处理/失败、建议草稿/已审核分别展示。保存错误保留输入；删除错误保留记录；回收站可恢复。公开摘要需要独立白名单与确认日期。
+
+## 布局
+
+系统字体、蓝色强调、浅底白卡、清楚边界与正文对比。减少渐变和玻璃效果；不默认让所有卡片上浮。390px手机布局不依赖一级标签横滑；长记录使用摘要与可展开详情。表单简版优先，补充字段折叠。视频封面先加载，点击才读取播放文件。
+
+## 可访问性
+
+输入与label绑定；使用真实按钮、checkbox、select和原生dialog。保留可见键盘焦点，弹窗Escape关闭并返回原焦点；图表有文字数据，状态不能只用颜色表示。支持减少动画偏好；中文lang、标题与描述一致。
+
+## 报告与来源
+
+独立报告同时渲染全部章节，打印不依赖方案子页状态。附范围、数据版本、计划版本、审核状态和来源记录。公开包与完整家庭报告分开。素材说明属于原始输入，技术结论需另有运动员确认、时间点与审核人。

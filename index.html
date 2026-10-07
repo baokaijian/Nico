@@ -1,28 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Track Nico's swimming training metrics, physical growth curves, performance times, and training media." />
-    <title>Nico's Swimming Tracker</title>
-    <script>
-      // Fallback loader if served statically from master branch root on GitHub Pages
-      if (location.hostname.includes('github.io') && !document.querySelector('script[crossorigin]')) {
-        const l = document.createElement('link');
-        l.rel = 'stylesheet';
-        l.href = '/Nico/assets/index.css';
-        document.head.appendChild(l);
-        const s = document.createElement('script');
-        s.type = 'module';
-        s.crossOrigin = 'anonymous';
-        s.src = '/Nico/assets/index.js';
-        document.head.appendChild(s);
-      }
-    </script>
+    <meta name="description" content="依据实际录入记录，查看Nico的游泳成长、训练复盘与精选影像。" />
+    <meta name="theme-color" content="#1764bb" />
+    <title>Nico 游泳成长记录</title>
   </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+  <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
 </html>
