@@ -46,6 +46,7 @@ test('API可靠保存、同ID更新、权限、冲突、回收站和恢复', asy
   assert.equal((await upload(coach, '无权上传测试')).status, 403);
   assert.equal((await upload(owner, '错误格式测试', rev, 'test.exe', 'application/octet-stream')).status, 400);
   assert.equal((await upload(owner, '')).status, 400);
+  assert.equal((await upload(owner, '   ')).status, 400);
   assert.equal((await upload(owner, '过期版本上传测试', 0)).status, 409);
   assert.deepEqual(store.read(), beforeUploads);
   assert.deepEqual(fs.readdirSync(path.join(directory, 'uploads')), []);
@@ -53,6 +54,9 @@ test('API可靠保存、同ID更新、权限、冲突、回收站和恢复', asy
     const response = await request(`/api/${key}/fixture-A`, 'PUT', { date: '2026-10-06' }); assert.equal(response.status, 200); assert.equal(response.data.id, 'fixture-A');
   }
   const planInput = { title: '接口测试计划（不写真实库）', startDate: '2026-10-06', endDate: '2026-10-06', focus: '校验版本保存', status: '草稿', sessions: [], sourceIds: [fixture.swim[3].id] };
+  const beforeEmptyPlan = store.read();
+  for (const field of ['title', 'focus']) assert.equal((await request('/api/plans', 'POST', { ...planInput, [field]: '   ' })).status, 400);
+  assert.deepEqual(store.read(), beforeEmptyPlan);
   const plan = await request('/api/plans', 'POST', planInput); assert.equal(plan.status, 201); assert.equal(plan.data.version, 1);
   const changedPlan = await request(`/api/plans/${plan.data.id}`, 'PUT', { focus: '校验历史保留' }); assert.equal(changedPlan.data.version, 2); assert.equal(store.read().data.planHistory.at(-1).version, 1);
   assert.equal((await request('/api/plans', 'POST', { ...planInput, sourceIds: ['nonexistent'] })).status, 400);
@@ -80,6 +84,12 @@ test('API可靠保存、同ID更新、权限、冲突、回收站和恢复', asy
   assert.equal((await request('/api/restore', 'POST', malformedMediaBackup)).status, 400);
   const malformedMeasurementBackup = structuredClone(backup); malformedMeasurementBackup.data.trainings[0].rpe = 99;
   assert.equal((await request('/api/restore', 'POST', malformedMeasurementBackup)).status, 400);
+  const malformedTextBackup = structuredClone(backup); malformedTextBackup.data.media[0].title = { invalid: '协议测试，不是文字' };
+  assert.equal((await request('/api/restore', 'POST', malformedTextBackup)).status, 400);
+  const malformedBooleanBackup = structuredClone(backup); malformedBooleanBackup.data.nutrition[0].calciumTaken = 'false';
+  assert.equal((await request('/api/restore', 'POST', malformedBooleanBackup)).status, 400);
+  const malformedTrashBackup = structuredClone(backup); malformedTrashBackup.data.trash = [{ id: 'invalid-trash', collection: 'media', record: { ...malformedTextBackup.data.media[0] } }];
+  assert.equal((await request('/api/restore', 'POST', malformedTrashBackup)).status, 400);
   assert.deepEqual(store.read(), beforeBadRestore);
   const before = store.read(); fs.rmSync(path.join(directory, 'backups'), { recursive: true }); fs.writeFileSync(path.join(directory, 'backups'), 'block-backup-write');
   assert.equal((await request('/api/trainings/fixture-A', 'PUT', { date: '2026-10-07' })).status, 500); assert.deepEqual(store.read(), before);

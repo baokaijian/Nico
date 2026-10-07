@@ -64,6 +64,7 @@ export function validateRecord(collection, input, previous = null) {
     } else {
       if (!empty && typeof value !== 'string') throw new Error(`${field.label}格式无效`);
       const s = empty ? '' : value.trim();
+      if (field.required && !s) throw new Error(`请填写${field.label}`);
       if (s.length > 4000) throw new Error(`${field.label}过长`);
       if (field.type === 'date' && s && !validDate(s)) throw new Error(`${field.label}不是有效日期`);
       if (field.type === 'select' && s && !field.options.includes(s) && s !== previous?.[field.key]) throw new Error(`${field.label}选项无效`);
@@ -117,14 +118,12 @@ export function normalizeState(raw) {
   const state = { ...emptyState(), ...raw };
   for (const key of COLLECTIONS) {
     if (!Array.isArray(state[key]) || state[key].some(r => !r || typeof r !== 'object' || typeof r.id !== 'string' || !r.id) || new Set(state[key].map(r => r.id)).size !== state[key].length) throw new Error(`数据集合${key}格式或ID无效`);
-    for (const record of state[key]) for (const field of FIELDS[key]) if (record[field.key] != null && record[field.key] !== '') {
-      if (field.type === 'number' && (typeof record[field.key] !== 'number' || !Number.isFinite(record[field.key]) || record[field.key] < field.min || record[field.key] > field.max || field.integer && !Number.isInteger(record[field.key]))) throw new Error(`数据集合${key}的${field.label}不是范围内的有效实测数值`);
-      if (field.type === 'date' && !validDate(record[field.key])) throw new Error(`数据集合${key}的日期无效`);
-    }
+    for (const record of state[key]) validateStoredFields(key, record);
   }
   if (!state.profile || typeof state.profile !== 'object' || typeof state.profile.name !== 'string' || !['', '女', '男'].includes(state.profile.sex) || state.profile.birthDate && !validDate(state.profile.birthDate)) throw new Error('档案格式无效');
   if (!state.publishing || !['swimIds', 'mediaIds'].every(k => Array.isArray(state.publishing[k]) && state.publishing[k].every(id => typeof id === 'string')) || typeof state.publishing.story !== 'string') throw new Error('发布范围格式无效');
-  if (!Array.isArray(state.trash) || state.trash.some(t => !COLLECTIONS.includes(t.collection) || !t.record?.id)) throw new Error('回收站格式无效');
+  if (!Array.isArray(state.trash) || state.trash.some(t => !t || !COLLECTIONS.includes(t.collection) || typeof t.record?.id !== 'string' || !t.record.id)) throw new Error('回收站格式无效');
+  for (const item of state.trash) validateStoredFields(item.collection, item.record);
   if (state.planHistory !== undefined && !Array.isArray(state.planHistory)) throw new Error('计划历史格式无效');
   for (const media of state.media) if (media.duration != null && (typeof media.duration !== 'number' || !Number.isFinite(media.duration) || media.duration <= 0)) throw new Error('素材时长格式无效');
   for (const plan of [...state.plans, ...(state.planHistory || [])]) {
@@ -134,6 +133,18 @@ export function normalizeState(raw) {
   }
   for (const annotation of state.annotations) validateRecord('annotations', Object.fromEntries(FIELDS.annotations.map(f => [f.key, annotation[f.key]])));
   return state;
+}
+function validateStoredFields(collection, record) {
+  for (const field of FIELDS[collection]) {
+    const value = record[field.key];
+    if (value == null || value === '') continue;
+    if (field.type === 'number') {
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < field.min || value > field.max || field.integer && !Number.isInteger(value)) throw new Error(`数据集合${collection}的${field.label}不是范围内的有效实测数值`);
+    } else if (field.boolean) {
+      if (typeof value !== 'boolean') throw new Error(`数据集合${collection}的${field.label}状态无效`);
+    } else if (typeof value !== 'string') throw new Error(`数据集合${collection}的${field.label}不是文字`);
+    if (field.type === 'date' && !validDate(value)) throw new Error(`数据集合${collection}的日期无效`);
+  }
 }
 export const ordered = (records = []) => [...records].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.id).localeCompare(String(b.id)));
 export const latest = records => ordered(records).at(-1) || null;
