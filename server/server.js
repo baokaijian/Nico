@@ -1,587 +1,186 @@
 import express from 'express';
-import cors from 'cors';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
+import { openStore } from './store.mjs';
+import { processMedia, inspectMedia } from './media.mjs';
+import { exportPublic } from './public-export.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = process.env.PORT || 3001;
-
-app.use(cors());
-app.use(express.json());
-
-// Serve uploads folder statically
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
-
-const DB_PATH = path.join(__dirname, 'db.json');
-
-// Helper to read DB
-const readDB = () => {
-  try {
-    const data = fs.readFileSync(DB_PATH, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading database:', error);
-    return { growth: [], swim: [], media: [], trainings: [], fitness: [], nutrition: [], goals: [] };
-  }
-};
-
-// Helper to write DB
-const writeDB = (data) => {
-  try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Error writing to database:', error);
-  }
-};
-
-// Ensure uploads folder exists
-const uploadsDir = path.join(__dirname, 'public/uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+let sequence = 0;
+const makeId = key => `${key}-${Date.now()}-${++sequence}`;
+const httpError = (status, message) => Object.assign(new Error(message), { status });
+const digest = value => createHash('sha256').update(value).digest();
+export function maintenanceMode(host, env = process.env) {
+  const remote = !['127.0.0.1', 'localhost', '::1'].includes(host);
+  return { authRequired: remote || env.NICO_AUTH_REQUIRED === 'true', readOnly: remote || env.NICO_READ_ONLY === 'true' };
 }
-
-// Multer storage config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif|mp4|mov|avi|webm/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    if (mimetype && extname) {
-      return cb(null, true);
+export function createApp({ store, uploadsDir, authRequired = false, tokens = {}, allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'], processUploads = true, webDir, readOnly = false, releaseDir = path.join(project, 'release') } = {}) {
+  if (authRequired && !tokens.owner) throw new Error('远程服务必须配置NICO_OWNER_TOKEN，不允许匿名启动');
+  for (const token of Object.values(tokens)) if (token && token.length < 32) throw new Error('访问密钥至少需要32个字符');
+  fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o700 });
+  const app = express();
+  app.disable('x-powered-by');
+  if (readOnly) app.use((req, res, next) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? next() : res.set('Allow', 'GET, HEAD, OPTIONS').status(405).json({ error: '此服务只读，公网不接受新增、修改、删除或上传' }));
+  // The web shell contains no private records. Only API/media requests require credentials.
+  if (webDir) app.use('/Nico', express.static(webDir, { dotfiles: 'deny' }));
+  app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store'); res.set('X-Content-Type-Options', 'nosniff');
+    const origin = req.headers.origin;
+    if (origin && !allowedOrigins.includes(origin)) return next(httpError(403, '此页面来源未获授权'));
+    if (!authRequired && !['127.0.0.1', 'localhost', '[::1]'].includes((req.headers.host || '').replace(/:\d+$/, ''))) return next(httpError(403, '本机服务只接受本机地址'));
+    if (origin) { res.set('Access-Control-Allow-Origin', origin); res.set('Vary', 'Origin'); }
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-Match');
+    res.set('Access-Control-Expose-Headers', 'X-Nico-Revision');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    const credential = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
+    let role = !authRequired ? 'owner' : '';
+    if (credential) role = Object.entries(tokens).find(([, token]) => token && timingSafeEqual(digest(token), digest(credential)))?.[0] || '';
+    if (!role) return next(httpError(401, '请输入有效访问密钥'));
+    req.role = role; next();
+  });
+  app.use(express.json({ limit: '5mb' }));
+  const requireOwner = req => { if (req.role !== 'owner') throw httpError(403, '此操作仅限家长管理者'); };
+  const canWrite = (req, collection) => {
+    if (req.role === 'owner' || req.role === 'coach' && ['plans', 'annotations', 'trainings', 'swim'].includes(collection)) return;
+    throw httpError(403, '没有此记录的修改权限');
+  };
+  const revision = req => {
+    const header = req.headers['if-match'];
+    if (!header || !/^\d+$/.test(header)) throw httpError(428, '请先加载最新记录，再提交修改');
+    return Number(header);
+  };
+  const reply = (res, saved, status = 200) => res.set('X-Nico-Revision', String(saved.revision)).status(status).json(saved.result);
+  const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw httpError(400, error.message); } };
+  function relations(collection, record, data) {
+    if (collection === 'plans') {
+      const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
+      if ((record.sourceIds || []).some(id => !existingIds.has(id))) throw httpError(400, '计划引用的来源记录不存在');
+      if (record.sourceVersion && record.sourceVersion !== analysis(data).version) throw httpError(409, '计划依据已经改变，请重新读取当前分析并核对');
     }
-    cb(new Error('Only images and video files are allowed!'));
-  },
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
-});
-
-// API Routes
-
-// Growth Records
-app.get('/api/growth', (req, res) => {
-  const db = readDB();
-  res.json(db.growth || []);
-});
-
-app.post('/api/growth', (req, res) => {
-  const { date, height, armSpan, weight, handLength, handWidth, footLength } = req.body;
-  if (!date) {
-    return res.status(400).json({ error: 'Date is required.' });
+    if (collection === 'annotations') {
+      const media = data.media.find(m => m.id === record.mediaId);
+      if (!media) throw httpError(400, '批注素材不存在');
+      if (media.duration != null && record.endSecond > media.duration) throw httpError(400, '批注时间超出素材时长');
+      if (record.status === '已审核' && !record.athleteIdentity) throw httpError(400, '请先确认运动员与泳道');
+    }
+    if (record.recordId && ![...data.swim, ...data.trainings].some(r => r.id === record.recordId)) throw httpError(400, '关联成绩/训练不存在');
+    if (collection === 'trainings' && record.plannedSessionId && !data.plans.some(p => p.sessions?.some(s => `${p.id}/${s.id}` === record.plannedSessionId))) throw httpError(400, '关联计划课次不存在');
   }
-
-  const db = readDB();
-  const newRecord = {
-    id: 'g-' + Date.now(),
-    date,
-    height: height ? parseFloat(height) : null,
-    armSpan: armSpan ? parseFloat(armSpan) : null,
-    weight: weight ? parseFloat(weight) : null,
-    handLength: handLength ? parseFloat(handLength) : null,
-    handWidth: handWidth ? parseFloat(handWidth) : null,
-    footLength: footLength ? parseFloat(footLength) : null
-  };
-
-  db.growth = db.growth || [];
-  db.growth.push(newRecord);
-  db.growth.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-
-  res.status(201).json(newRecord);
-});
-
-app.put('/api/growth/:id', (req, res) => {
-  const { id } = req.params;
-  const { date, height, armSpan, weight, handLength, handWidth, footLength } = req.body;
-  if (!date) {
-    return res.status(400).json({ error: 'Date is required.' });
+  app.get('/api/snapshot', (req, res) => {
+    const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json({ ...current, role: req.role, athleteId: 'nico' });
+  });
+  for (const key of COLLECTIONS) {
+    app.get(`/api/${key}`, (req, res) => { const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json(current.data[key]); });
+    if (key !== 'media') app.post(`/api/${key}`, (req, res) => {
+      canWrite(req, key); const record = { ...validate(key, req.body), id: makeId(key) };
+      reply(res, store.change(revision(req), data => { relations(key, record, data); data[key].push(record); return record; }), 201);
+    });
+    app.put(`/api/${key}/:id`, (req, res) => {
+      canWrite(req, key);
+      reply(res, store.change(revision(req), data => {
+        const index = data[key].findIndex(r => r.id === req.params.id);
+        if (index < 0) throw httpError(404, '记录不存在');
+        const record = validate(key, req.body, data[key][index]); relations(key, record, data);
+        if (key === 'plans') { data.planHistory ||= []; data.planHistory.push(structuredClone(data[key][index])); }
+        data[key][index] = record; return record;
+      }));
+    });
+    app.delete(`/api/${key}/:id`, (req, res) => {
+      canWrite(req, key);
+      reply(res, store.change(revision(req), data => {
+        const index = data[key].findIndex(r => r.id === req.params.id);
+        if (index < 0) throw httpError(404, '记录不存在');
+        const [record] = data[key].splice(index, 1); data.trash ||= [];
+        data.trash.push({ id: makeId('trash'), collection: key, record, deletedAt: new Date().toISOString() });
+        return { success: true, message: '已移至回收站，原素材保留，可恢复' };
+      }));
+    });
   }
-
-  const db = readDB();
-  const index = (db.growth || []).findIndex(item => item.id === id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Record not found' });
-  }
-
-  db.growth[index] = {
-    id,
-    date,
-    height: height ? parseFloat(height) : null,
-    armSpan: armSpan ? parseFloat(armSpan) : null,
-    weight: weight ? parseFloat(weight) : null,
-    handLength: handLength ? parseFloat(handLength) : null,
-    handWidth: handWidth ? parseFloat(handWidth) : null,
-    footLength: footLength ? parseFloat(footLength) : null
-  };
-  writeDB(db);
-
-  res.json(db.growth[index]);
-});
-
-app.delete('/api/growth/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  db.growth = (db.growth || []).filter(item => item.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: 'Record deleted.' });
-});
-
-// Swim Records
-app.get('/api/swim', (req, res) => {
-  const db = readDB();
-  res.json(db.swim || []);
-});
-
-app.post('/api/swim', (req, res) => {
-  const { date, distance, stroke, time, poolLength, notes } = req.body;
-  if (!date || !distance || !stroke || !time || !poolLength) {
-    return res.status(400).json({ error: 'Required fields: date, distance, stroke, time, poolLength.' });
-  }
-
-  let seconds = 0;
-  const parts = time.split(':');
-  if (parts.length === 2) {
-    seconds = parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
-  } else if (parts.length === 1) {
-    seconds = parseFloat(parts[0]);
-  } else {
-    return res.status(400).json({ error: 'Invalid time format. Please use MM:SS.hh or SS.hh' });
-  }
-
-  const db = readDB();
-  const newRecord = {
-    id: 's-' + Date.now(),
-    date,
-    distance,
-    stroke,
-    time,
-    seconds: parseFloat(seconds.toFixed(2)),
-    poolLength,
-    notes: notes || ''
-  };
-
-  db.swim = db.swim || [];
-  db.swim.push(newRecord);
-  db.swim.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-
-  res.status(201).json(newRecord);
-});
-
-app.put('/api/swim/:id', (req, res) => {
-  const { id } = req.params;
-  const { date, distance, stroke, time, poolLength, notes } = req.body;
-  if (!date || !distance || !stroke || !time || !poolLength) {
-    return res.status(400).json({ error: 'Required fields: date, distance, stroke, time, poolLength.' });
-  }
-
-  let seconds = 0;
-  const parts = time.split(':');
-  if (parts.length === 2) {
-    seconds = parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
-  } else if (parts.length === 1) {
-    seconds = parseFloat(parts[0]);
-  } else {
-    return res.status(400).json({ error: 'Invalid time format. Please use MM:SS.hh or SS.hh' });
-  }
-
-  const db = readDB();
-  const index = (db.swim || []).findIndex(item => item.id === id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Record not found' });
-  }
-
-  db.swim[index] = {
-    id,
-    date,
-    distance,
-    stroke,
-    time,
-    seconds: parseFloat(seconds.toFixed(2)),
-    poolLength,
-    notes: notes || ''
-  };
-  writeDB(db);
-
-  res.json(db.swim[index]);
-});
-
-app.delete('/api/swim/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  db.swim = (db.swim || []).filter(item => item.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: 'Record deleted.' });
-});
-
-// Water Training Logs Routes
-app.get('/api/trainings', (req, res) => {
-  const db = readDB();
-  res.json(db.trainings || []);
-});
-
-app.post('/api/trainings', (req, res) => {
-  const {
-    date, session, trainingType, totalMeters, kickMeters,
-    intensity, focusSkills, rpe, coachNotes, completionRate
-  } = req.body;
-
-  if (!date) {
-    return res.status(400).json({ error: '训练日期为必填项。' });
-  }
-
-  const db = readDB();
-  const newRecord = {
-    id: 't-' + Date.now(),
-    date,
-    session: session || '下午主训',
-    trainingType: trainingType || '技术水感课',
-    totalMeters: totalMeters ? parseInt(totalMeters, 10) : 0,
-    kickMeters: kickMeters ? parseInt(kickMeters, 10) : 0,
-    intensity: intensity || '中强度 (A2有氧基础)',
-    focusSkills: focusSkills || '',
-    rpe: rpe ? parseInt(rpe, 10) : 7,
-    coachNotes: coachNotes || '',
-    completionRate: completionRate ? parseInt(completionRate, 10) : 100
-  };
-
-  db.trainings = db.trainings || [];
-  db.trainings.push(newRecord);
-  db.trainings.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-  res.status(201).json(newRecord);
-});
-
-app.put('/api/trainings/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  const index = (db.trainings || []).findIndex(item => item.id === id);
-  if (index === -1) {
-    return res.status(404).json({ error: '训练记录未找到。' });
-  }
-
-  const {
-    date, session, trainingType, totalMeters, kickMeters,
-    intensity, focusSkills, rpe, coachNotes, completionRate
-  } = req.body;
-
-  db.trainings[index] = {
-    id,
-    date: date || db.trainings[index].date,
-    session: session || db.trainings[index].session,
-    trainingType: trainingType || db.trainings[index].trainingType,
-    totalMeters: totalMeters !== undefined ? parseInt(totalMeters, 10) : db.trainings[index].totalMeters,
-    kickMeters: kickMeters !== undefined ? parseInt(kickMeters, 10) : db.trainings[index].kickMeters,
-    intensity: intensity || db.trainings[index].intensity,
-    focusSkills: focusSkills !== undefined ? focusSkills : db.trainings[index].focusSkills,
-    rpe: rpe !== undefined ? parseInt(rpe, 10) : db.trainings[index].rpe,
-    coachNotes: coachNotes !== undefined ? coachNotes : db.trainings[index].coachNotes,
-    completionRate: completionRate !== undefined ? parseInt(completionRate, 10) : db.trainings[index].completionRate
-  };
-
-  db.trainings.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-  res.json(db.trainings[index]);
-});
-
-app.delete('/api/trainings/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  db.trainings = (db.trainings || []).filter(item => item.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: '训练记录已删除。' });
-});
-
-// Dryland Fitness & Flexibility Routes
-app.get('/api/fitness', (req, res) => {
-  const db = readDB();
-  res.json(db.fitness || []);
-});
-
-app.post('/api/fitness', (req, res) => {
-  const {
-    date, standingJump, plankSeconds, sitAndReach,
-    shoulderFlex, ankleFlex, shuttleRun, notes
-  } = req.body;
-
-  if (!date) {
-    return res.status(400).json({ error: '测试日期为必填项。' });
-  }
-
-  const db = readDB();
-  const newRecord = {
-    id: 'f-' + Date.now(),
-    date,
-    standingJump: standingJump ? parseFloat(standingJump) : null,
-    plankSeconds: plankSeconds ? parseInt(plankSeconds, 10) : null,
-    sitAndReach: sitAndReach ? parseFloat(sitAndReach) : null,
-    shoulderFlex: shoulderFlex || '',
-    ankleFlex: ankleFlex || '极佳 (天生脚蹼特征)',
-    shuttleRun: shuttleRun ? parseFloat(shuttleRun) : null,
-    notes: notes || ''
-  };
-
-  db.fitness = db.fitness || [];
-  db.fitness.push(newRecord);
-  db.fitness.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-  res.status(201).json(newRecord);
-});
-
-app.put('/api/fitness/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  const index = (db.fitness || []).findIndex(item => item.id === id);
-  if (index === -1) {
-    return res.status(404).json({ error: '体能记录未找到。' });
-  }
-
-  const {
-    date, standingJump, plankSeconds, sitAndReach,
-    shoulderFlex, ankleFlex, shuttleRun, notes
-  } = req.body;
-
-  db.fitness[index] = {
-    id,
-    date: date || db.fitness[index].date,
-    standingJump: standingJump !== undefined ? (standingJump ? parseFloat(standingJump) : null) : db.fitness[index].standingJump,
-    plankSeconds: plankSeconds !== undefined ? (plankSeconds ? parseInt(plankSeconds, 10) : null) : db.fitness[index].plankSeconds,
-    sitAndReach: sitAndReach !== undefined ? (sitAndReach ? parseFloat(sitAndReach) : null) : db.fitness[index].sitAndReach,
-    shoulderFlex: shoulderFlex !== undefined ? shoulderFlex : db.fitness[index].shoulderFlex,
-    ankleFlex: ankleFlex !== undefined ? ankleFlex : db.fitness[index].ankleFlex,
-    shuttleRun: shuttleRun !== undefined ? (shuttleRun ? parseFloat(shuttleRun) : null) : db.fitness[index].shuttleRun,
-    notes: notes !== undefined ? notes : db.fitness[index].notes
-  };
-
-  db.fitness.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-  res.json(db.fitness[index]);
-});
-
-app.delete('/api/fitness/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  db.fitness = (db.fitness || []).filter(item => item.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: '体能记录已删除。' });
-});
-
-// Nutrition & Recovery Routes
-app.get('/api/nutrition', (req, res) => {
-  const db = readDB();
-  res.json(db.nutrition || []);
-});
-
-app.post('/api/nutrition', (req, res) => {
-  const {
-    date, preMeal, postMeal, waterMl,
-    calciumTaken, ironTaken, zincTaken, sleepHours,
-    morningPulse, recoveryScore, notes
-  } = req.body;
-
-  if (!date) {
-    return res.status(400).json({ error: '记录日期为必填项。' });
-  }
-
-  const db = readDB();
-  const newRecord = {
-    id: 'n-' + Date.now(),
-    date,
-    preMeal: preMeal || '',
-    postMeal: postMeal || '',
-    waterMl: waterMl ? parseInt(waterMl, 10) : 1500,
-    calciumTaken: Boolean(calciumTaken),
-    ironTaken: Boolean(ironTaken),
-    zincTaken: Boolean(zincTaken),
-    sleepHours: sleepHours ? parseFloat(sleepHours) : 9.5,
-    morningPulse: morningPulse ? parseInt(morningPulse, 10) : null,
-    recoveryScore: recoveryScore ? parseInt(recoveryScore, 10) : 5,
-    notes: notes || ''
-  };
-
-  db.nutrition = db.nutrition || [];
-  db.nutrition.push(newRecord);
-  db.nutrition.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-  res.status(201).json(newRecord);
-});
-
-app.put('/api/nutrition/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  const index = (db.nutrition || []).findIndex(item => item.id === id);
-  if (index === -1) {
-    return res.status(404).json({ error: '饮食营养记录未找到。' });
-  }
-
-  const {
-    date, preMeal, postMeal, waterMl,
-    calciumTaken, ironTaken, zincTaken, sleepHours,
-    morningPulse, recoveryScore, notes
-  } = req.body;
-
-  db.nutrition[index] = {
-    id,
-    date: date || db.nutrition[index].date,
-    preMeal: preMeal !== undefined ? preMeal : db.nutrition[index].preMeal,
-    postMeal: postMeal !== undefined ? postMeal : db.nutrition[index].postMeal,
-    waterMl: waterMl !== undefined ? parseInt(waterMl, 10) : db.nutrition[index].waterMl,
-    calciumTaken: calciumTaken !== undefined ? Boolean(calciumTaken) : db.nutrition[index].calciumTaken,
-    ironTaken: ironTaken !== undefined ? Boolean(ironTaken) : db.nutrition[index].ironTaken,
-    zincTaken: zincTaken !== undefined ? Boolean(zincTaken) : db.nutrition[index].zincTaken,
-    sleepHours: sleepHours !== undefined ? parseFloat(sleepHours) : db.nutrition[index].sleepHours,
-    morningPulse: morningPulse !== undefined ? (morningPulse ? parseInt(morningPulse, 10) : null) : db.nutrition[index].morningPulse,
-    recoveryScore: recoveryScore !== undefined ? parseInt(recoveryScore, 10) : db.nutrition[index].recoveryScore,
-    notes: notes !== undefined ? notes : db.nutrition[index].notes
-  };
-
-  db.nutrition.sort((a, b) => new Date(a.date) - new Date(b.date));
-  writeDB(db);
-  res.json(db.nutrition[index]);
-});
-
-app.delete('/api/nutrition/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  db.nutrition = (db.nutrition || []).filter(item => item.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: '饮食营养记录已删除。' });
-});
-
-// Goals & Milestones Routes
-app.get('/api/goals', (req, res) => {
-  const db = readDB();
-  res.json(db.goals || []);
-});
-
-app.post('/api/goals', (req, res) => {
-  const { title, category, targetMetric, currentProgress, deadline, status, notes } = req.body;
-  if (!title) {
-    return res.status(400).json({ error: '目标名称为必填项。' });
-  }
-
-  const db = readDB();
-  const newRecord = {
-    id: 'goal-' + Date.now(),
-    title,
-    category: category || '赛事达级',
-    targetMetric: targetMetric || '',
-    currentProgress: currentProgress !== undefined ? parseInt(currentProgress, 10) : 0,
-    deadline: deadline || '',
-    status: status || '进行中',
-    notes: notes || ''
-  };
-
-  db.goals = db.goals || [];
-  db.goals.push(newRecord);
-  writeDB(db);
-  res.status(201).json(newRecord);
-});
-
-app.put('/api/goals/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  const index = (db.goals || []).findIndex(item => item.id === id);
-  if (index === -1) {
-    return res.status(404).json({ error: '目标未找到。' });
-  }
-
-  const { title, category, targetMetric, currentProgress, deadline, status, notes } = req.body;
-  db.goals[index] = {
-    id,
-    title: title || db.goals[index].title,
-    category: category || db.goals[index].category,
-    targetMetric: targetMetric !== undefined ? targetMetric : db.goals[index].targetMetric,
-    currentProgress: currentProgress !== undefined ? parseInt(currentProgress, 10) : db.goals[index].currentProgress,
-    deadline: deadline !== undefined ? deadline : db.goals[index].deadline,
-    status: status || db.goals[index].status,
-    notes: notes !== undefined ? notes : db.goals[index].notes
-  };
-
-  writeDB(db);
-  res.json(db.goals[index]);
-});
-
-app.delete('/api/goals/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  db.goals = (db.goals || []).filter(item => item.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: '目标已删除。' });
-});
-
-// Media Routes
-app.get('/api/media', (req, res) => {
-  const db = readDB();
-  res.json(db.media || []);
-});
-
-app.post('/api/media', upload.single('file'), (req, res) => {
-  const { date, title, description, category } = req.body;
-  if (!req.file) {
-    return res.status(400).json({ error: 'No media file was uploaded.' });
-  }
-
-  const db = readDB();
-  const isVideo = req.file.mimetype.startsWith('video/');
-  
-  const newMedia = {
-    id: 'm-' + Date.now(),
-    date: date || new Date().toISOString().split('T')[0],
-    title: title || 'Untitled',
-    description: description || '',
-    type: isVideo ? 'video' : 'photo',
-    url: `/uploads/${req.file.filename}`,
-    category: category || 'General'
-  };
-
-  db.media = db.media || [];
-  db.media.push(newMedia);
-  // Sort by date descending (newest first for gallery feed)
-  db.media.sort((a, b) => new Date(b.date) - new Date(a.date));
-  writeDB(db);
-
-  res.status(201).json(newMedia);
-});
-
-app.delete('/api/media/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  const mediaItem = (db.media || []).find(item => item.id === id);
-
-  if (mediaItem) {
-    // Delete local file
-    const filename = path.basename(mediaItem.url);
-    const filepath = path.join(uploadsDir, filename);
-    if (fs.existsSync(filepath)) {
-      try {
-        fs.unlinkSync(filepath);
-      } catch (err) {
-        console.error('Error deleting local file:', err);
+  app.post('/api/trash/:id/restore', (req, res) => {
+    requireOwner(req);
+    reply(res, store.change(revision(req), data => {
+      const index = data.trash.findIndex(t => t.id === req.params.id);
+      if (index < 0) throw httpError(404, '回收记录不存在');
+      const [item] = data.trash.splice(index, 1);
+      if (data[item.collection].some(r => r.id === item.record.id)) throw httpError(409, '相同ID已存在');
+      data[item.collection].push(item.record); return item.record;
+    }));
+  });
+  app.put('/api/profile', (req, res) => {
+    requireOwner(req); const { name, sex, birthDate } = req.body;
+    if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男'].includes(sex) || birthDate && !validDate(birthDate)) throw httpError(400, '档案字段无效');
+    reply(res, store.change(revision(req), data => (data.profile = { name: name.trim(), sex, birthDate: birthDate || '' })));
+  });
+  app.put('/api/publishing', (req, res) => {
+    requireOwner(req); const { swimIds, mediaIds, story, confirmedBy, confirmedAt } = req.body;
+    if (!Array.isArray(swimIds) || !Array.isArray(mediaIds) || typeof story !== 'string' || story.length > 4000 || !confirmedBy || !validDate(confirmedAt)) throw httpError(400, '请选择内容并填写发布范围确认人和日期');
+    reply(res, store.change(revision(req), data => {
+      if (swimIds.some(id => !data.swim.some(r => r.id === id)) || mediaIds.some(id => !data.media.some(r => r.id === id))) throw httpError(400, '选择的记录或素材不存在');
+      data.publishing = { swimIds, mediaIds, story, confirmedBy: String(confirmedBy).slice(0, 100), confirmedAt }; return data.publishing;
+    }));
+  });
+  app.get('/api/public-preview', (req, res) => { requireOwner(req); res.json(publicSnapshot(store.read().data)); });
+  app.post('/api/public-export', (req, res) => {
+    requireOwner(req);
+    const current = store.read();
+    if (revision(req) !== current.revision) throw httpError(409, '发布范围已更新，请刷新后重新核对');
+    res.json(exportPublic(current.data, releaseDir, uploadsDir));
+  });
+  app.get('/api/backup', (req, res) => { requireOwner(req); res.json({ format: 'nico-backup-v1', ...store.read() }); });
+  app.post('/api/restore', (req, res) => {
+    requireOwner(req);
+    if (req.body?.format !== 'nico-backup-v1') throw httpError(400, '请选择平台导出的完整备份');
+    let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
+    for (const key of COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
+    reply(res, store.change(revision(req), data => { for (const key of Object.keys(data)) delete data[key]; Object.assign(data, restored); return { success: true }; }));
+  });
+  const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
+    const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };
+    if (!formats[path.extname(file.originalname).toLowerCase()]?.includes(file.mimetype)) return cb(httpError(400, '支持PNG/JPEG/WebP或MP4/MOV/WebM；请勿修改扩展名伪装格式'));
+    cb(null, true);
+  } });
+  app.post('/api/media', (req, _res, next) => { try { canWrite(req, 'media'); revision(req); next(); } catch (error) { next(error); } }, upload.single('file'), async (req, res) => {
+    if (!req.file) throw httpError(400, '请选择文件');
+    try {
+      const record = { ...validate('media', req.body), id: makeId('media'), type: req.file.mimetype.startsWith('video/') ? 'video' : 'photo', url: `/uploads/${req.file.filename}`, processingStatus: '待处理' };
+      if (processUploads) {
+        let info;
+        try { info = await inspectMedia(req.file.path, record.type); } catch { throw httpError(400, '无法识别真实素材格式，请检查文件或FFmpeg配置'); }
+        record.duration = info.duration;
       }
-    }
-  }
-
-  db.media = (db.media || []).filter(item => item.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: 'Media entry and file deleted.' });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running locally on port ${PORT}`);
-});
+      const saved = store.change(revision(req), data => { relations('media', record, data); data.media.push(record); return record; }); reply(res, saved, 201);
+      if (processUploads) processMedia(record, uploadsDir).then(info => {
+        const current = store.read(); store.change(current.revision, data => { const target = data.media.find(m => m.id === record.id); if (target) Object.assign(target, info); });
+      }).catch(error => console.error('素材处理失败，原文件已保留：', error.message));
+    } catch (error) { fs.unlinkSync(req.file.path); throw error; }
+  });
+  app.get('/api/media/:id/content/:variant', (req, res) => {
+    if (!['poster', 'original', 'playback'].includes(req.params.variant)) throw httpError(404, '素材类型不存在');
+    const item = store.read().data.media.find(m => m.id === req.params.id);
+    if (!item) throw httpError(404, '素材不存在');
+    const url = req.params.variant === 'poster' ? item.posterUrl : req.params.variant === 'original' ? item.url : item.playbackUrl || item.url;
+    if (!url?.startsWith('/uploads/')) throw httpError(404, '素材尚未生成');
+    res.sendFile(path.join(uploadsDir, path.basename(url)));
+  });
+  app.use((_req, _res, next) => next(httpError(404, '接口不存在')));
+  app.use((error, _req, res, _next) => {
+    const status = error.status || (error instanceof multer.MulterError || error instanceof SyntaxError ? 400 : 500);
+    if (status === 500) console.error(error);
+    res.status(status).json({ error: status === 500 ? '服务保存或读取失败，未确认成功；请保留输入并检查备份' : error.message });
+  });
+  return app;
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const host = process.env.NICO_HOST || '127.0.0.1';
+  const store = openStore({ filename: process.env.NICO_DB_PATH || path.join(project, 'data/nico.sqlite'), seedPath: process.env.NICO_SEED_PATH || path.join(project, 'data/original-input.json'), backupDir: process.env.NICO_BACKUP_DIR || path.join(project, 'data/backups') });
+  const tokens = { owner: process.env.NICO_OWNER_TOKEN, coach: process.env.NICO_COACH_TOKEN, viewer: process.env.NICO_VIEWER_TOKEN };
+  const app = createApp({ store, uploadsDir: process.env.NICO_UPLOADS_DIR || path.join(project, 'data/uploads'), ...maintenanceMode(host), tokens, allowedOrigins: process.env.NICO_ALLOWED_ORIGINS?.split(',').filter(Boolean) || undefined, webDir: process.env.NICO_WEB_DIR });
+  const server = app.listen(Number(process.env.PORT || 3001), host, () => console.log(`Nico私有服务：http://${host}:${process.env.PORT || 3001}`));
+  const stop = () => server.close(() => { store.close(); process.exit(0); });
+  process.on('SIGINT', stop); process.on('SIGTERM', stop);
+}
