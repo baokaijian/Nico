@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { openStore } from '../server/store.mjs';
-import { normalizeState } from '../shared/domain.mjs';
-import { preserveDeletedRecords } from '../shared/deletion.mjs';
+import { normalizeState, publicSnapshot } from '../shared/domain.mjs';
+import { applyDeletionFlags, preserveDeletedRecords } from '../shared/deletion.mjs';
 import { seedBytes, raw } from './fixture.mjs';
 
 test('旧SQLite无损迁移，逐条逻辑删除/恢复、回滚冲突和禁止物理删除', t => {
@@ -41,6 +41,25 @@ test('旧SQLite无损迁移，逐条逻辑删除/恢复、回滚冲突和禁止�
   assert.throws(() => inspect.exec('DELETE FROM state'), /逻辑删除保护/);
   store.close(); store = openStore({ filename, seedPath, backupDir: path.join(directory, 'backups') });
   assert.equal(store.read().revision, 11); assert.deepEqual(JSON.parse(row().payload), original);
+  inspect.prepare('UPDATE records SET is_deleted=1,deleted_at=?,deleted_by=? WHERE collection=? AND record_id=?').run('2026-10-12T00:00:00Z','database-admin','swim',original.id);
+  assert.ok(!store.read().data.swim.some(item => item.id === original.id));
+  const tombstone = store.read().data.trash.find(item => item.record.id === original.id);
+  assert.deepEqual(tombstone.record, original); assert.equal(tombstone.deletedBy, 'database-admin');
+  store.change(11, next => { next.swim.push(tombstone.record); next.trash = []; }, 'admin');
+  assert.equal(row().is_deleted, 0); assert.deepEqual(JSON.parse(row().payload), original);
+});
+
+test('直接数据库删除标记也会隐藏公开内容并保留可恢复的完整原记录', () => {
+  const original = normalizeState(structuredClone(raw));
+  const score = original.swim[0], video = original.media[0];
+  original.publishing.swimIds = [score.id]; original.publishing.mediaIds = [video.id];
+  const before = structuredClone(original);
+  const effective = applyDeletionFlags(structuredClone(original), [
+    { collection: 'swim', record_id: score.id, payload: score, deleted_at: '2026-10-12T00:00:00Z', deleted_by: 'admin' },
+    { collection: 'media', record_id: video.id, payload: video, deleted_at: '2026-10-12T00:00:00Z', deleted_by: 'admin' },
+  ]);
+  assert.equal(publicSnapshot(effective).swim.length, 0); assert.equal(publicSnapshot(effective).media.length, 0);
+  assert.deepEqual(effective.trash.map(item => item.record), [score, video]); assert.deepEqual(original, before);
 });
 
 test('备份恢复不会丢弃较新记录，已有回收记录保留删除人和原时间', () => {

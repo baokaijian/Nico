@@ -98,3 +98,15 @@ revoke all on function public.nico_sync_records(jsonb,bigint,text),public.nico_s
 grant execute on function public.nico_sync_records(jsonb,bigint,text),public.nico_sync_state_records(),public.nico_block_physical_delete() to service_role;
 -- Backfill existing facts once, without editing the snapshot or its revision.
 select public.nico_sync_records(data,revision,'schema-backfill') from public.nico_state where id=1;
+
+-- One statement prevents torn reads between the snapshot and deletion flags.
+create function public.nico_read_state() returns jsonb
+language sql stable security invoker set search_path='' as $$
+  select jsonb_build_object('data',s.data,'revision',s.revision,'deleted_records',
+    (select coalesce(jsonb_agg(jsonb_build_object('collection',r.collection,'record_id',r.record_id,
+      'payload',r.payload,'deleted_at',r.deleted_at,'deleted_by',r.deleted_by)),'[]'::jsonb)
+      from public.nico_records r where r.is_deleted))
+  from public.nico_state s where s.id=1 and not s.is_deleted;
+$$;
+revoke all on function public.nico_read_state() from public,anon,authenticated;
+grant execute on function public.nico_read_state() to service_role;
