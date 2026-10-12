@@ -20,3 +20,17 @@ test('客户端不会把断网或错误响应当成成功，且发送表单原�
     await assert.rejects(api.mediaBlob('protocol-only-media', 'poster'), { name: 'AbortError' });
   } finally { globalThis.fetch = original; }
 });
+test('管理员凭据只保存在内存，退出后忽略旧会话响应且下次登录重置记录版本', async () => {
+  const original = globalThis.fetch, api = createApi('https://test.invalid');
+  try {
+    globalThis.fetch = async (_url, options) => { assert.equal(options.credentials, 'omit'); assert.equal(options.headers['If-Match'], undefined); return new Response(JSON.stringify({ accessToken: 'test-session', expiresAt: Date.now() + 1000 })); };
+    await api.authRequest('login', { username: 'admin', password: 'isolated-test-password' });
+    let resolveResponse;
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, 'Bearer test-session'); return new Promise(resolve => { resolveResponse = resolve; }); };
+    const inFlight = api.request('/api/snapshot'); api.resetAuth();
+    resolveResponse(new Response(JSON.stringify({ data: { private: true } }), { headers: { 'X-Nico-Revision': '8' } }));
+    await assert.rejects(inFlight, { name: 'AbortError' }); assert.equal(api.getRevision(), null);
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, undefined); return new Response(JSON.stringify({ data: {} }), { headers: { 'X-Nico-Revision': '2' } }); };
+    await api.request('/api/public-summary'); assert.equal(api.getRevision(), 2);
+  } finally { globalThis.fetch = original; }
+});
