@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { COLLECTIONS, normalizeState } from '../shared/domain.mjs';
-import { preserveDeletedRecords } from '../shared/deletion.mjs';
+import { applyDeletionFlags, preserveDeletedRecords } from '../shared/deletion.mjs';
 
 export class ConflictError extends Error { constructor() { super('记录已被其他设备更新，请刷新后核对并重试；当前输入已保留。'); this.status = 409; } }
 export function atomicJSON(filename, value) {
@@ -59,9 +59,12 @@ export function openStore({ filename, seedPath, backupDir }) {
     for (const key of COLLECTIONS) for (const record of data[key]) upsertActive.run(key, record.id, JSON.stringify(record), revision);
   }
   function read() {
-    const row = db.prepare('SELECT data, revision FROM state WHERE id=1 AND is_deleted=0').get();
+    const row = db.prepare(`SELECT data,revision,(SELECT coalesce(json_group_array(json_object(
+      'collection',collection,'record_id',record_id,'payload',json(payload),
+      'deleted_at',deleted_at,'deleted_by',deleted_by)),'[]') FROM records WHERE is_deleted=1) AS deleted
+      FROM state WHERE id=1 AND is_deleted=0`).get();
     if (!row) throw new Error('事实库缺失，已停止写入');
-    return { data: normalizeState(JSON.parse(row.data)), revision: row.revision };
+    return { data: applyDeletionFlags(normalizeState(JSON.parse(row.data)), JSON.parse(row.deleted)), revision: row.revision };
   }
   function change(expectedRevision, mutate, actor = 'local-admin') {
     db.exec('BEGIN IMMEDIATE');

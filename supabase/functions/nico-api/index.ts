@@ -1,4 +1,5 @@
 import { createCloudHandler } from '../../../server/cloud-api.mjs';
+import { applyDeletionFlags } from '../../../shared/deletion.mjs';
 const base = Deno.env.get('SUPABASE_URL')!;
 const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 if (!base || !secret) throw new Error('后台服务凭据未配置');
@@ -23,7 +24,7 @@ const backend = {
   deleteSession: (hash: string) => rest(`nico_sessions?token_hash=eq.${hash}`, 'DELETE'),
   loginAttempt: (key: string) => rest('rpc/nico_login_attempt', 'POST', { p_key: key }),
   changePassword: (username: string, previous: string, salt: string, hash: string) => rest('rpc/nico_change_password', 'POST', { p_username: username, p_previous: previous, p_salt: salt, p_hash: hash }),
-  read: async () => { const value = (await rest('nico_state?id=eq.1&is_deleted=eq.false&select=data,revision'))[0]; if (!value) throw new Error('Nico facts missing'); return value; },
+  read: async () => { const value = await rest('rpc/nico_read_state'); if (!value) throw new Error('Nico facts missing'); return { data: applyDeletionFlags(value.data, value.deleted_records), revision: value.revision }; },
   save: (expected: number, data: unknown, actor: string) => rest('rpc/nico_save_state', 'POST', { p_expected: expected, p_data: data, p_actor: actor }),
   ensureBucket: async () => {
     const found = await fetch(`${base}/storage/v1/bucket/${bucket}`, { headers }); if (found.ok) return;
