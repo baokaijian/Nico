@@ -8,6 +8,8 @@ import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot,
 import { openStore } from './store.mjs';
 import { processMedia, inspectMedia } from './media.mjs';
 import { exportPublic } from './public-export.mjs';
+import { createAccounts } from './accounts.mjs';
+import { validatePublicSummary } from '../shared/publication.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let sequence = 0;
@@ -18,8 +20,8 @@ export function maintenanceMode(host, env = process.env) {
   const remote = !['127.0.0.1', 'localhost', '::1'].includes(host);
   return { authRequired: remote || env.NICO_AUTH_REQUIRED === 'true', readOnly: remote || env.NICO_READ_ONLY === 'true' };
 }
-export function createApp({ store, uploadsDir, authRequired = false, tokens = {}, allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'], processUploads = true, webDir, readOnly = false, releaseDir = path.join(project, 'release') } = {}) {
-  if (authRequired && !tokens.owner) throw new Error('远程服务必须配置NICO_OWNER_TOKEN，不允许匿名启动');
+export function createApp({ store, uploadsDir, authRequired = true, accounts, allowAccountSetup = false, tokens = {}, allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'], processUploads = true, webDir, readOnly = false, releaseDir = path.join(project, 'release') } = {}) {
+  if (!accounts && !tokens.owner) throw new Error('请配置管理员账号，不允许匿名维护档案');
   for (const token of Object.values(tokens)) if (token && token.length < 32) throw new Error('访问密钥至少需要32个字符');
   fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o700 });
   const app = express();
@@ -29,19 +31,56 @@ export function createApp({ store, uploadsDir, authRequired = false, tokens = {}
   if (webDir) app.use('/Nico', express.static(webDir, { dotfiles: 'deny' }));
   app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store'); res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Referrer-Policy', 'no-referrer'); res.set('X-Frame-Options', 'DENY');
     const origin = req.headers.origin;
     if (origin && !allowedOrigins.includes(origin)) return next(httpError(403, '此页面来源未获授权'));
     if (!authRequired && !['127.0.0.1', 'localhost', '[::1]'].includes((req.headers.host || '').replace(/:\d+$/, ''))) return next(httpError(403, '本机服务只接受本机地址'));
     if (origin) { res.set('Access-Control-Allow-Origin', origin); res.set('Vary', 'Origin'); }
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-Match');
+    res.set('Access-Control-Allow-Credentials', 'true');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-Match, X-CSRF-Token');
     res.set('Access-Control-Expose-Headers', 'X-Nico-Revision');
     res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+  const publicSummary = () => validatePublicSummary(JSON.parse(fs.readFileSync(path.join(releaseDir, 'public-summary.json'), 'utf8')));
+  app.get('/api/public-summary', (_req, res) => res.json(publicSummary()));
+  app.get('/api/public-media/:file', (req, res) => {
+    const files = publicSummary().media.flatMap(item => [item.url, item.posterUrl].filter(Boolean).map(url => path.basename(url)));
+    if (!files.includes(req.params.file)) throw httpError(404, '此素材未对外开放');
+    res.sendFile(path.join(releaseDir, 'uploads', req.params.file));
+  });
+  const cookieToken = req => /(?:^|;\s*)nico_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1];
+  const sessionFor = req => accounts?.readSession(cookieToken(req));
+  const requireCSRF = req => { const session = sessionFor(req); if (!session || req.headers['x-csrf-token'] !== session.csrf) throw httpError(403, '会话验证失败，请重新登录'); return session; };
+  const cookie = (req, res, token, age) => res.cookie('nico_session', token, { httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/api', maxAge: age });
+  if (accounts) {
+    app.get('/api/auth/session', (req, res) => {
+      const session = sessionFor(req);
+      res.json({ authenticated: !!session, username: session?.username || '', role: session?.role || 'viewer', csrf: session?.csrf || '', expiresAt: session?.expiresAt || null, setupRequired: !accounts.configured() && allowAccountSetup });
+    });
+    app.use('/api/auth', express.json({ limit: '4kb', strict: true }));
+    app.post('/api/auth/login', async (req, res) => {
+      if (!req.is('application/json')) throw httpError(415, '请使用账号登录表单');
+      const { token, session } = await accounts.login(req.body?.username, req.body?.password, req.ip);
+      cookie(req, res, token, accounts.sessionMs); res.json({ ...session, fingerprint: undefined });
+    });
+    app.post('/api/auth/setup', async (req, res) => {
+      if (!allowAccountSetup || !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip)) throw httpError(403, '首次账号设置只允许在本机完成');
+      if (!req.is('application/json')) throw httpError(415, '请使用账号设置表单');
+      const { token, session } = await accounts.setup(req.body || {});
+      cookie(req, res, token, accounts.sessionMs); res.status(201).json({ ...session, fingerprint: undefined });
+    });
+    app.post('/api/auth/logout', (req, res) => { requireCSRF(req); accounts.logout(cookieToken(req)); cookie(req, res, '', 0); res.json({ success: true }); });
+  }
+  app.use((req, _res, next) => {
     const credential = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
-    let role = !authRequired ? 'owner' : '';
+    const session = sessionFor(req);
+    let role = session?.role || '';
     if (credential) role = Object.entries(tokens).find(([, token]) => token && timingSafeEqual(digest(token), digest(credential)))?.[0] || '';
-    if (!role) return next(httpError(401, '请输入有效访问密钥'));
-    req.role = role; next();
+    if (!role) return next(httpError(401, '请先登录管理员账号'));
+    if (session && !credential && !['GET', 'HEAD'].includes(req.method)) { try { requireCSRF(req); } catch (error) { return next(error); } }
+    req.role = role; req.username = credential ? role : session?.username || role; next();
   });
   app.use(express.json({ limit: '5mb' }));
   const requireOwner = req => { if (req.role !== 'owner') throw httpError(403, '此操作仅限家长管理者'); };
@@ -54,6 +93,7 @@ export function createApp({ store, uploadsDir, authRequired = false, tokens = {}
     if (!header || !/^\d+$/.test(header)) throw httpError(428, '请先加载最新记录，再提交修改');
     return Number(header);
   };
+  const change = (req, mutate) => store.change(revision(req), mutate, req.username);
   const reply = (res, saved, status = 200) => res.set('X-Nico-Revision', String(saved.revision)).status(status).json(saved.result);
   const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw httpError(400, error.message); } };
   function relations(collection, record, data) {
@@ -78,11 +118,11 @@ export function createApp({ store, uploadsDir, authRequired = false, tokens = {}
     app.get(`/api/${key}`, (req, res) => { const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json(current.data[key]); });
     if (key !== 'media') app.post(`/api/${key}`, (req, res) => {
       canWrite(req, key); const record = { ...validate(key, req.body), id: makeId(key) };
-      reply(res, store.change(revision(req), data => { relations(key, record, data); data[key].push(record); return record; }), 201);
+      reply(res, change(req, data => { relations(key, record, data); data[key].push(record); return record; }), 201);
     });
     app.put(`/api/${key}/:id`, (req, res) => {
       canWrite(req, key);
-      reply(res, store.change(revision(req), data => {
+      reply(res, change(req, data => {
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
         const record = validate(key, req.body, data[key][index]); relations(key, record, data);
@@ -92,18 +132,18 @@ export function createApp({ store, uploadsDir, authRequired = false, tokens = {}
     });
     app.delete(`/api/${key}/:id`, (req, res) => {
       canWrite(req, key);
-      reply(res, store.change(revision(req), data => {
+      reply(res, change(req, data => {
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
         const [record] = data[key].splice(index, 1); data.trash ||= [];
-        data.trash.push({ id: makeId('trash'), collection: key, record, deletedAt: new Date().toISOString() });
+        data.trash.push({ id: makeId('trash'), collection: key, record, deletedAt: new Date().toISOString(), deletedBy: req.username });
         return { success: true, message: '已移至回收站，原素材保留，可恢复' };
       }));
     });
   }
   app.post('/api/trash/:id/restore', (req, res) => {
     requireOwner(req);
-    reply(res, store.change(revision(req), data => {
+    reply(res, change(req, data => {
       const index = data.trash.findIndex(t => t.id === req.params.id);
       if (index < 0) throw httpError(404, '回收记录不存在');
       const [item] = data.trash.splice(index, 1);
@@ -114,12 +154,12 @@ export function createApp({ store, uploadsDir, authRequired = false, tokens = {}
   app.put('/api/profile', (req, res) => {
     requireOwner(req); const { name, sex, birthDate } = req.body;
     if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男'].includes(sex) || birthDate && !validDate(birthDate)) throw httpError(400, '档案字段无效');
-    reply(res, store.change(revision(req), data => (data.profile = { name: name.trim(), sex, birthDate: birthDate || '' })));
+    reply(res, change(req, data => (data.profile = { name: name.trim(), sex, birthDate: birthDate || '' })));
   });
   app.put('/api/publishing', (req, res) => {
     requireOwner(req); const { swimIds, mediaIds, story, confirmedBy, confirmedAt } = req.body;
     if (!Array.isArray(swimIds) || !Array.isArray(mediaIds) || typeof story !== 'string' || story.length > 4000 || !confirmedBy || !validDate(confirmedAt)) throw httpError(400, '请选择内容并填写发布范围确认人和日期');
-    reply(res, store.change(revision(req), data => {
+    reply(res, change(req, data => {
       if (swimIds.some(id => !data.swim.some(r => r.id === id)) || mediaIds.some(id => !data.media.some(r => r.id === id))) throw httpError(400, '选择的记录或素材不存在');
       data.publishing = { swimIds, mediaIds, story, confirmedBy: String(confirmedBy).slice(0, 100), confirmedAt }; return data.publishing;
     }));
@@ -137,7 +177,7 @@ export function createApp({ store, uploadsDir, authRequired = false, tokens = {}
     if (req.body?.format !== 'nico-backup-v1') throw httpError(400, '请选择平台导出的完整备份');
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
     for (const key of COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
-    reply(res, store.change(revision(req), data => { for (const key of Object.keys(data)) delete data[key]; Object.assign(data, restored); return { success: true }; }));
+    reply(res, change(req, data => { for (const key of Object.keys(data)) delete data[key]; Object.assign(data, restored); return { success: true }; }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
     const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };
@@ -153,7 +193,7 @@ export function createApp({ store, uploadsDir, authRequired = false, tokens = {}
         try { info = await inspectMedia(req.file.path, record.type); } catch { throw httpError(400, '无法识别真实素材格式，请检查文件或FFmpeg配置'); }
         record.duration = info.duration;
       }
-      const saved = store.change(revision(req), data => { relations('media', record, data); data.media.push(record); return record; }); reply(res, saved, 201);
+      const saved = change(req, data => { relations('media', record, data); data.media.push(record); return record; }); reply(res, saved, 201);
       if (processUploads) processMedia(record, uploadsDir).then(info => {
         const current = store.read(); store.change(current.revision, data => { const target = data.media.find(m => m.id === record.id); if (target) Object.assign(target, info); });
       }).catch(error => console.error('素材处理失败，原文件已保留：', error.message));
@@ -179,7 +219,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const host = process.env.NICO_HOST || '127.0.0.1';
   const store = openStore({ filename: process.env.NICO_DB_PATH || path.join(project, 'data/nico.sqlite'), seedPath: process.env.NICO_SEED_PATH || path.join(project, 'data/original-input.json'), backupDir: process.env.NICO_BACKUP_DIR || path.join(project, 'data/backups') });
   const tokens = { owner: process.env.NICO_OWNER_TOKEN, coach: process.env.NICO_COACH_TOKEN, viewer: process.env.NICO_VIEWER_TOKEN };
-  const app = createApp({ store, uploadsDir: process.env.NICO_UPLOADS_DIR || path.join(project, 'data/uploads'), ...maintenanceMode(host), tokens, allowedOrigins: process.env.NICO_ALLOWED_ORIGINS?.split(',').filter(Boolean) || undefined, webDir: process.env.NICO_WEB_DIR });
+  const accounts = createAccounts({ filename: path.join(project, 'data/admin-account.json'), setupCodePath: path.join(project, 'data/admin-setup-code.txt') });
+  const app = createApp({ store, accounts, allowAccountSetup: ['127.0.0.1', 'localhost', '::1'].includes(host), uploadsDir: process.env.NICO_UPLOADS_DIR || path.join(project, 'data/uploads'), ...maintenanceMode(host), tokens, allowedOrigins: process.env.NICO_ALLOWED_ORIGINS?.split(',').filter(Boolean) || undefined, webDir: process.env.NICO_WEB_DIR });
   const server = app.listen(Number(process.env.PORT || 3001), host, () => console.log(`Nico私有服务：http://${host}:${process.env.PORT || 3001}`));
   const stop = () => server.close(() => { store.close(); process.exit(0); });
   process.on('SIGINT', stop); process.on('SIGTERM', stop);

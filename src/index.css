@@ -584,3 +584,5 @@ dialog{margin:auto;max-width:min(1000px,94vw);max-height:92vh;width:900px;border
 @media print{.no-print,.app-footer,.status-line,.notice{display:none!important}.container{padding:0}.report-preview{border:0}}
 
 .source-button{font-size:.75rem;margin:3px;min-height:32px;padding:4px 8px}
+
+.admin-login{max-width:520px;margin:24px auto}.admin-login form{display:grid;gap:16px}.nav-tabs:has(button:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}
