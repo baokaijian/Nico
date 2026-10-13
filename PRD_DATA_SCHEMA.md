@@ -46,9 +46,9 @@ npm run check
 
 ## 云端执行顺序
 
-本次云端连接的自动审批失败：审批额度用完，读取未执行。因此本次本地审计不能证明云端当前数据已符合要求，也未修改现有云端数据或部署后台。本次代码提交到独立分支，不触发 master 的 Pages 自动发布。
+2026-10-13 已恢复云端连接，以最新云端版本9重新审计后整改到版本10，原版本自动备份。随后真实管理员API同值保存验收通过，版本为11，事实内容未改变。新版 Nico 后台已部署为版本5；匿名私有读取 / 写入返回401，管理员登录、保存和视频分段读取通过，临时验收账号已停用。生日、排名等37项缺失信息继续等待真实来源补录。
 
-额度恢复后，必须读取云端最新的 `nico_read_state` / 管理员完整备份及版本，不能以本地数据或旧导出覆盖可能已有的新录入。对最新导出执行：
+后续再次整改时，必须读取云端最新的 `nico_read_state` / 管理员完整备份及版本，不能以本地数据或旧导出覆盖可能已有的新录入。对最新导出执行：
 
 ```sh
 npm run audit:data -- --input review/latest-cloud-backup.json --report review/cloud-prd-audit.json --cloud-sql review/cloud-prd-rectification.sql
@@ -56,4 +56,4 @@ npm run audit:data -- --input review/latest-cloud-backup.json --report review/cl
 
 生成的 SQL 包含私人档案，仅保存在 `review`。复核后通过已授权 Supabase 连接执行；使用既有 `nico_save_state` 的版本检查、自动备份和逻辑删除同步事务。并发更新会拒绝整改，需重新读取，不跳过冲突检查。本次新增结构是现有 JSON 档案 / 台账 `payload` 的字段升级，不新增对匿名账号开放的表或权限。
 
-云端应用新版数据前先部署兼容后台。Edge Function 完整依赖现在包括 `supabase/functions/nico-api/index.ts`、`server/cloud-api.mjs`、`shared/domain.mjs`、`shared/password.mjs`、`shared/deletion.mjs` 和新增 `shared/prd.mjs`。保留已有自定义认证和 `verify_jwt=false`；服务端密钥不进入前端。部署后重新验收管理员写入、旧备份恢复、匿名禁止写入和公开影像白名单，再发布前端。
+云端应用新版数据前必须先部署兼容后台。Edge Function 完整依赖现在包括 `supabase/functions/nico-api/index.ts`、`server/cloud-api.mjs`、`shared/domain.mjs`、`shared/password.mjs`、`shared/deletion.mjs` 和新增 `shared/prd.mjs`。保留已有自定义认证和 `verify_jwt=false`；服务端密钥不进入前端。部署后重新验收管理员写入、旧备份恢复、匿名禁止写入和公开影像白名单，再发布前端。
