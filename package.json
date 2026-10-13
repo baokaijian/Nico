@@ -21,6 +21,8 @@
     "audit:data": "node scripts/prd-audit.mjs"
   },
   "dependencies": {
+    "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/ffmpeg": "0.12.15",
     "express": "^5.2.1",
     "multer": "^2.2.0",
     "react": "^19.2.7",
