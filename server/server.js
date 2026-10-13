@@ -1,3 +1,4 @@
+import { upgradePrdState } from '../shared/prd.mjs';
 import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
@@ -153,7 +154,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   });
   app.put('/api/profile', (req, res) => {
     requireOwner(req); const { name, sex, birthDate } = req.body;
-    if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男'].includes(sex) || birthDate && !validDate(birthDate)) throw httpError(400, '档案字段无效');
+    if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男', '其他'].includes(sex) || birthDate && !validDate(birthDate)) throw httpError(400, '档案字段无效');
     reply(res, change(req, data => (data.profile = { name: name.trim(), sex, birthDate: birthDate || '' })));
   });
   app.put('/api/publishing', (req, res) => {
@@ -177,7 +178,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (req.body?.format !== 'nico-backup-v1') throw httpError(400, '请选择平台导出的完整备份');
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
     for (const key of COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
-    reply(res, change(req, data => { for (const key of Object.keys(data)) delete data[key]; Object.assign(data, restored); return { success: true }; }));
+    reply(res, change(req, data => { const dataVersion = data.schemaVersion; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); return { success: true }; }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
     const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };

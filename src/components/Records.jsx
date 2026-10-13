@@ -1,3 +1,4 @@
+import { BODY_FIELDS, bodyFormat, dateFormat, scoreFormat, parseScore, derivePrdState } from '../../shared/prd.mjs';
 import { downloadJSON, today } from '../services/files';
 import { useEffect, useState } from 'react';
 import { FIELDS, ordered, validateRecord, WOMEN_50, STANDARD_SOURCE, STANDARD_VERSION } from '../../shared/domain.mjs';
@@ -9,6 +10,7 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : '']));
   const [values, setValues] = useState(blank), [editing, setEditing] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [filter, setFilter] = useState('');
+  const [scoreKind, setScoreKind] = useState('全部');
   const [draftFound, setDraftFound] = useState(null);
   const [baseRevision, setBaseRevision] = useState(() => api?.getRevision()), [conflict, setConflict] = useState(false);
   const key = `nico_form_draft_${type}`;
@@ -31,14 +33,17 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
     if (!window.confirm('移入回收站？可以在档案页恢复。')) return;
     try { await api.request(`/api/${type}/${id}`, { method: 'DELETE' }); onSaved(type, null, id); } catch (problem) { setError(problem.message); }
   };
-  const records = ordered(data[type]).reverse().filter(r => !filter || JSON.stringify(r).includes(filter));
+  const records = ordered(data[type]).reverse().filter(r => (type !== 'swim' || publicMode || scoreKind === '全部' || (r.recordType || '未知') === scoreKind) && (!filter || JSON.stringify(r).includes(filter)));
+  const effective = derivePrdState(structuredClone(data));
   const sessionOptions = data.plans.flatMap(p => (p.sessions || []).map(s => ({ id: `${p.id}/${s.id}`, label: `${s.date} · ${s.title || s.type} · ${p.title} v${p.version}` })));
   const uiField = field => {
     const choices = field.key === 'plannedSessionId' ? sessionOptions : field.key === 'mediaId' ? data.media.map(m => ({ id: m.id, label: `${m.date} · ${m.title} · 尾号${m.id.slice(-4)}` })) : field.key === 'recordId' ? [...data.swim, ...data.trainings].map(r => ({ id: r.id, label: `${r.date} · ${r.distance || r.session || '训练'} ${r.time || ''}` })) : null;
+    if (type === 'growth' && BODY_FIELDS.includes(field.key)) return { ...field, step: 0.1 };
     return choices ? { ...field, type: 'select', options: choices.map(o => o.id), optionLabels: Object.fromEntries(choices.map(o => [o.id, o.label])) } : field;
   };
   const simpleKeys = type === 'trainings' ? ['date', 'plannedSessionId', 'durationMinutes', 'totalMeters', 'feeling', 'discomfort', 'coachNotes'] : type === 'nutrition' ? ['date', 'sleepHours', 'fatigue', 'discomfort', 'willingness'] : fields.map(f => f.key);
   return <div className="stack"><header><h1>{names[type]}记录</h1><p className="muted">{publicMode ? '仅展示家长已确认公开的成绩，按距离、泳姿与池长分别查看。' : readOnly ? '查看实际录入的记录，未填写的字段表示未知。' : '填写实际观察；留空表示未记录，0只表示实际为零。'}</p></header>
+    {type === 'growth' && <Message>身体测量须保留一位小数。臂长与臂展分别记录，测量方法未确认时请留空。</Message>}
     {type === 'fitness' && <Message>目前只做个人测量记录。体能值不能替代游泳等级标准；具体训练由教练确认。</Message>}
     {type === 'nutrition' && <Message>记录实际睡眠、感受和饮食。晨脉与恢复感受不用于自动判断能否下水；补充剂仅记录既有专业建议。</Message>}
     {type === 'goals' && <Message>历史目标原文完整保留，包含未核实的规则或旧标准。手动进度不代表预测概率；未经确认的原文不作为训练指令。</Message>}
@@ -48,11 +53,13 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
       <form onSubmit={save}><div className="form-grid">{fields.filter(f => simpleKeys.includes(f.key)).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{simpleKeys.length < fields.length && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{fields.filter(f => !simpleKeys.includes(f.key)).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
         <div className="actions"><button disabled={busy} className="apple-btn apple-btn-primary">{busy ? '正在保存…' : '保存到服务端'}</button><button type="button" onClick={reset} className="apple-btn apple-btn-secondary">清空 / 取消</button><button type="button" onClick={() => downloadJSON(`Nico-${type}-未提交草稿.json`, { collection: type, values, editing })} className="apple-btn apple-btn-secondary">导出未提交草稿</button></div><p className="muted">草稿仅在此设备，不会自动覆盖服务端。保存失败时输入保留。</p>
       </form></details>}
+    {type === 'swim' && !publicMode && <><Message>测试年龄组按测试年份减出生年份计算；生日未知时留空。排名、上一次成绩和第一名成绩按实际来源填写，缺失时不自动推算。</Message><label>记录分类<select className="apple-input" value={scoreKind} onChange={e => setScoreKind(e.target.value)}>{['全部', '测试', '比赛', '训练', '未知'].map(kind => <option key={kind}>{kind}</option>)}</select></label></>}
     <label className="search">查找记录<input className="apple-input" value={filter} onChange={e => setFilter(e.target.value)} placeholder="日期、项目或备注"/></label>
     {!records.length && <Empty>{publicMode ? '尚无已选择的公开成绩，或没有符合查找条件的成绩。' : '尚无匹配记录；未录入不代表没有训练。'}</Empty>}
-    <div className="record-list">{records.map(r => <article className="glass-card" key={r.id}><div className="flex-between"><h2>{r.date || r.deadline || '未填写日期'} · {type === 'swim' ? `${r.distance}${r.stroke} ${r.time} · ${r.poolLength}池` : type === 'goals' ? '个人目标原始记录' : names[type]}</h2>{!readOnly && <div className="actions"><button onClick={() => edit(r)}>编辑</button><button onClick={() => remove(r.id)}>移入回收站</button></div>}</div>
+    <div className="record-list">{records.map(r => <article className="glass-card" key={r.id}><div className="flex-between"><h2>{dateFormat(r.date || r.deadline)} · {type === 'swim' ? `${r.distance}${r.stroke} ${scoreFormat(parseScore(r.time)) || r.time} · ${r.poolLength}池` : type === 'goals' ? '个人目标原始记录' : names[type]}</h2>{!readOnly && <div className="actions"><button onClick={() => edit(r)}>编辑</button><button onClick={() => remove(r.id)}>移入回收站</button></div>}</div>
       {type === 'swim' && !publicMode && <p className="muted">{r.startType || '出发未知'} · {r.timingMethod || '计时未知'} · {r.recordType || '记录性质未知'}</p>}
-      <details><summary>{type === 'goals' ? '查看原始目标（规则待复核）' : publicMode ? '查看成绩条件' : '查看完整字段与来源'}</summary><dl className="record-fields">{displayFields.map(f => <div key={f.key}><dt>{f.label}</dt><dd>{valueLabel(r[f.key])}</dd></div>)}<div><dt>记录ID</dt><dd>{r.id}</dd></div></dl></details>
+      <details><summary>{type === 'goals' ? '查看原始目标（规则待复核）' : publicMode ? '查看成绩条件' : '查看完整字段与来源'}</summary><dl className="record-fields">{displayFields.map(f => <div key={f.key}><dt>{f.label}</dt><dd>{type === 'growth' && BODY_FIELDS.includes(f.key) ? bodyFormat(r[f.key]) : f.type === 'date' ? dateFormat(r[f.key]) : valueLabel(r[f.key])}</dd></div>)}<div><dt>记录ID</dt><dd>{r.id}</dd></div></dl></details>
+      {type === 'swim' && !publicMode && <dl className="record-fields"><div><dt>测试年龄组</dt><dd>{valueLabel(effective.swim.find(s => s.id === r.id)?.testAgeGroup)}</dd></div><div><dt>与第一名差距</dt><dd>{valueLabel(effective.swim.find(s => s.id === r.id)?.gapTime)}</dd></div><div><dt>关联照片 / 视频</dt><dd>{data.media.filter(m => m.recordId === r.id).map(m => m.title).join('、') || '未关联（请在素材说明中选择关联记录）'}</dd></div></dl>}
       {type === 'swim' && !publicMode && <StandardNote record={r} sex={data.profile.sex}/>}
     </article>)}</div>
   </div>;

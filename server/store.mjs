@@ -1,3 +1,4 @@
+import { derivePrdState } from '../shared/prd.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -74,6 +75,7 @@ export function openStore({ filename, seedPath, backupDir }) {
       const next = structuredClone(current.data);
       const result = mutate(next);
       preserveDeletedRecords(current.data, next, actor, new Date().toISOString());
+      derivePrdState(next);
       normalizeState(next);
       atomicJSON(path.join(backupDir, `revision-${current.revision}.json`), { ...current, format: 'nico-backup-v1' });
       db.prepare('UPDATE state SET data=?, revision=revision+1 WHERE id=1').run(JSON.stringify(next));
