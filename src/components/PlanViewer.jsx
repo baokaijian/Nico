@@ -1,9 +1,11 @@
-import { downloadJSON } from '../services/files';
+import { downloadJSON, today } from '../services/files';
 import { useState } from 'react';
-import { FIELDS, analysis, validateRecord, fingerprint } from '../../shared/domain.mjs';
+import { FIELDS, analysis, validateRecord, fingerprint, planContext } from '../../shared/domain.mjs';
+import RecordSources from './RecordSources';
 import { Field, Message, Empty } from './ui';
 export default function PlanViewer({ data, api, onSaved, readOnly }) {
   const result = analysis(data);
+  const context = planContext(data, today(), result.version);
   const blank = () => Object.fromEntries(FIELDS.plans.map(f => [f.key, '']));
   const [form, setForm] = useState(blank), [sessions, setSessions] = useState([]), [editing, setEditing] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const [baseRevision, setBaseRevision] = useState(() => api.getRevision()), [conflict, setConflict] = useState(false);
@@ -14,8 +16,10 @@ export default function PlanViewer({ data, api, onSaved, readOnly }) {
     try { const previous = data.plans.find(p => p.id === editing); validateRecord('plans', payload(), previous); const saved = await api.request(`/api/plans${editing ? `/${editing}` : ''}`, { method: editing ? 'PUT' : 'POST', body: payload(), expectedRevision: baseRevision }); onSaved('plans', saved); setForm(blank()); setSessions([]); setEditing(null); setBaseRevision(api.getRevision()); } catch (problem) { setError(problem.message); setConflict(problem.status === 409); } finally { setBusy(false); }
   };
   return <div className="stack"><header><h1>本周与训练提升计划</h1><p className="muted">依据当前记录生成的4周管理建议；具体组数、强度、休息由现场教练安排。</p></header>
-    <section className="glass-card"><h2>当前重点：{result.focus}</h2><p>来源：{result.recent ? `${result.recent.date} · ${result.recent.id} · ${result.recent.notes || '无备注'}` : '尚无成绩，先建立记录基线'}</p><p className="muted">出发、计时、分段与体能资料不足，不推断快肌状态、不相加提速秒数、不把25米乘2换算50米。</p></section>
-    <div className="stage-grid">{result.stages.map(stage => <article className="glass-card" key={stage.title}><h2>{stage.title}</h2><p>{stage.action}</p><p className="muted">交付：{stage.delivery}</p><span className="badge">建议草稿 · 待教练确认</span></article>)}</div>
+    <section className="glass-card"><h2>{context.current ? '本周期确认重点' : '待教练确认的重点'}：{context.current?.focus || result.focus}</h2><Message>{context.message}</Message>{context.current && <p>{context.current.title} · 版本{context.current.version} · 确认人{context.current.reviewedBy} · {context.current.startDate}—{context.current.endDate}</p>}{result.focusEvidence ? <><p>建议依据：{result.focusEvidence.kind} · {result.focusEvidence.date} · {result.focusEvidence.text}</p><RecordSources data={data} ids={result.focusEvidence.sourceIds}/></> : <p>尚无技术反馈或审核观察，先由教练确认重点。</p>}<p className="muted">备注与原话仅供复核；不据关键词诊断体能，不相加提速秒数，不把25米乘2换算50米。</p></section>
+    <section className="glass-card"><h2>已录入参考成绩与基线缺口</h2><p>{result.baseline.text}</p><p>{result.baseline.missingConditions.length ? `待补齐：${result.baseline.missingConditions.join('、')}。` : result.baseline.recordId ? '已填条件仍需现场确认，参考成绩尚未自动认定为本周期基线。' : '没有参考成绩时不生成基线数值。'}</p><RecordSources data={data} ids={result.baseline.recordId ? [result.baseline.recordId] : []}/></section>
+    <p className="muted">以下四周为记录、验证和复盘的建议流程，尚未执行；具体日期、课次和练习量由教练填写。</p>
+    <div className="stage-grid">{result.stages.map(stage => <article className="glass-card" key={stage.title}><h2>{stage.title}</h2><p>{stage.action}</p><p className="muted">交付：{stage.delivery}</p><RecordSources data={data} ids={stage.sourceIds}/><p><span className="badge">建议草稿 · 待教练确认</span></p></article>)}</div>
     <section className="glass-card"><h2>执行与恢复边界</h2><ul className="data-list"><li>不安排家庭水下憋气任务或强制限气口令，水下技能须有合格现场监督。</li><li>家庭额外活动计入总负荷。具体运动由教练确认；有疼痛、不适、反复疲惫或厌训时先沟通。</li><li>记录实际课表与休息日；不因年龄或网页模板自动追加每天的弹跳、拉伸和补充剂。</li><li>长池50米没有半程转身；短池相关技术单独记录。</li></ul><p className="muted">资料：<a href="https://www.redcross.org/content/dam/redcross/training-services/scientific-advisory-council/2022%20Hypoxic%20Blackout%20-%20Joint%20Statement%20-%20Red%20Cross%20Y%20USA%20Swimming%2010-31-2022.pdf" target="_blank" rel="noreferrer">水上呼吸安全联合声明</a> · <a href="https://publications.aap.org/pediatrics/article/153/2/e2023065129/196435" target="_blank" rel="noreferrer">AAP儿童运动负荷资料</a> · <a href="https://aasm.org/advocacy/position-statements/child-sleep-duration-health-advisory/" target="_blank" rel="noreferrer">睡眠参考</a></p></section>
     <h2>已保存的周期与课次</h2>{!data.plans.length && <Empty>尚无已保存计划；以上建议没有被当作已执行课表。</Empty>}
     {data.plans.map(p => <PlanCard key={p.id} plan={p} stale={p.sourceVersion && p.sourceVersion !== result.version} onEdit={readOnly ? null : () => { setBaseRevision(api.getRevision()); setEditing(p.id); setForm(Object.fromEntries(FIELDS.plans.map(f => [f.key, p[f.key] ?? '']))); setSessions(structuredClone(p.sessions || [])); }}/>) }
