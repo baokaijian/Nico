@@ -12,7 +12,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node server/public-server.mjs ./server/public-server.mjs
-COPY --chown=node:node shared/domain.mjs shared/publication.mjs ./shared/
+COPY --chown=node:node shared/domain.mjs shared/publication.mjs shared/prd.mjs ./shared/
 USER node
 ENV NODE_ENV=production NICO_PUBLIC_HOST=0.0.0.0 NICO_PUBLIC_PORT=8080
 EXPOSE 8080
