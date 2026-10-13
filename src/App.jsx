@@ -74,5 +74,5 @@ export default function App() {
         {!privateMode && tab === 'results' && <Records type="swim" data={data} readOnly publicMode/>}
         {!privateMode && tab === 'media' && <Gallery data={data} api={adminCapable ? api : undefined} readOnly publicMode/>}
       </Suspense>}
-    </main><footer className="app-footer">{privateMode ? '依据录入记录生成分析 · 训练建议需教练确认' : '公开精选内容 · 发布范围由家长确认'}</footer></div>;
+    </main><footer className="app-footer">{privateMode ? '依据录入记录生成分析 · 训练建议需教练确认' : '公开精选内容 · 发布范围由家长确认'} · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer></div>;
 }

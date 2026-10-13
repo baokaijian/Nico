@@ -32,7 +32,7 @@ export function validatePublicDirectory(directory, privateIds = []) {
       if (entry.isSymbolicLink()) throw new Error('公开产物不允许符号链接');
       if (entry.isDirectory()) { if (!['assets', 'uploads'].includes(relative)) throw new Error(`公开产物包含未知目录：${relative}`); inspect(filename); continue; }
       if (!entry.isFile()) throw new Error('公开产物只允许普通文件');
-      if (!['index.html', 'public-summary.json', 'nico-build.json', 'favicon.svg', '.nojekyll'].includes(relative) && !/^assets\/[A-Za-z0-9_.-]+\.(?:js|css|svg|png|jpg|webp|woff2?|ttf)$/.test(relative) && !mediaFiles.has(relative)) throw new Error(`公开产物包含未允许文件：${relative}`);
+      if (!['index.html', 'public-summary.json', 'nico-build.json', 'favicon.svg', '.nojekyll', 'third-party-notices.html'].includes(relative) && !/^assets\/[A-Za-z0-9_.-]+\.(?:js|css|svg|png|jpg|webp|woff2?|ttf)$/.test(relative) && !/^assets\/ffmpeg-core-[A-Za-z0-9_-]+\.wasm$/.test(relative) && !mediaFiles.has(relative)) throw new Error(`公开产物包含未允许文件：${relative}`);
       if (relative.startsWith('uploads/') && !mediaFiles.has(relative)) throw new Error('公开产物包含未选择素材');
       if (/\.(?:js|json|html)$/.test(filename) && privateIds.some(id => fs.readFileSync(filename, 'utf8').includes(id))) throw new Error(`公开产物包含私有记录：${relative}`);
       visited.add(relative);
