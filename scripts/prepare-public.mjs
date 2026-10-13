@@ -7,6 +7,7 @@ const snapshot = validatePublicSummary(JSON.parse(fs.readFileSync(path.join(rele
 const out = path.join(root, '.generated-public');
 fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
 fs.copyFileSync(path.join(root, 'public/favicon.svg'), path.join(out, 'favicon.svg'));
+fs.copyFileSync(path.join(root, 'public/third-party-notices.html'), path.join(out, 'third-party-notices.html'));
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
 fs.writeFileSync(path.join(out, 'public-summary.json'), JSON.stringify(snapshot, null, 2) + '\n');
 for (const item of snapshot.media) for (const url of [item.url, item.posterUrl].filter(Boolean)) {

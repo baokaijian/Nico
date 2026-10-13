@@ -239,6 +239,8 @@ export function analysis(state) {
   // Plans deliberately stay outside their own evidence version, so saving one
   // cannot make itself stale. Media/annotations are evidence and must invalidate it.
   const evidence = Object.fromEntries(['swim', 'trainings', 'growth', 'fitness', 'nutrition', 'goals', 'media', 'annotations'].map(key => [key, [...state[key]].sort((a, b) => a.id.localeCompare(b.id))]));
+  // Encoding/storage status does not change an observation or coach decision.
+  evidence.media = evidence.media.map(m => Object.fromEntries(['id', 'date', 'title', 'type', 'duration', 'recordId'].filter(key => m[key] !== undefined).map(key => [key, m[key]])));
   return { pb, recent, facts, focus, focusEvidence, baseline, sourceIds: unique([...facts.flatMap(f => f.sourceIds), ...stages.flatMap(s => s.sourceIds)]), version: fingerprint({ rules: 'evidence-v2', ...evidence, profile: state.profile }), stages };
 }
 export function rangeSummary(state, start, end) {

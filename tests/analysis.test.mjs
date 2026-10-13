@@ -68,6 +68,7 @@ test('证据版本跨jsonb键序及集合排序稳定，批注和素材变化会
   assert.equal(analysis(reordered).version, version);
   assert.notEqual(analysis({ ...state, annotations: [{ ...annotation, observation: '另一个协议观察' }] }).version, version);
   assert.notEqual(analysis({ ...state, media: [{ ...video, duration: 2 }] }).version, version);
+  assert.equal(analysis({ ...state, media: [{ ...video, playbackUrl: '/uploads/new.mp4', processingStatus: '已处理', sourceSha256: 'a'.repeat(64) }] }).version, version);
   state.plans = [plan('current', { sourceVersion: version })];
   assert.equal(analysis(state).version, version);
 });

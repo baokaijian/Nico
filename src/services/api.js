@@ -50,7 +50,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       xhr.send(body);
     });
   }
-  async function mediaBlob(id, variant, signal) {
+  async function mediaFile(id, variant, signal) {
     const started = generation;
     const token = credential();
     try {
@@ -59,12 +59,13 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       if (!res.ok) throw new ApiError('素材暂不可用，请刷新处理状态或选择原片', res.status);
       const blob = await res.blob();
       if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧素材响应', 'AbortError');
-      return URL.createObjectURL(blob);
+      return blob;
     } catch (problem) {
       if (problem.name === 'AbortError' || problem instanceof ApiError) throw problem;
       throw new ApiError('连接中断，未能读取素材。请检查连接后重新打开。', 0);
     }
   }
+  const mediaBlob = async (id, variant, signal) => URL.createObjectURL(await mediaFile(id, variant, signal));
   async function authRequest(action, body, { signal } = {}) {
     const started = generation;
     const token = credential();
@@ -77,6 +78,6 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     return result;
   }
   const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; };
-  return { cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), request, upload, mediaBlob, authRequest, resetAuth, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
+  return { cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), request, upload, mediaBlob, mediaFile, authRequest, resetAuth, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };
 }

@@ -2,6 +2,7 @@ import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
 import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
 import { preserveDeletedRecords } from '../shared/deletion.mjs';
+import { digestBytes, inspectPlayback, inspectPoster, validateVariantMetadata, MEDIA_MAX_BYTES, POSTER_MAX_BYTES } from '../shared/media-variants.mjs';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw fail(400, error.message); } };
@@ -123,6 +124,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       if (!/^\d+$/.test(expected || '')) throw fail(428, '请先加载最新记录，再提交修改');
       if (Number(expected) !== current.revision) throw fail(409, '记录已被更新，请刷新后核对并重试；当前输入已保留');
       let result, uploadedFile;
+      const uploadedVariants = [];
       try {
         if (parts[1] === 'media' && parts.length === 2 && method === 'POST') {
           const form = await request.formData(), file = form.get('file');
@@ -132,13 +134,47 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           const record = validate('media', Object.fromEntries([...form.entries()].filter(([key]) => key !== 'file')));
           uploadedFile = `file-${randomHex(16)}.${types[file.type]}`;
           Object.assign(record, { id: `media-${randomHex(16)}`, type: file.type.startsWith('video/') ? 'video' : 'photo', url: `/uploads/${uploadedFile}`, processingStatus: file.type.startsWith('video/') ? '已保存原片，兼容副本待处理' : '原图已保存' });
-          relations('media', record, data); await backend.upload(uploadedFile, await file.arrayBuffer(), file.type); data.media.push(record); result = record;
+          const source = await file.arrayBuffer();
+          record.sourceSha256 = await digestBytes(source);
+          relations('media', record, data); await backend.upload(uploadedFile, source, file.type); data.media.push(record); result = record;
+        } else if (parts[1] === 'media' && parts.length === 4 && method === 'POST' && ['variants', 'processing-failure'].includes(parts[3])) {
+          const item = data.media.find(m => m.id === parts[2]);
+          if (!item || item.type !== 'video') throw fail(404, '视频原片记录不存在');
+          if (parts[3] === 'processing-failure') {
+            const input = await body();
+            if (input.sourceUrl !== item.url || typeof input.message !== 'string' || !input.message.trim() || input.message.length > 300) throw fail(400, '处理状态信息无效');
+            // A failed new attempt must not destroy an existing usable variant.
+            if (item.playbackUrl && item.posterUrl) return json(item);
+            Object.assign(item, { processingStatus: '处理未完成，原片保留', processingError: input.message }); result = item;
+          } else {
+            const form = await request.formData(), playback = form.get('playback'), poster = form.get('poster');
+            if ([...form.keys()].length !== 4 || [...form.keys()].some(k => !['sourceUrl', 'playback', 'poster', 'metadata'].includes(k)) || form.get('sourceUrl') !== item.url || !(playback instanceof Blob) || !playback.size || playback.size > MEDIA_MAX_BYTES || playback.type !== 'video/mp4' || !(poster instanceof Blob) || !poster.size || poster.size > POSTER_MAX_BYTES || poster.type !== 'image/jpeg') throw fail(400, '请选择属于此原片的播放副本及JPEG封面');
+            const playbackBytes = new Uint8Array(await playback.arrayBuffer()), posterBytes = new Uint8Array(await poster.arrayBuffer());
+            let info;
+            const metadata = form.get('metadata');
+            if (typeof metadata !== 'string' || metadata.length > 2000) throw fail(400, '处理信息格式无效');
+            try { const container = inspectPlayback(playbackBytes); inspectPoster(posterBytes); info = validateVariantMetadata(JSON.parse(metadata), container); } catch (error) { throw fail(400, error.message); }
+            let originalHash = item.sourceSha256;
+            if (!originalHash) {
+              const source = await backend.download(fileFor(item.url), null, 'GET');
+              if (!source.ok) throw fail(404, '原片暂不可读取，请保留处理结果后重试');
+              const sourceBytes = await source.arrayBuffer();
+              if (sourceBytes.byteLength > MEDIA_MAX_BYTES) throw fail(400, '原片超过处理范围');
+              originalHash = await digestBytes(sourceBytes);
+            }
+            if (originalHash !== info.sourceSha256) throw fail(400, '处理文件与已保存原片不一致，禁止替换关联');
+            if (data.annotations.some(a => a.mediaId === item.id && a.endSecond > info.duration)) throw fail(400, '原片时长与现有批注矛盾，请先核对');
+            const prefix = `derived-${randomHex(16)}`, playbackName = `${prefix}.mp4`, posterName = `${prefix}.jpg`;
+            await backend.upload(playbackName, playbackBytes.buffer, 'video/mp4'); uploadedVariants.push(playbackName);
+            await backend.upload(posterName, posterBytes.buffer, 'image/jpeg'); uploadedVariants.push(posterName);
+            Object.assign(item, info, { playbackUrl: `/uploads/${playbackName}`, posterUrl: `/uploads/${posterName}` }); result = item;
+          }
         } else if (COLLECTIONS.includes(parts[1]) && parts[0] === 'api') {
           const key = parts[1];
           if (method === 'POST' && parts.length === 2 && key !== 'media') { const record = { ...validate(key, await body()), id: `${key}-${randomHex(16)}` }; relations(key, record, data); data[key].push(record); result = record; }
           else if (['PUT', 'DELETE'].includes(method) && parts.length === 3) {
             const index = data[key].findIndex(record => record.id === parts[2]); if (index < 0) throw fail(404, '记录不存在');
-            if (method === 'PUT') { const record = validate(key, await body(), data[key][index]); relations(key, record, data); if (key === 'plans') data.planHistory.push(structuredClone(data[key][index])); data[key][index] = record; result = record; }
+            if (method === 'PUT') { const record = validate(key, await body(), data[key][index]); relations(key, record, data); if (key === 'plans') (data.planHistory ||= []).push(structuredClone(data[key][index])); data[key][index] = record; result = record; }
             else { const [record] = data[key].splice(index, 1); data.trash.push({ id: `trash-${randomHex(16)}`, collection: key, record, deletedAt: new Date(now()).toISOString(), deletedBy: session.username }); result = { success: true, message: '已移至回收站，原素材保留' }; }
           } else throw fail(404, '接口不存在');
         } else if (parts[1] === 'trash' && parts[3] === 'restore' && method === 'POST') {
@@ -165,8 +201,11 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
         normalizeState(data);
         const revision = await backend.save(current.revision, data, session.username);
         headers['X-Nico-Revision'] = String(revision);
-        return json(result, method === 'POST' && COLLECTIONS.includes(parts[1]) ? 201 : 200);
-      } catch (error) { if (uploadedFile) await backend.removeFile(uploadedFile); throw error; }
+        return json(result, method === 'POST' && COLLECTIONS.includes(parts[1]) && parts.length === 2 ? 201 : 200);
+      } catch (error) {
+        for (const name of [...uploadedVariants, ...(uploadedFile ? [uploadedFile] : [])]) { try { await backend.removeFile(name); } catch { /* Never remove an older linked file; unlinked cleanup can be retried. */ } }
+        throw error;
+      }
     } catch (error) { return json({ error: error.status ? error.message : '后台读取或保存失败，请保留输入并稍后重试' }, error.status || 500); }
   };
 }
