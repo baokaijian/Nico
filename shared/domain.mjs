@@ -154,8 +154,23 @@ export function best(records, distance = '50m', stroke = '自由泳', poolLength
 }
 export function fingerprint(data) {
   let hash = 2166136261;
-  for (const char of JSON.stringify(data)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  // Postgres jsonb and local JSON can return different object-key orders.
+  const canonical = JSON.stringify(data, (_, value) => value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
+  for (const char of canonical) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
   return `记录版本-${hash.toString(16).padStart(8, '0')}`;
+}
+export function planContext(state, day, version = analysis(state).version) {
+  if (!validDate(day)) throw new Error('查看计划的日期无效');
+  const candidates = state.plans.filter(p => p.status === '已确认' && p.reviewedBy?.trim() && p.startDate <= day && p.endDate >= day);
+  const stale = candidates.filter(p => p.sourceVersion && p.sourceVersion !== version);
+  // Overlapping confirmations need a human choice, rather than array-order priority.
+  const current = candidates.length === 1 && !stale.length ? candidates[0] : null;
+  const message = candidates.length > 1 ? '当前周期有多份确认计划，请教练明确采用哪一份。'
+    : stale.length ? '当前周期计划的依据已更新，请教练复核后保存新版本。'
+      : current && !current.sourceVersion ? '本周期为手动确认计划，尚未关联分析依据。'
+        : !current ? '当前日期没有适用的已确认计划；以下为待确认建议。' : '';
+  return { day, current, candidates, stale, message };
 }
 export function analysis(state) {
   const records = eventRecords(state.swim);
@@ -183,14 +198,48 @@ export function analysis(state) {
     const down = [['handWidth', '手宽'], ['footLength', '脚长']].filter(([key]) => a[key] != null && b[key] != null && b[key] < a[key]);
     if (down.length) facts.push({ kind: '待验证建议', text: `${down.map(([, name]) => name).join('、')}两次测量下降，先核对测量方法和录入，不据此推断生长异常或竞技天赋。`, sourceIds: [a.id, b.id] });
   }
-  const explosive = /爆发/.test(recent?.notes || '');
-  const focus = explosive ? '请教练验证出发、蹬壁和短段加速的具体问题' : '请教练依据当前成绩确认一个主要技术重点';
-  return { pb, recent, facts, focus, sourceIds: [...new Set(facts.flatMap(f => f.sourceIds))], version: fingerprint({ swim: state.swim, trainings: state.trainings, growth: state.growth, fitness: state.fitness, nutrition: state.nutrition, goals: state.goals, profile: state.profile }), stages: [
-    { title: '第1周 · 确认基线', action: `${focus}。补齐同条件出发、计时方式；核实实际课表和休息日。`, delivery: '一个技术重点 + 同条件基线记录' },
-    { title: '第2周 · 记录执行', action: '由教练在原课表内安排练习；记录实际时长、泳程、感受、不适和教练原话。不自动追加训练量。', delivery: '课次记录 + 一个教练提示' },
-    { title: '第3周 · 录像验证', action: '先确认运动员与泳道，再用时间点批注验证当前重点。没有录像证据时保留为待验证建议。', delivery: '一段已定位的观察或明确的证据缺口' },
-    { title: '第4周 · 复测调整', action: '教练选择适合的同条件复测，比较记录并决定保留或调整重点；不承诺固定提速秒数和晋升时间。', delivery: '周期复盘 + 下一周期重点' },
-  ] };
+  const training = latest(state.trainings), recovery = latest(state.nutrition);
+  const feedback = latest(state.trainings.filter(r => r.focusSkills?.trim() || r.coachNotes?.trim()));
+  if (training) facts.push({ kind: '事实', text: `最近训练记录为${training.date}；实际时长${training.durationMinutes == null ? '未填' : `${training.durationMinutes}分钟`}，泳程${training.totalMeters == null ? '未填' : `${training.totalMeters}m`}。`, sourceIds: [training.id] });
+  if (feedback) facts.push({ kind: '原始意见', text: `${feedback.date}的训练技术提示：${feedback.focusSkills || '未填'}；教练原话：${feedback.coachNotes || '未填'}。原话需在现场核对适用条件。`, sourceIds: [feedback.id] });
+  if (recovery) facts.push({ kind: '原始记录', text: `最近恢复记录为${recovery.date}；总睡眠${recovery.sleepHours == null ? '未填' : `${recovery.sleepHours}小时`}，疲惫感：${recovery.fatigue || '未填'}；不适：${recovery.discomfort || '未填'}；训练意愿：${recovery.willingness || '未填'}。未填项不代表状态正常。`, sourceIds: [recovery.id] });
+  const videos = ordered(state.media.filter(m => m.type === 'video'));
+  const reviewed = state.annotations.filter(a => {
+    const media = videos.find(m => m.id === a.mediaId);
+    return media && a.status === '已审核' && a.reviewedBy?.trim() && a.athleteIdentity?.trim()
+      && a.observation?.trim() && Number.isFinite(a.startSecond) && Number.isFinite(a.endSecond)
+      && a.startSecond >= 0 && a.endSecond > a.startSecond && (media.duration == null || a.endSecond <= media.duration)
+      && (!a.recordId || [...state.swim, ...state.trainings].some(r => r.id === a.recordId));
+  }).sort((a, b) => {
+    const key = x => `${videos.find(m => m.id === x.mediaId).date}/${x.updatedAt || x.createdAt || ''}/${x.id}`;
+    return key(a).localeCompare(key(b));
+  });
+  for (const a of reviewed) facts.push({ kind: '已审核观察', text: `${videos.find(m => m.id === a.mediaId).title}，${a.startSecond}–${a.endSecond}秒；运动员/泳道：${a.athleteIdentity}；观察：${a.observation}；限制：${a.limitation || '未填写'}；审核人：${a.reviewedBy}。`, sourceIds: [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])] });
+  facts.push({ kind: '事实', text: `已录入视频${videos.length}段；具备运动员确认、有效时间片段和审核人的批注${reviewed.length}条。其余批注不作为个体技术分析依据。`, sourceIds: [...videos.map(m => m.id), ...state.annotations.map(a => a.id)] });
+  const candidates = [
+    ...(recent?.notes ? [{ date: recent.date, kind: '原始成绩备注', text: recent.notes, sourceIds: [recent.id], focus: '请教练核对最新成绩备注，确认一个主要技术重点' }] : []),
+    ...(feedback ? [{ date: feedback.date, kind: '原始训练意见', text: [feedback.focusSkills, feedback.coachNotes].filter(Boolean).join('；'), sourceIds: [feedback.id], focus: '请教练复核最近训练的技术提示与原话，确认一个主要技术重点' }] : []),
+    ...reviewed.map(a => ({ date: videos.find(m => m.id === a.mediaId).date, kind: '已审核录像观察', text: a.observation, sourceIds: [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])], focus: '请教练围绕已审核录像观察，确认一个主要技术重点' })),
+  ];
+  // Date wins; on the same date a reviewed observation has priority over raw notes.
+  const focusEvidence = candidates.map((c, index) => ({ ...c, index })).sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index).at(-1) || null;
+  const focus = focusEvidence?.focus || '请教练依据当前成绩确认一个主要技术重点';
+  const reference = records.at(-1) || null;
+  const conditions = [['startType', '出发方式'], ['timingMethod', '计时方式'], ['recordType', '记录性质']];
+  const missingConditions = reference ? conditions.filter(([key]) => !reference[key] || reference[key] === '未知').map(([, label]) => label) : [];
+  const comparable = reference && !missingConditions.length ? records.filter(r => conditions.every(([key]) => r[key] === reference[key]) && ['testItem', 'task'].every(key => (r[key] || '') === (reference[key] || ''))) : [];
+  const baseline = { recordId: reference?.id || null, missingConditions, comparableIds: comparable.map(r => r.id), text: reference ? `${reference.date} · ${reference.distance}${reference.stroke} · ${reference.poolLength}池 · ${timeLabel(parseTime(reference.time))}；出发${reference.startType || '未知'}，计时${reference.timingMethod || '未知'}，性质${reference.recordType || '未知'}` : '尚无长池50米自由泳成绩，先录入真实参考成绩。' };
+  const unique = ids => [...new Set(ids)];
+  const stages = [
+    { title: '第1周 · 确认基线', action: `${focus}。参考成绩：${baseline.text}。${missingConditions.length ? `须先补齐${missingConditions.join('、')}，目前不能确认同条件变化。` : reference ? '请教练确认此记录是否适合作为本周期参考；相同项目仍须核对任务与器材。' : '建立真实记录后再比较成绩。'}核实实际课表和休息日。`, delivery: '一个经教练确认的重点 + 有条件说明的基线卡', sourceIds: unique([...(focusEvidence?.sourceIds || []), ...(reference ? [reference.id] : [])]) },
+    { title: '第2周 · 记录执行', action: `${training ? `最近实际训练为${training.date}，时长${training.durationMinutes == null ? '未填' : `${training.durationMinutes}分钟`}、泳程${training.totalMeters == null ? '未填' : `${training.totalMeters}m`}；先核对是否与当前重点有关。` : '尚无实际训练记录，先记录现场教练原课表及本次执行。'}${recovery ? `结合${recovery.date}的恢复原始记录与教练沟通，不从留空项判断可否加量。` : '尚无恢复记录，补记实际睡眠、感受、不适和训练意愿。'}记录时长、泳程和教练原话，不自动追加训练量。`, delivery: '可关联课次的实际记录 + 教练反馈 + 恢复记录', sourceIds: [training?.id, recovery?.id].filter(Boolean) },
+    { title: '第3周 · 录像验证', action: reviewed.length ? `当前有${reviewed.length}条具备身份、时间片段和审核人的观察；围绕已定位片段复核当前重点及证据限制，再由教练确认练习方向。` : videos.length ? `当前有${videos.length}段视频，尚无符合条件的审核观察。先确认运动员与泳道，定位时间片段并请教练审核；不能从素材说明直接得出个体技术结论。` : '尚无视频，选择真实片段并确认运动员、泳道和时间点；缺少证据时保留建议待验证。', delivery: '已定位、已审核的观察或明确的证据缺口', sourceIds: unique(reviewed.length ? reviewed.flatMap(a => [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])]) : videos.map(m => m.id)) },
+    { title: '第4周 · 复测调整', action: `${comparable.length > 1 ? `有${comparable.length}条与参考记录的已填条件一致的成绩，可逐条核对后复盘；记录变化不能直接归因于某个动作。` : reference ? `当前可确认同条件的成绩${comparable.length}条，${missingConditions.length ? '先补齐参考条件，再由教练安排适合的复测' : '需由教练安排同条件复测后再评估变化'}。` : '建立真实基线并由教练安排同条件复测后再评估变化。'}结合实际课次、恢复与已审核观察决定保留或调整重点，不承诺固定提速秒数和晋升时间。`, delivery: '有实际来源的周期复盘 + 教练确认的下一周期重点', sourceIds: unique([...comparable.map(r => r.id), ...(reference ? [reference.id] : []), training?.id, recovery?.id].filter(Boolean)) },
+  ];
+  // Plans deliberately stay outside their own evidence version, so saving one
+  // cannot make itself stale. Media/annotations are evidence and must invalidate it.
+  const evidence = Object.fromEntries(['swim', 'trainings', 'growth', 'fitness', 'nutrition', 'goals', 'media', 'annotations'].map(key => [key, [...state[key]].sort((a, b) => a.id.localeCompare(b.id))]));
+  return { pb, recent, facts, focus, focusEvidence, baseline, sourceIds: unique([...facts.flatMap(f => f.sourceIds), ...stages.flatMap(s => s.sourceIds)]), version: fingerprint({ rules: 'evidence-v2', ...evidence, profile: state.profile }), stages };
 }
 export function rangeSummary(state, start, end) {
   const inRange = key => ordered(state[key]).filter(r => r.date >= start && r.date <= end);
