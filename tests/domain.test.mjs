@@ -15,7 +15,8 @@ test('同项目PB与分析只来自录入记录，25米不会污染50米', () =>
   assert.equal(best(data.swim).seconds, expected);
   assert.equal(best(data.swim, '25m', '自由泳', '25m').seconds, Math.min(...raw.swim.filter(r => r.distance === '25m' && r.poolLength === '25m').map(r => r.seconds)));
   const result = analysis(data); assert.ok(result.facts[1].text.includes((long[0].seconds - expected).toFixed(2)));
-  assert.match(result.focus, /出发、蹬壁和短段加速/);
+  assert.match(result.focus, /核对最新成绩备注/);
+  assert.equal(result.focusEvidence.text, result.recent.notes);
   assert.ok(result.facts.some(f => /体能已录入0条/.test(f.text)));
   assert.ok(result.facts.some(f => /原始目标的/.test(f.text)));
   assert.deepEqual(analysis(data), analysis(data));
