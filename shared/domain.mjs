@@ -1,3 +1,4 @@
+import { parseScore, validatePrdRecord, validatePrdState, SCORE_DISTANCES, TEST_ITEMS } from './prd.mjs';
 // Shared by the UI, API, reports and tests. Empty measurements stay empty.
 export const COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media'];
 export const STANDARD_SOURCE = 'https://www.sport.gov.cn/rlzx/n5633/c28294142/part/28294152.pdf';
@@ -16,8 +17,8 @@ const notes = text('notes', '备注 / 原始观察', { type: 'textarea' });
 const method = text('measurementMethod', '测量方法 / 器材');
 const recorder = text('recordedBy', '记录者');
 export const FIELDS = {
-  swim: [date, text('distance', '距离（如25m，可自填分段）', { required: true, options: ['10m', '15m', '25m', '50m', '100m', '200m', '400m', '800m', '1500m'] }), select('stroke', '泳姿', ['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳'], { required: true }), select('poolLength', '池长', ['25m', '50m'], { required: true }), text('time', '成绩（秒或分:秒，如00:56.17）', { required: true }), select('startType', '出发方式', ['跳台', '蹬壁', '水中', '未知']), select('timingMethod', '计时方式', ['自动计时', '手动计时', '未知']), select('recordType', '记录性质', ['训练', '比赛', '测试', '未知']), text('eventName', '赛事 / 测试名称'), text('task', '测试任务与器材'), text('certificate', '等级证书 / 凭证（如有）'), recorder, notes],
-  growth: [date, number('height', '身高（cm）', 20, 250), number('armSpan', '臂展（cm）', 20, 280), number('weight', '体重（kg）', 1, 250), number('handLength', '手长（cm）', 1, 40), number('handWidth', '手宽（cm）', 1, 30), number('footLength', '脚长（cm）', 1, 50), method, recorder, notes],
+  swim: [date, select('distance', '测试 / 比赛长度', SCORE_DISTANCES, { required: true }), select('stroke', '泳姿', ['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳', '打腿'], { required: true }), select('poolLength', '池长', ['25m', '50m', '其他'], { required: true }), text('time', '成绩（分:秒:百分秒，如00:56:17）', { required: true }), select('startType', '出发方式', ['跳台', '蹬壁', '水中', '未知']), select('timingMethod', '计时方式', ['自动计时', '手动计时', '未知']), select('recordType', '记录性质', ['训练', '比赛', '测试', '未知']), select('testItem', '测试项目（固定选项）', TEST_ITEMS), text('location', '测试 / 比赛地点'), text('testedBy', '测试人员'), text('ageGroup', '比赛年龄组'), text('team', '代表队伍'), text('competitionSession', '比赛场次'), select('isFinal', '是否决赛', ['否', '是'], { boolean: true }), number('preliminaryRank', '预赛排名（决赛时填写）', 1, 100000, { integer: true }), text('eventName', '赛事 / 比赛项目名称'), text('heat', '比赛组别'), number('lane', '比赛道次', 1, 100, { integer: true }), text('previousTime', '上一次成绩（分:秒:百分秒）'), number('rank', '测试 / 比赛排名', 1, 100000, { integer: true }), text('winnerTime', '第一名成绩（分:秒:百分秒）'), text('task', '测试任务与器材'), text('certificate', '等级证书 / 凭证（如有）'), recorder, notes],
+  growth: [date, number('height', '身高（cm）', 20, 250), number('armLength', '臂长（cm，测量口径须确认）', 1, 280), number('armSpan', '臂展（cm，历史字段）', 20, 280), number('weight', '体重（kg）', 1, 250), number('handLength', '手长（cm）', 1, 40), number('handWidth', '手宽（cm）', 1, 30), number('footLength', '脚长（cm）', 1, 50), number('sitAndReach', '坐位体前屈（cm）', -50, 100), method, recorder, notes],
   trainings: [date, text('session', '课次名称'), text('plannedSessionId', '关联计划课次ID'), number('durationMinutes', '实际时长（分钟）', 0, 600), number('totalMeters', '实际总泳程（m）', 0, 50000), number('kickMeters', '其中打腿（m）', 0, 50000), text('trainingType', '训练内容'), text('intensity', '强度说明（教练原话）'), text('focusSkills', '本次技术提示'), number('rpe', '主观用力感（1–10）', 1, 10, { integer: true }), number('completionRate', '完成度（0–100%）', 0, 100), text('feeling', '课后感受'), text('discomfort', '疼痛 / 不适（没有请明确填无）'), text('coachNotes', '教练原话', { type: 'textarea' }), recorder],
   fitness: [date, number('standingJump', '立定跳远（cm）', 0, 400), number('plankSeconds', '平板支撑（秒）', 0, 3600), number('sitAndReach', '坐位体前屈（cm）', -50, 100), text('shoulderFlex', '肩关节活动观察'), text('ankleFlex', '踝关节活动观察'), number('shuttleRun', '折返跑（秒）', 0.01, 600), method, recorder, notes],
   nutrition: [date, number('sleepHours', '总睡眠（小时）', 0, 24), text('bedtime', '入睡时间'), text('appetite', '食欲'), text('fatigue', '疲惫感'), text('discomfort', '疼痛 / 不适'), text('willingness', '训练意愿'), text('preMeal', '实际课前饮食'), text('postMeal', '实际课后饮食'), number('waterMl', '实际饮水量（ml，可不填）', 0, 15000), number('morningPulse', '晨脉（次/分，可不填）', 20, 250, { integer: true }), number('recoveryScore', '个人恢复感受（1–5，可不填）', 1, 5, { integer: true }), ...['calciumTaken', 'ironTaken', 'zincTaken'].map((key, i) => select(key, ['钙补充剂', '铁补充剂', '锌补充剂'][i], ['未服用', '按既有专业建议服用'], { boolean: true })), text('supplementAdvice', '既有专业建议、产品及实际用量'), recorder, notes],
@@ -31,13 +32,7 @@ export function validDate(value) {
   const parsed = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
-export function parseTime(value) {
-  if (typeof value !== 'string' || !/^(?:\d{1,3}:)?\d{1,4}(?:\.\d{1,2})?$/.test(value.trim())) return null;
-  const parts = value.trim().split(':');
-  if (parts.length === 2 && Number(parts[1]) >= 60) return null;
-  const seconds = parts.length === 2 ? Number(parts[0]) * 60 + Number(parts[1]) : Number(parts[0]);
-  return seconds > 0 && seconds <= 86400 ? seconds : null;
-}
+export const parseTime = parseScore;
 export const timeLabel = (seconds) => seconds == null ? '未记录' : `${Number(seconds).toFixed(2)}秒`;
 export function validateRecord(collection, input, previous = null) {
   const fields = FIELDS[collection];
@@ -89,6 +84,7 @@ export function validateRecord(collection, input, previous = null) {
     }
     if (input.sourceVersion !== undefined) result.sourceVersion = String(input.sourceVersion).slice(0, 100);
   }
+  if (['growth', 'swim'].includes(collection)) validatePrdRecord(collection, result, { canonicalize: true });
   return result;
 }
 export function validateSessions(sessions, plan) {
@@ -115,12 +111,13 @@ export function emptyState() {
 }
 export function normalizeState(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('数据文件格式无效，禁止用空库覆盖');
+  if (raw.schemaVersion !== undefined && ![1, 2].includes(raw.schemaVersion)) throw new Error('不支持的数据结构版本，请勿覆盖事实库');
   const state = { ...emptyState(), ...raw };
   for (const key of COLLECTIONS) {
     if (!Array.isArray(state[key]) || state[key].some(r => !r || typeof r !== 'object' || typeof r.id !== 'string' || !r.id) || new Set(state[key].map(r => r.id)).size !== state[key].length) throw new Error(`数据集合${key}格式或ID无效`);
     for (const record of state[key]) validateStoredFields(key, record);
   }
-  if (!state.profile || typeof state.profile !== 'object' || typeof state.profile.name !== 'string' || !['', '女', '男'].includes(state.profile.sex) || state.profile.birthDate && !validDate(state.profile.birthDate)) throw new Error('档案格式无效');
+  if (!state.profile || typeof state.profile !== 'object' || typeof state.profile.name !== 'string' || !['', '女', '男', '其他'].includes(state.profile.sex) || state.profile.birthDate && !validDate(state.profile.birthDate)) throw new Error('档案格式无效');
   if (!state.publishing || !['swimIds', 'mediaIds'].every(k => Array.isArray(state.publishing[k]) && state.publishing[k].every(id => typeof id === 'string')) || typeof state.publishing.story !== 'string') throw new Error('发布范围格式无效');
   if (!Array.isArray(state.trash) || state.trash.some(t => !t || !COLLECTIONS.includes(t.collection) || typeof t.record?.id !== 'string' || !t.record.id)) throw new Error('回收站格式无效');
   for (const item of state.trash) validateStoredFields(item.collection, item.record);
@@ -132,6 +129,7 @@ export function normalizeState(raw) {
     if (!Array.isArray(plan.sessions)) throw new Error('计划课次格式无效');
   }
   for (const annotation of state.annotations) validateRecord('annotations', Object.fromEntries(FIELDS.annotations.map(f => [f.key, annotation[f.key]])));
+  if (state.schemaVersion === 2) validatePrdState(state);
   return state;
 }
 function validateStoredFields(collection, record) {

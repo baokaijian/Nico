@@ -17,7 +17,8 @@
     "check": "npm run lint && npm test && npm run build && npm run verify:public",
     "verify:public": "node scripts/verify-public.mjs",
     "media:prepare": "node scripts/media-prepare.mjs",
-    "init:data": "node scripts/init-data.mjs"
+    "init:data": "node scripts/init-data.mjs",
+    "audit:data": "node scripts/prd-audit.mjs"
   },
   "dependencies": {
     "express": "^5.2.1",
