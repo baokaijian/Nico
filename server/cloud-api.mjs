@@ -1,3 +1,4 @@
+import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
 import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
 import { preserveDeletedRecords } from '../shared/deletion.mjs';
@@ -145,7 +146,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           const [item] = data.trash.splice(index, 1); if (data[item.collection].some(record => record.id === item.record.id)) throw fail(409, '相同ID已存在'); data[item.collection].push(item.record); result = item.record;
         } else if (endpoint === '/api/profile' && method === 'PUT') {
           const { name, sex, birthDate } = await body();
-          if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男'].includes(sex) || birthDate && !validDate(birthDate)) throw fail(400, '档案字段无效');
+          if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男', '其他'].includes(sex) || birthDate && !validDate(birthDate)) throw fail(400, '档案字段无效');
           result = data.profile = { name: name.trim(), sex, birthDate: birthDate || '' };
         } else if (endpoint === '/api/publishing' && method === 'PUT') {
           const { swimIds, mediaIds, story, confirmedBy, confirmedAt } = await body();
@@ -155,10 +156,12 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           const input = await body(); if (input.format !== 'nico-backup-v1') throw fail(400, '请选择平台导出的完整备份');
           let restored; try { restored = normalizeState(input.data); } catch (error) { throw fail(400, error.message); }
           for (const key of COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
-          for (const key of Object.keys(data)) delete data[key]; Object.assign(data, restored); result = { success: true };
+          const dataVersion = data.schemaVersion;
+          for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); result = { success: true };
         } else if (endpoint === '/api/public-export' && method === 'POST') return json({ success: true, message: '云端公开白名单已生效，访客只读取这些内容；未提交私有数据到GitHub。' });
         else throw fail(404, '接口不存在');
         preserveDeletedRecords(current.data, data, session.username, new Date(now()).toISOString());
+        derivePrdState(data);
         normalizeState(data);
         const revision = await backend.save(current.revision, data, session.username);
         headers['X-Nico-Revision'] = String(revision);
