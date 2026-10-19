@@ -5,13 +5,14 @@ import { FIELDS, ordered, validateRecord, WOMEN_50, STANDARD_SOURCE, STANDARD_VE
 import { Field, Message, Empty } from './ui';
 const names = { swim: '成绩', trainings: '水上训练', fitness: '体能', nutrition: '恢复与饮食', growth: '身体测量', goals: '个人目标', annotations: '录像批注', media: '素材说明' };
 function valueLabel(value) { return value === true ? '按既有专业建议服用' : value === false ? '未服用' : value == null || value === '' ? '未填写' : String(value); }
-export default function Records({ type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false }) {
+export default function Records({ type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter }) {
   const fields = FIELDS[type];
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : '']));
   const [values, setValues] = useState(blank), [editing, setEditing] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [filter, setFilter] = useState('');
   const [scoreKind, setScoreKind] = useState('全部'), [from, setFrom] = useState(''), [to, setTo] = useState(''), [facets, setFacets] = useState({ distance: '', stroke: '', poolLength: '' });
   const [draftFound, setDraftFound] = useState(null);
+  useEffect(() => { if (initialFilter !== undefined) setFilter(initialFilter); }, [initialFilter]);
   const [baseRevision, setBaseRevision] = useState(() => api?.getRevision()), [conflict, setConflict] = useState(false);
   const key = `nico_form_draft_${type}`;
   useEffect(() => { try { setDraftFound(JSON.parse(localStorage.getItem(key) || 'null')); } catch { setError('本地草稿无法读取，可继续使用服务端数据'); } }, [key]);
