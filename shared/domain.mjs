@@ -38,7 +38,7 @@ export function validateRecord(collection, input, previous = null) {
   const fields = FIELDS[collection];
   if (!fields || !input || typeof input !== 'object' || Array.isArray(input)) throw new Error('记录格式无效');
   const result = { ...previous };
-  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion']);
+  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy']);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`不支持的字段：${key}`);
   for (const field of fields) {
     if (previous && input[field.key] === undefined) continue;
@@ -83,9 +83,43 @@ export function validateRecord(collection, input, previous = null) {
       result.sourceIds = input.sourceIds;
     }
     if (input.sourceVersion !== undefined) result.sourceVersion = String(input.sourceVersion).slice(0, 100);
+    if (input.generatedBy !== undefined || previous?.generatedBy !== undefined) {
+      result.generatedBy = validateGeneratedBy(input.generatedBy !== undefined ? input.generatedBy : previous.generatedBy);
+    }
   }
   if (['growth', 'swim'].includes(collection)) validatePrdRecord(collection, result, { canonicalize: true });
   return result;
+}
+// Metadata the deterministic plan engine attaches to the reserved draft slot.
+// It carries provenance only; removing it never changes a coach's own plan.
+function validateGeneratedBy(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('计划生成元数据格式无效');
+  const allowed = new Set(['engine', 'evidenceVersion', 'triggeredByRecordId', 'generatedAt', 'manualEdited', 'dataRange', 'history']);
+  for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`计划生成元数据不支持字段：${key}`);
+  if (typeof value.engine !== 'string' || !value.engine.trim() || value.engine.length > 100) throw new Error('计划生成引擎标识无效');
+  if (typeof value.evidenceVersion !== 'string' || !value.evidenceVersion || value.evidenceVersion.length > 100) throw new Error('计划依据版本无效');
+  if (value.triggeredByRecordId != null && typeof value.triggeredByRecordId !== 'string') throw new Error('计划触发记录无效');
+  if (typeof value.generatedAt !== 'string' || !Number.isFinite(Date.parse(value.generatedAt))) throw new Error('计划生成时间无效');
+  if (value.manualEdited != null && typeof value.manualEdited !== 'boolean') throw new Error('计划手动编辑标记无效');
+  if (value.dataRange !== undefined) {
+    if (!value.dataRange || typeof value.dataRange !== 'object' || Array.isArray(value.dataRange)) throw new Error('计划数据范围格式无效');
+    for (const key of Object.keys(value.dataRange)) if (!['start', 'end', 'counts'].includes(key)) throw new Error(`计划数据范围不支持字段：${key}`);
+    for (const key of ['start', 'end']) if (value.dataRange[key] !== '' && !validDate(value.dataRange[key])) throw new Error('计划数据范围日期无效');
+    if (value.dataRange.counts !== undefined) {
+      if (typeof value.dataRange.counts !== 'object' || Array.isArray(value.dataRange.counts)) throw new Error('计划数据范围计数格式无效');
+      for (const [key, count] of Object.entries(value.dataRange.counts)) if (!/^[a-z]{1,20}$/.test(key) || !Number.isInteger(count) || count < 0) throw new Error('计划数据范围计数无效');
+    }
+  }
+  if (value.history !== undefined) {
+    if (!Array.isArray(value.history) || value.history.length > 50) throw new Error('计划触发历史格式无效');
+    for (const entry of value.history) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('计划触发历史条目无效');
+      if (typeof entry.triggeredAt !== 'string' || !Number.isFinite(Date.parse(entry.triggeredAt))) throw new Error('计划触发历史时间无效');
+      if (typeof entry.evidenceVersion !== 'string' || !entry.evidenceVersion || entry.evidenceVersion.length > 100) throw new Error('计划触发历史版本无效');
+      if (!Array.isArray(entry.rules) || entry.rules.some(id => typeof id !== 'string' || !/^R-[A-Z]+$/.test(id))) throw new Error('计划触发历史规则无效');
+    }
+  }
+  return structuredClone(value);
 }
 export function validateSessions(sessions, plan) {
   if (!Array.isArray(sessions) || sessions.length > 100) throw new Error('课次格式无效');
@@ -125,7 +159,7 @@ export function normalizeState(raw) {
   for (const media of state.media) if (media.duration != null && (typeof media.duration !== 'number' || !Number.isFinite(media.duration) || media.duration <= 0)) throw new Error('素材时长格式无效');
   for (const plan of [...state.plans, ...(state.planHistory || [])]) {
     if (!Number.isInteger(plan.version) || plan.version < 1) throw new Error('计划版本格式无效');
-    validateRecord('plans', { ...Object.fromEntries(FIELDS.plans.map(f => [f.key, plan[f.key]])), sessions: plan.sessions });
+    validateRecord('plans', { ...Object.fromEntries(FIELDS.plans.map(f => [f.key, plan[f.key]])), sessions: plan.sessions, ...(plan.generatedBy !== undefined ? { generatedBy: plan.generatedBy } : {}) });
     if (!Array.isArray(plan.sessions)) throw new Error('计划课次格式无效');
   }
   for (const annotation of state.annotations) validateRecord('annotations', Object.fromEntries(FIELDS.annotations.map(f => [f.key, annotation[f.key]])));

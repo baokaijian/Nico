@@ -1,4 +1,5 @@
 import { derivePrdState } from '../shared/prd.mjs';
+import { syncPlanDraft } from '../shared/plan-engine.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -67,13 +68,14 @@ export function openStore({ filename, seedPath, backupDir }) {
     if (!row) throw new Error('事实库缺失，已停止写入');
     return { data: applyDeletionFlags(normalizeState(JSON.parse(row.data)), JSON.parse(row.deleted)), revision: row.revision };
   }
-  function change(expectedRevision, mutate, actor = 'local-admin') {
+  function change(expectedRevision, mutate, actor = 'local-admin', { planSync = true } = {}) {
     db.exec('BEGIN IMMEDIATE');
     try {
       const current = read();
       if (expectedRevision !== current.revision) throw new ConflictError();
       const next = structuredClone(current.data);
       const result = mutate(next);
+      if (planSync) syncPlanDraft(current.data, next, { triggeredByRecordId: result?.id ?? null });
       preserveDeletedRecords(current.data, next, actor, new Date().toISOString());
       derivePrdState(next);
       normalizeState(next);

@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
+import { commitPlanUpdate } from '../shared/plan-engine.mjs';
 import { openStore } from './store.mjs';
 import { processMedia, inspectMedia } from './media.mjs';
 import { exportPublic } from './public-export.mjs';
@@ -94,7 +95,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (!header || !/^\d+$/.test(header)) throw httpError(428, '请先加载最新记录，再提交修改');
     return Number(header);
   };
-  const change = (req, mutate) => store.change(revision(req), mutate, req.username);
+  const change = (req, mutate, options) => store.change(revision(req), mutate, req.username, options);
   const reply = (res, saved, status = 200) => res.set('X-Nico-Revision', String(saved.revision)).status(status).json(saved.result);
   const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw httpError(400, error.message); } };
   function relations(collection, record, data) {
@@ -127,7 +128,10 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
         const record = validate(key, req.body, data[key][index]); relations(key, record, data);
-        if (key === 'plans') { data.planHistory ||= []; data.planHistory.push(structuredClone(data[key][index])); }
+        if (key === 'plans') {
+          const outcome = commitPlanUpdate(data, req.params.id, data[key][index], record);
+          if (outcome.error) throw httpError(400, outcome.error);
+        }
         data[key][index] = record; return record;
       }));
     });
@@ -178,7 +182,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (req.body?.format !== 'nico-backup-v1') throw httpError(400, '请选择平台导出的完整备份');
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
     for (const key of COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
-    reply(res, change(req, data => { const dataVersion = data.schemaVersion; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); return { success: true }; }));
+    reply(res, change(req, data => { const dataVersion = data.schemaVersion; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); return { success: true }; }, { planSync: false }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
     const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };
