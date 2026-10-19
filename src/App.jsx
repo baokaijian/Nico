@@ -8,15 +8,16 @@ const Plans = lazy(() => import('./components/PlanViewer'));
 const Records = lazy(() => import('./components/Records'));
 const Reports = lazy(() => import('./components/Reports'));
 const Gallery = lazy(() => import('./components/MediaGallery'));
+const Showcase = lazy(() => import('./components/Showcase'));
 const Profile = lazy(() => import('./components/Profile'));
 const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'private' || !!import.meta.env.VITE_API_URL;
 const AdminLogin = lazy(() => import('./components/AdminLogin'));
 const ChangePassword = lazy(() => import('./components/ChangePassword'));
 const privateTabs = [['today', '今日'], ['week', '本周'], ['records', '记录'], ['review', '复盘'], ['profile', '档案']];
-const publicTabs = [['results', '公开成绩'], ['media', '公开影像']];
+const publicTabs = [['home', '概览'], ['results', '成绩'], ['media', '影像']];
 const recordTypes = [['trainings', '水上训练'], ['swim', '成绩'], ['fitness', '体能'], ['nutrition', '恢复与饮食'], ['growth', '身体测量']];
 export default function App() {
-  const [data, setData] = useState(emptyState), [tab, setTab] = useState('results'), [recordType, setRecordType] = useState('trainings'), [reviewTab, setReviewTab] = useState('report'), [role, setRole] = useState('viewer'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [auth, setAuth] = useState(false), [session, setSession] = useState(null), [published, setPublished] = useState(null);
+  const [data, setData] = useState(emptyState), [tab, setTab] = useState('home'), [recordType, setRecordType] = useState('trainings'), [reviewTab, setReviewTab] = useState('report'), [role, setRole] = useState('viewer'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [auth, setAuth] = useState(false), [session, setSession] = useState(null), [published, setPublished] = useState(null), [story, setStory] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
   const privateMode = !!session?.authenticated && !session?.mustChangePassword;
   const [loaded, setLoaded] = useState(false);
@@ -43,8 +44,8 @@ export default function App() {
           return response.json();
         })();
         setData({ ...emptyState(), swim: snapshot.swim || [], media: snapshot.media || [] });
-        setPublished(snapshot.publishedAt); setRole('viewer'); setLoaded(true);
-        setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : 'results');
+        setPublished(snapshot.publishedAt); setStory(snapshot.story || ''); setRole('viewer'); setLoaded(true);
+        setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : 'home');
       }
     } catch (problem) { if (problem.name === 'AbortError') return; if (problem.status === 401) { api.resetAuth(); setSession(null); setAuth(true); setData(emptyState()); setLoaded(false); } setError(problem.message); }
     finally { if (!controller.signal.aborted) setLoading(false); }
@@ -77,8 +78,7 @@ export default function App() {
         {privateMode && tab === 'records' && <><div className="sub-nav" aria-label="记录类型">{recordTypes.map(([key, label]) => <button key={key} aria-pressed={recordType === key} onClick={() => setRecordType(key)}>{label}</button>)}</div><Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords}/></>}
         {privateMode && tab === 'review' && <><div className="sub-nav"><button aria-pressed={reviewTab === 'report'} onClick={() => setReviewTab('report')}>周期报告</button><button aria-pressed={reviewTab === 'media'} onClick={() => setReviewTab('media')}>录像复盘</button></div>{reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>}</>}
         {privateMode && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
-        {!privateMode && tab === 'results' && <Records type="swim" data={data} readOnly publicMode/>}
-        {!privateMode && tab === 'media' && <Gallery data={data} api={adminCapable ? api : undefined} readOnly publicMode/>}
+        {!privateMode && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={data} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
       </Suspense>}
     </main><footer className="app-footer">{privateMode ? '依据录入记录生成分析 · 训练建议需教练确认' : '公开精选内容 · 发布范围由家长确认'} · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer></div>;
 }
