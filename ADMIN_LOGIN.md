@@ -10,7 +10,7 @@
 
 - 密码使用随机盐与PBKDF2-SHA256（600000次）派生，后台存放哈希。
 - 云端会话最长1小时，随机会话凭据只保存在当前页面内存。刷新/重新打开页面需重新登录；退出立即撤销后台会话，不依赖跨站Cookie。
-- 本机独立维护服务使用HttpOnly、SameSite=Strict会话Cookie及CSRF验证，首次设置需要仅保存在本机的初始化码；未登录也不能读完整档案。
+- 本机独立维护服务使用HttpOnly、SameSite=Strict会话Cookie及CSRF验证，首次设置需要仅保存在本机的初始化码；未登录可只读浏览已录入内容，录入、修改、导出与恢复仍需会话（设置`NICO_REQUIRE_LOGIN_FOR_READ=1`可恢复"读取也需登录"）。
 - Nico表开启RLS并撤销anon/authenticated直接权限；仅后台服务访问。账号、会话、完整档案和备份不进入公开构建。
 - 写入使用记录版本和数据库事务；冲突返回409并保留输入，每次成功写入前备份旧版本。退出或过期后，不再接收旧会话迟到响应。
 - Storage桶`nico-private`不公开。匿名素材接口每次核对公开白名单；原片、未选择素材只有登录后可读。
@@ -28,7 +28,9 @@
 
 `VITE_API_URL=https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api`是公开接口地址，不是密钥。已在本机`.env.local`和Pages流水线配置。使用`npm run client`可在本机访问同一云端后台；不要把`SUPABASE_SERVICE_ROLE_KEY`放入任何Vite变量。
 
-初始数据库结构见`backend/nico-schema.sql`，随后执行逻辑删除升级`backend/nico-soft-delete.sql`，云端入口见`supabase/functions/nico-api/index.ts`，业务权限和校验见`server/cloud-api.mjs`。入口关闭平台JWT前置检查，以便访客查看公开内容和登录；其余接口在函数体内校验数据库保存的、可撤销且有有效期的管理员会话。不存在匿名维护旁路或访客注册接口。
+初始数据库结构见`backend/nico-schema.sql`，随后执行逻辑删除升级`backend/nico-soft-delete.sql`，云端入口见`supabase/functions/nico-api/index.ts`，业务权限和校验见`server/cloud-api.mjs`。
+
+Pages工作流只发布静态页面，**不会部署Edge Function**。配置仓库secret `SUPABASE_ACCESS_TOKEN`后，`.github/workflows/deploy-function.yml`在`server/`、`shared/`、`supabase/functions/`变更时部署`nico-api`并自动跑游客只读校验；也可手动执行`supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit`。函数未重新部署时，线上会继续沿用旧逻辑拒绝游客读取——这是"本地已改、线上仍要登录"的唯一原因。部署后用`npm run verify:guest -- https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api`确认，并检查`supabase secrets list`里没有遗留`NICO_REQUIRE_LOGIN_FOR_READ=1`。入口关闭平台JWT前置检查，以便访客查看公开内容和登录；其余接口在函数体内校验数据库保存的、可撤销且有有效期的管理员会话。不存在匿名维护旁路或访客注册接口。
 
 RLS无公开策略为有意配置：Nico匿名/普通Supabase账号都不应直接访问完整表。[Supabase相关审查说明](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)。项目原有学习应用的表和策略没有修改。
 

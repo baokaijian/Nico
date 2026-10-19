@@ -57,3 +57,17 @@ test('云端：匿名可查看全部内容，写入强制会话；换临时密�
   assert.equal((await request('/api/swim', 'POST', {}, token)).status, 401, '会话过期后不能录入');
   assert.equal(await digestHex('test'), '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
 });
+test('云端开关：默认游客可只读浏览，NICO_REQUIRE_LOGIN_FOR_READ 可恢复“读取也需登录”', async () => {
+  let current = { data: normalizeState(raw), revision: 3 };
+  const backend = { read: async () => structuredClone(current), account: async () => null, session: async () => null, createSession: async value => value, deleteSession: async () => {}, loginAttempt: async () => 0, changePassword: async () => false, save: async expected => expected, download: async () => new Response('isolated-bytes') };
+  const call = (handler, endpoint, method = 'GET') => handler(new Request('https://test.invalid/nico-api' + endpoint, { method, headers: { Origin: 'https://baokaijian.github.io', 'Content-Type': 'application/json' } }));
+  const open = createCloudHandler({ backend, origins: ['https://baokaijian.github.io'] });
+  const locked = createCloudHandler({ backend, origins: ['https://baokaijian.github.io'], requireLoginForRead: true });
+  assert.equal((await (await call(open, '/api/snapshot')).json()).role, 'viewer');
+  assert.equal((await call(open, '/api/swim')).status, 200);
+  assert.equal((await call(locked, '/api/snapshot')).status, 401, '开关打开后读取需要会话');
+  assert.equal((await call(locked, '/api/swim')).status, 401);
+  assert.equal((await call(locked, '/api/auth/session')).status, 200, '登录入口始终可用');
+  assert.equal((await call(locked, '/api/public-summary')).status, 200, '白名单摘要始终开放');
+  assert.equal((await call(locked, '/api/swim', 'POST')).status, 401, '写入始终需要会话');
+});

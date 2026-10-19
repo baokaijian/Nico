@@ -5,7 +5,7 @@ import { practiceOverview } from '../../shared/practice.mjs';
 import { Empty, Message } from './ui';
 import RecordSources, { RecordSourceModal } from './RecordSources';
 const projectKey = record => [record.distance || '未知', record.stroke || '未知', record.poolLength || '未知'].join(' · ');
-export default function Dashboard({ data, navigate }) {
+export default function Dashboard({ data, navigate, readOnly = false }) {
   const result = useMemo(() => analysis(data), [data]);
   const pb25 = useMemo(() => best(data.swim, '25m', '自由泳', '25m'), [data.swim]);
   const growth = useMemo(() => latest(data.growth), [data.growth]);
@@ -31,7 +31,7 @@ export default function Dashboard({ data, navigate }) {
     const min = Math.min(...points), max = Math.max(...points);
     return { min, max, spread: max - min };
   }, [values]);
-  return <div className="stack fade-in"><header className="page-header"><div><p className="eyebrow">依据你录入的记录</p><h1>{data.profile.name || 'Nico'}的游泳成长</h1><p className="muted">最近成绩记录：{result.recent?.date || '尚未录入'}</p></div><button className="apple-btn apple-btn-primary" onClick={() => navigate('records', 'trainings')}>记录本次训练</button></header>
+  return <div className="stack fade-in"><header className="page-header"><div><p className="eyebrow">依据你录入的记录</p><h1>{data.profile.name || 'Nico'}的游泳成长</h1><p className="muted">最近成绩记录：{result.recent?.date || '尚未录入'}</p></div><button className="apple-btn apple-btn-primary" onClick={() => navigate('records', 'trainings')}>{readOnly ? '查看训练记录' : '记录本次训练'}</button></header>
     <section className="focus-card"><span className="eyebrow">{activePlan ? '已确认的周期重点' : '当前待确认的重点'}</span><h2>{activePlan?.focus || result.focus}</h2><p>{activePlan ? `计划${activePlan.title} · 版本${activePlan.version} · 确认人${activePlan.reviewedBy} · ${activePlan.startDate}—${activePlan.endDate}` : '依据成绩、训练反馈和已审核录像生成复核建议；具体课表、练习量和技术判断由家长依据教练反馈确认。'}</p><Message>{context.message}</Message>{!activePlan && result.focusEvidence && <><p>{result.focusEvidence.kind}（{result.focusEvidence.date}）：{result.focusEvidence.text}</p><RecordSources data={data} ids={result.focusEvidence.sourceIds}/></>}<button onClick={() => navigate('week')}>查看本周与提升计划 →</button></section>
     <section className="fact-grid"><Fact label="50米自由泳 · 50米池PB" value={result.pb ? timeLabel(parseTime(result.pb.time)) : '未记录'} detail={result.pb?.date}/><Fact label="25米自由泳 · 25米池PB" value={pb25 ? timeLabel(parseTime(pb25.time)) : '未记录'} detail={pb25?.date}/><Fact label="最近身体测量" value={growth?.date || '未记录'} detail="只展示测量，不推断竞技天赋"/></section>
     <section className="glass-card"><div className="section-head"><h2>数据覆盖</h2><p className="muted">点击进入对应类型的实际记录</p></div><div className="coverage-grid">{[['trainings', '水上训练'], ['fitness', '体能测量'], ['nutrition', '恢复与饮食']].map(([key, label]) => <button key={key} onClick={() => navigate('records', key)}><strong>{data[key].length}条</strong><span>{label}</span><small>{data[key].length ? '查看实际记录' : '未记录 · 未评估'}</small></button>)}</div></section>

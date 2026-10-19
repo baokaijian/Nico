@@ -52,35 +52,50 @@ export default function App() {
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
   // Content is viewable without logging in; a session only unlocks entry.
-  const fullView = adminCapable;
+  // When the service itself refuses anonymous reads, guests still get the published summary instead of a login wall.
+  const [publicFallback, setPublicFallback] = useState(false);
+  const fullView = adminCapable && !publicFallback;
   const authenticated = !!session?.authenticated && !session?.mustChangePassword;
   const [loaded, setLoaded] = useState(false);
   const reloadController = useRef(null);
+  // Only a request made with credentials can mean "session lost"; an anonymous 401 is a server-side read policy, not a login prompt.
+  const hadSession = useRef(false);
   const reload = useCallback(async () => {
     reloadController.current?.abort();
     const controller = new AbortController(); reloadController.current = controller;
     setError('');
+    const publishedFallback = async () => {
+      const response = await fetch(`${import.meta.env.BASE_URL}public-summary.json`, { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error('摘要加载失败，请重试');
+      const snapshot = await response.json();
+      setData({ ...emptyState(), swim: snapshot.swim || [], media: snapshot.media || [] });
+      setPublished(snapshot.publishedAt); setStory(snapshot.story || ''); setRole('viewer'); setLoaded(true); setPublicFallback(true);
+      setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : 'home');
+    };
     try {
       const currentSession = adminCapable ? await api.authRequest('session', undefined, { signal: controller.signal }) : null;
       if (controller.signal.aborted) return;
       if (adminCapable) {
+        hadSession.current = !!currentSession?.authenticated;
         if (currentSession && !currentSession.authenticated) api.resetAuth();
         const current = await api.request('/api/snapshot', { signal: controller.signal });
         if (controller.signal.aborted || current.revision < api.getRevision()) return;
         setSession(currentSession);
         setData(normalizeState(current.data));
         setRole(currentSession?.authenticated ? currentSession.role : 'viewer');
-        setAuth(false); setLoaded(true);
+        setAuth(false); setLoaded(true); setPublicFallback(false);
         setTab(currentTab => privateTabs.some(([key]) => key === currentTab) ? currentTab : 'today');
-      } else {
-        const response = await fetch(`${import.meta.env.BASE_URL}public-summary.json`, { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error('摘要加载失败，请重试');
-        const snapshot = await response.json();
-        setData({ ...emptyState(), swim: snapshot.swim || [], media: snapshot.media || [] });
-        setPublished(snapshot.publishedAt); setStory(snapshot.story || ''); setRole('viewer'); setLoaded(true);
-        setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : 'home');
-      }
-    } catch (problem) { if (problem.name === 'AbortError') return; if (problem.status === 401) { api.resetAuth(); setSession(null); setAuth(true); setData(emptyState()); setLoaded(false); } setError(problem.message); }
+      } else await publishedFallback();
+    } catch (problem) {
+      if (problem.name === 'AbortError') return;
+      // A guest refused by the service still gets the published summary; the login button stays available for entry.
+      if (adminCapable && !hadSession.current) { try { await publishedFallback(); setError('当前按展示摘要浏览；完整记录需要服务开放只读后刷新查看。'); return; } catch { /* report the original failure below */ } }
+      if (controller.signal.aborted) return;
+      if (problem.status === 401 && hadSession.current) { api.resetAuth(); setSession(null); setAuth(true); setData(emptyState()); setLoaded(false); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); }
+      // Guests keep whatever is already rendered; a server that still requires a session for reads must not force the login layer open.
+      else if (problem.status === 401) setError('此服务当前要求登录后才能查看内容。可登录后录入，或由管理员关闭“读取也需登录”限制后刷新。');
+      else setError(problem.message);
+    }
     finally { if (!controller.signal.aborted) setLoading(false); }
   }, [api]);
   useEffect(() => { api.setOnUnauthorized(() => { reloadController.current?.abort(); api.resetAuth(); setSession(null); setData(emptyState()); setRole('viewer'); setLoaded(false); setAuth(true); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); }); return () => api.setOnUnauthorized(() => {}); }, [api]);
@@ -169,7 +184,7 @@ export default function App() {
         {session?.authenticated && session.mustChangePassword
           ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
           : loading ? <Message>正在读取记录…</Message> : !loaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense fallback={<Message>正在打开页面…</Message>}>
-            {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate}/>}
+            {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate} readOnly={readOnly}/>}
             {fullView && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
             {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
             {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} initialFilter={searchSeed}/>}

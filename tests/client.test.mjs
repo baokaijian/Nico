@@ -34,3 +34,18 @@ test('管理员凭据只保存在内存，退出后忽略旧会话响应且下�
     await api.request('/api/public-summary'); assert.equal(api.getRevision(), 2);
   } finally { globalThis.fetch = original; }
 });
+test('游客只读请求被拒时不强制弹出登录层，只有带凭据的会话失效才重开', async () => {
+  const original = globalThis.fetch;
+  try {
+    let prompted = 0;
+    const guest = createApi('', () => '');
+    guest.setOnUnauthorized(() => prompted++);
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: '请先登录管理员账号' }), { status: 401 });
+    await assert.rejects(guest.request('/api/snapshot'), { status: 401 });
+    assert.equal(prompted, 0, '未登录请求被拒不弹登录层');
+    const member = createApi('', () => 'test-only-token');
+    member.setOnUnauthorized(() => prompted++);
+    await assert.rejects(member.request('/api/snapshot'), { status: 401 });
+    assert.equal(prompted, 1, '会话失效仍然提示重新登录');
+  } finally { globalThis.fetch = original; }
+});

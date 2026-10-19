@@ -96,6 +96,37 @@ npm run media:prepare
 - `.env.example` 提供字段说明。Node不自动读取`.env`，由部署环境注入变量，或使用 `node --env-file=.env server/server.js`。
 - 默认Dockerfile提供公网只读构建，不提供私有数据维护接口。管理员远程服务使用Supabase Edge Function；Docker仅用于独立静态展示预览。
 
+## 游客只读访问（未登录浏览）
+
+未登录访客可直接浏览记录、AI 训练优化方案与数据分析报告；登录只用于录入与修改。规则由四处共同决定，改动任一处都要重新核对：
+
+| 位置 | 文件 | 只读（GET/HEAD） | 写入与身份功能 |
+| --- | --- | --- | --- |
+| 后端鉴权中间件 | `server/server.js` | `/api/snapshot`、`/api/<集合>`、`/api/media/:id/content/:variant` 匿名放行，角色置 `viewer` | POST/PUT/DELETE、`/api/backup`、`/api/restore`、`/api/public-export`、`/api/public-preview`、`/api/publishing`、`/api/profile` 仍需会话 |
+| 云端适配层 | `server/cloud-api.mjs` | 同上，`openRead` 白名单；`/api/auth/session`、`/api/public-summary`、`/api/public-media` 始终开放 | 同上，`requireLoginForRead` 为 true 时读取也要登录 |
+| 前端登录态判断 | `src/App.jsx`、`src/services/api.js` | `fullView` 只看是否有后端，不看登录态；未登录同样渲染今日/本周/打卡/记录/复盘/档案 | `readOnly` 跟随登录态，隐藏录入、修改、删除、上传、备份恢复、改密码等入口 |
+| 组件写控件 | `Records`/`PlanViewer`/`Practice`/`Profile`/`MediaGallery` | 列表与详情只读展示 | `readOnly` 或 `role !== 'owner'` 时表单不渲染 |
+
+本机与云端都保留一个开关：设置 `NICO_REQUIRE_LOGIN_FOR_READ=1`（本机环境变量 / Supabase 项目 secret）即可恢复“读取也需登录”。默认不设置，即开放只读。前端遇到匿名 401 时只提示“此服务当前要求登录”，不会强制弹出登录层；只有携带凭据的请求失效才提示重新登录。
+
+验证未登录浏览（不带 cookie、不带 Authorization）：
+
+```sh
+npm run server                                   # 或已部署的云端地址
+npm run verify:guest                             # 默认 http://127.0.0.1:3001
+npm run verify:guest -- https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
+```
+
+脚本只读检查 22 项：会话查询 200 且未登录、快照 200 且 `role=viewer`、各集合列表 200、素材内容不返回 401；写入、导出备份与发布预览必须 401。浏览器验证：用无痕窗口打开站点，能直接翻看各页；尝试提交任意记录会提示登录，接口返回 401。
+
+云端函数需要单独部署才会生效，GitHub Pages 工作流不会部署它。配置仓库 secret `SUPABASE_ACCESS_TOKEN` 后，`.github/workflows/deploy-function.yml` 在 `server/`、`shared/`、`supabase/functions/` 变更时自动部署并跑上述游客校验；也可手动执行：
+
+```sh
+supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit
+```
+
+部署后确认线上没有遗留 `NICO_REQUIRE_LOGIN_FOR_READ=1`（`supabase secrets list`），否则线上仍会拒绝游客读取。
+
 ## 验证
 
 ```sh

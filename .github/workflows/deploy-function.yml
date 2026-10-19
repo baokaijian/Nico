@@ -1,0 +1,32 @@
+name: Deploy Nico cloud API
+# The public site and the private app both read from this function. Without this job the
+# deployed function keeps old code (anonymous reads rejected) while the repository is already fixed.
+on:
+  push:
+    branches: [master]
+    paths:
+      - server/**
+      - shared/**
+      - supabase/functions/**
+      - .github/workflows/deploy-function.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nico-function
+  cancel-in-progress: false
+jobs:
+  deploy:
+    # Skipped (not failed) until the repository owner adds the SUPABASE_ACCESS_TOKEN secret.
+    if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      - name: Guest read check against the deployed function
+        run: node scripts/verify-guest-read.mjs https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
