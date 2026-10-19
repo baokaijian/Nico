@@ -44,7 +44,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       xhr.onload = () => {
         if (started !== generation) return reject(new DOMException('登录状态已改变，已忽略旧上传响应', 'AbortError'));
         let result; try { result = JSON.parse(xhr.responseText); } catch { return reject(new ApiError('上传响应无效', xhr.status)); }
-        if (xhr.status < 200 || xhr.status >= 300) { if (xhr.status === 401) onUnauthorized(); return reject(new ApiError(result.error || '上传失败', xhr.status)); }
+        if (xhr.status < 200 || xhr.status >= 300) { if (xhr.status === 401 && (token || csrf)) onUnauthorized(); return reject(new ApiError(result.error || '上传失败', xhr.status)); }
         const next = xhr.getResponseHeader('X-Nico-Revision'); if (next && Number(next) >= revision) revision = Number(next);
         resolve(result);
       };

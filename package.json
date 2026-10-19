@@ -16,6 +16,7 @@
     "test": "node --test tests/*.test.mjs",
     "check": "npm run lint && npm test && npm run build && npm run verify:public",
     "verify:public": "node scripts/verify-public.mjs",
+    "verify:guest": "node scripts/verify-guest-read.mjs",
     "media:prepare": "node scripts/media-prepare.mjs",
     "init:data": "node scripts/init-data.mjs",
     "audit:data": "node scripts/prd-audit.mjs"
