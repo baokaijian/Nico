@@ -5,7 +5,7 @@ import { normalizeState, publicSnapshot } from '../shared/domain.mjs';
 import { passwordHash, digestHex } from '../shared/password.mjs';
 import { raw } from './fixture.mjs';
 
-test('云端按管理员会话授权，强制换临时密码、真实数据CRUD、冲突、公开素材范围、退出和过期', async () => {
+test('云端：匿名可查看全部内容，写入强制会话；换临时密码、真实数据CRUD、冲突、素材范围、退出和过期', async () => {
   let current = { data: normalizeState(raw), revision: 8 }, time = Date.now();
   current.data.publishing = { swimIds: [raw.swim[0].id], mediaIds: [raw.media[0].id], confirmedBy: '隔离测试', confirmedAt: '2026-10-12', story: '' };
   let account = { username: 'admin', salt: 'test-only-salt', password_hash: await passwordHash('temporary-test-password', 'test-only-salt'), must_change_password: true };
@@ -22,7 +22,9 @@ test('云端按管理员会话授权，强制换临时密码、真实数据CRUD�
   const request = (endpoint, method = 'GET', body, token = '', revision = current.revision) => handler(new Request('https://test.invalid/nico-api' + endpoint, { method, headers: { Origin: 'https://baokaijian.github.io', 'Content-Type': 'application/json', 'If-Match': String(revision), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }));
   const before = structuredClone(current);
   assert.deepEqual(await (await request('/api/public-summary')).json(), publicSnapshot(current.data));
-  for (const endpoint of ['/api/snapshot', '/api/growth', '/api/backup', `/api/media/${raw.media[0].id}/content/original`]) assert.equal((await request(endpoint)).status, 401);
+  for (const endpoint of ['/api/snapshot', '/api/growth', `/api/media/${raw.media[0].id}/content/original`]) assert.equal((await request(endpoint)).status, 200, endpoint);
+  assert.equal((await (await request('/api/snapshot')).json()).role, 'viewer');
+  assert.equal((await request('/api/backup')).status, 401);
   for (const method of ['POST', 'PUT', 'DELETE']) assert.equal((await request('/api/swim', method, {})).status, 401);
   assert.deepEqual(current, before);
   assert.equal((await request('/api/public-media/not-selected.mp4')).status, 404);
@@ -31,7 +33,8 @@ test('云端按管理员会话授权，强制换临时密码、真实数据CRUD�
   assert.ok(token); assert.equal((await request('/api/snapshot', 'GET', undefined, token)).status, 403);
   const changed = await request('/api/auth/password', 'POST', { currentPassword: 'temporary-test-password', password: 'new-test-only-password' }, token); assert.equal(changed.status, 200);
   const old = token; token = (await changed.json()).accessToken;
-  assert.equal((await request('/api/snapshot', 'GET', undefined, old)).status, 401);
+  assert.equal((await (await request('/api/snapshot', 'GET', undefined, old)).json()).role, 'viewer', '旧令牌按未登录读取');
+  assert.equal((await request('/api/swim', 'POST', {}, old)).status, 401, '旧令牌不能录入');
   const snapshot = await request('/api/snapshot', 'GET', undefined, token); assert.equal(snapshot.status, 200); assert.equal((await snapshot.json()).role, 'owner');
   const profile = await request('/api/profile', 'PUT', current.data.profile, token); assert.equal(profile.status, 200); assert.equal(backups.length, 1); assert.deepEqual(current.data, before.data);
   assert.equal((await request('/api/profile', 'PUT', current.data.profile, token, 8)).status, 409);
@@ -46,8 +49,11 @@ test('云端按管理员会话授权，强制换临时密码、真实数据CRUD�
   assert.deepEqual(current.data.swim.find(item => item.id === original.id), original);
   assert.equal(current.data.trash.length, 0);
   assert.equal((await request('/api/auth/logout', 'POST', {}, token)).status, 200);
-  assert.equal((await request('/api/snapshot', 'GET', undefined, token)).status, 401);
+  assert.equal((await request('/api/snapshot', 'GET', undefined, token)).status, 200, '退出后仍可查看');
+  assert.equal((await request('/api/swim', 'POST', {}, token)).status, 401, '退出后不能录入');
   token = (await (await request('/api/auth/login', 'POST', { username: 'admin', password: 'new-test-only-password' })).json()).accessToken;
-  time += 3600001; assert.equal((await request('/api/snapshot', 'GET', undefined, token)).status, 401);
+  time += 3600001;
+  assert.equal((await request('/api/snapshot', 'GET', undefined, token)).status, 200, '会话过期后仍可查看');
+  assert.equal((await request('/api/swim', 'POST', {}, token)).status, 401, '会话过期后不能录入');
   assert.equal(await digestHex('test'), '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
 });

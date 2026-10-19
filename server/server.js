@@ -75,12 +75,19 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     });
     app.post('/api/auth/logout', (req, res) => { requireCSRF(req); accounts.logout(cookieToken(req)); cookie(req, res, '', 0); res.json({ success: true }); });
   }
+  // Viewing is open: login only gates entry. Set NICO_REQUIRE_LOGIN_FOR_READ=1 to require a session for reads as well.
+  const anonymousReadAllowed = !/^(?:1|true|yes|on)$/i.test(String(process.env.NICO_REQUIRE_LOGIN_FOR_READ || '').trim());
+  const openReadEndpoints = new Set(['/api/snapshot', ...COLLECTIONS.map(key => `/api/${key}`)]);
+  const isOpenRead = req => req.method === 'GET' && (openReadEndpoints.has(req.path) || /^\/api\/media\/[^/]+\/content\/[^/]+$/.test(req.path));
   app.use((req, _res, next) => {
     const credential = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
     const session = sessionFor(req);
     let role = session?.role || '';
     if (credential) role = Object.entries(tokens).find(([, token]) => token && timingSafeEqual(digest(token), digest(credential)))?.[0] || '';
-    if (!role) return next(httpError(401, '请先登录管理员账号'));
+    if (!role) {
+      if (!anonymousReadAllowed || !isOpenRead(req)) return next(httpError(401, '请先登录管理员账号'));
+      req.role = 'viewer'; req.username = 'visitor'; return next();
+    }
     if (session && !credential && !['GET', 'HEAD'].includes(req.method)) { try { requireCSRF(req); } catch (error) { return next(error); } }
     req.role = role; req.username = credential ? role : session?.username || role; next();
   });

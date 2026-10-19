@@ -48,7 +48,7 @@ export default function PlanViewer({ data, api, onSaved, readOnly, navigate }) {
   const triggered = dimensions.rules.filter(rule => rule.triggered);
   const volume = dimensions.volume, intensity = dimensions.intensity;
   return <div className="stack fade-in"><header><h1>本周与训练提升计划</h1><p className="muted">依据当前记录生成的4周管理建议；具体组数、强度、休息由家长依据教练反馈录入。</p></header>
-    <section className="glass-card"><h2>{displayedPlan ? '本周期确认重点' : '待家长确认的重点'}：{displayedPlan?.focus || result.focus}</h2><Message>{context.message}</Message>
+    <section className="glass-card"><h2>{displayedPlan ? '本周期确认重点' : '当前待确认的重点'}：{displayedPlan?.focus || result.focus}</h2><Message>{context.message}</Message>
       {context.candidates.length > 1 && <fieldset className="glass-card"><legend>选择本周期采用的确认计划</legend>{context.candidates.map(p => <label key={p.id}><input type="radio" name="active-plan" checked={displayedPlan?.id === p.id} onChange={() => setSelectedPlanId(p.id)}/> {p.title} · 版本{p.version} · {p.startDate}—{p.endDate} · 确认人{p.reviewedBy || '未填写'}</label>)}<p className="muted">重叠周期须由教练明确采用哪一份；此处选择仅用于查看，不改变记录内容。</p></fieldset>}
       {displayedPlan && <p>{displayedPlan.title} · 版本{displayedPlan.version} · 确认人{displayedPlan.reviewedBy} · {displayedPlan.startDate}—{displayedPlan.endDate}</p>}
       {displayedPlan && context.stale.some(p => p.id === displayedPlan.id) && <Message>此计划的依据已更新（{displayedPlan.sourceVersion} → {result.version}），请家长复核后保存新版本。</Message>}

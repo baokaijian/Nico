@@ -58,37 +58,37 @@ export default function Showcase({ data, published, story = '', view = 'home', a
   }, [swim, events, event]);
   const selected = media.find(item => item.id === active) || null;
   const nothing = !swim.length && !media.length;
-  if (nothing) return <div className="stack"><EmptyPublic>{published ? '家长已确认发布范围，但当前没有选择任何成绩或影像。' : '家长尚未选择公开内容。此页只显示家长确认公开的成绩与影像，不会展示任何未公开记录，也不会填充示例数据。'}</EmptyPublic></div>;
+  if (nothing) return <div className="stack"><EmptyPublic>当前摘要中没有成绩或影像。内容为原始录入值，不填充示例数据。</EmptyPublic></div>;
   if (view === 'media') return <div className="stack fade-in">
-    <header><h1>精选影像</h1><p className="muted">仅展示家长已确认公开的图片与视频，共{media.length}项。</p></header>
-    {!media.length ? <EmptyPublic>尚未选择公开的影像。</EmptyPublic> : <div className="media-showcase-grid">{media.map(item => <MediaCard key={item.id} item={item} api={api} onPlay={() => setActive(item.id)}/>)}</div>}
+    <header><h1>精选影像</h1><p className="muted">共{media.length}项影像，按日期排列。</p></header>
+    {!media.length ? <EmptyPublic>摘要中尚无影像。</EmptyPublic> : <div className="media-showcase-grid">{media.map(item => <MediaCard key={item.id} item={item} api={api} onPlay={() => setActive(item.id)}/>)}</div>}
     {selected && <Modal title={`${dayLabel(selected.date)} · ${selected.title}`} onClose={() => setActive(null)}>
       {selected.type === 'video'
         ? <video className="media-player" controls playsInline preload="metadata" src={assetUrl(api, selected.url)}/>
         : <img className="media-player" src={assetUrl(api, selected.url)} alt={selected.title}/>}
-      <p className="muted">{selected.duration ? `时长${selected.duration.toFixed(1)}秒。` : ''}原始素材按公开范围提供，未作剪辑。</p>
+      <p className="muted">{selected.duration ? `时长${selected.duration.toFixed(1)}秒。` : ''}素材为原始文件，未作剪辑。</p>
     </Modal>}
   </div>;
   if (view === 'results') return <div className="stack fade-in">
-    <div className="section-head"><div><h1>成绩记录</h1><p className="muted">仅含家长已确认公开的成绩，共{swim.length}条，按项目分别统计。</p></div></div>
-    {!swim.length ? <EmptyPublic>尚未选择公开的成绩。</EmptyPublic> : <>
+    <div className="section-head"><div><h1>成绩记录</h1><p className="muted">共{swim.length}条成绩，按项目分别统计。</p></div></div>
+    {!swim.length ? <EmptyPublic>摘要中尚无成绩。</EmptyPublic> : <>
       <div className="chip-row" role="group" aria-label="按项目筛选">
         <button className="chip" aria-pressed={!event} onClick={() => setEvent('')}>全部项目</button>
         {events.map(group => <button key={group.key} className="chip" aria-pressed={event === group.key} onClick={() => setEvent(group.key)}>{group.label}（{group.records.length}）</button>)}
       </div>
       <div className="timeline">{timeline.map(record => <article className="timeline-item" key={record.id}>
         <span className="timeline-date">{dayLabel(record.date)}</span>
-        <span className="timeline-event">{strokeLabel(record)}<small>家长已确认公开</small></span>
+        <span className="timeline-event">{strokeLabel(record)}</span>
         <span className="timeline-value">{record.time}{record.gap === 0 ? <small className="timeline-delta"><span className="badge">该项目个人最佳</span></small> : <small className="timeline-delta">较该项目最好成绩慢{record.gap.toFixed(2)}秒</small>}</span>
       </article>)}</div>
-      <p className="showcase-note">"个人最佳"与差距均由上方已公开成绩直接计算，不是预测；未公开的成绩不参与比较。</p>
+      <p className="showcase-note">“个人最佳”与差距均由上方成绩直接计算，不是预测；不同项目不合并比较。</p>
     </>}
   </div>;
   return <div className="stack fade-in">
     <section className="hero">
-      <span className="eyebrow">家长已确认的公开内容</span>
+      <span className="eyebrow">游泳成长摘要</span>
       <h1>Nico 的游泳成长</h1>
-      <p>{story || '展示家长选择公开的成绩与影像。'}</p>
+      <p>{story || '成绩与影像摘要。'}</p>
       <div className="hero-meta">
         <span className="badge">发布日期：{published || '未确认'}</span>
         <span className="badge">成绩 {swim.length}条</span>
@@ -96,7 +96,7 @@ export default function Showcase({ data, published, story = '', view = 'home', a
       </div>
     </section>
     <section className="stat-grid">
-      <article className="stat"><span className="stat-value">{swim.length}</span><span className="stat-label">已公开成绩</span><span className="stat-hint">按项目分别统计</span></article>
+      <article className="stat"><span className="stat-value">{swim.length}</span><span className="stat-label">成绩记录</span><span className="stat-hint">按项目分别统计</span></article>
       <article className="stat"><span className="stat-value">{events.length}</span><span className="stat-label">覆盖项目</span><span className="stat-hint">距离 · 泳姿 · 池长</span></article>
       <article className="stat"><span className="stat-value">{media.length}</span><span className="stat-label">精选影像</span><span className="stat-hint">视频与图片</span></article>
     </section>
@@ -114,6 +114,6 @@ export default function Showcase({ data, published, story = '', view = 'home', a
       <div className="media-showcase-grid">{[...media].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map(item => <MediaCard key={item.id} item={item} api={api} onPlay={() => onNavigate ? onNavigate('media') : setActive(item.id)}/>)}</div>
     </section>}
     {swim.length > 0 && <div className="actions">{onNavigate && <button className="apple-btn apple-btn-primary" onClick={() => onNavigate('results')}>查看全部成绩记录 →</button>}</div>}
-    <p className="showcase-note">本页只显示家长在档案页勾选并确认公开的成绩与影像；其余记录不会出现在公开页面。成绩为原始录入值，未经换算或预测。</p>
+    <p className="showcase-note">成绩为原始录入值，未经换算或预测。</p>
   </div>;
 }
