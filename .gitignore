@@ -36,6 +36,7 @@ uploads/*-poster.jpg
 
 # Family reviews, reports and originals are private.
 review/
+.workbuddy/
 uploads/
 server/db.json
 # Only the explicitly confirmed public package may contain distributable media.

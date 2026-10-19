@@ -1,5 +1,6 @@
 import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
 import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
+import { syncPlanDraft, commitPlanUpdate } from '../shared/plan-engine.mjs';
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
 import { preserveDeletedRecords } from '../shared/deletion.mjs';
 import { digestBytes, inspectPlayback, inspectPoster, validateVariantMetadata, MEDIA_MAX_BYTES, POSTER_MAX_BYTES } from '../shared/media-variants.mjs';
@@ -125,6 +126,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       if (Number(expected) !== current.revision) throw fail(409, '记录已被更新，请刷新后核对并重试；当前输入已保留');
       let result, uploadedFile;
       const uploadedVariants = [];
+      let planSync = true;
       try {
         if (parts[1] === 'media' && parts.length === 2 && method === 'POST') {
           const form = await request.formData(), file = form.get('file');
@@ -174,7 +176,11 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           if (method === 'POST' && parts.length === 2 && key !== 'media') { const record = { ...validate(key, await body()), id: `${key}-${randomHex(16)}` }; relations(key, record, data); data[key].push(record); result = record; }
           else if (['PUT', 'DELETE'].includes(method) && parts.length === 3) {
             const index = data[key].findIndex(record => record.id === parts[2]); if (index < 0) throw fail(404, '记录不存在');
-            if (method === 'PUT') { const record = validate(key, await body(), data[key][index]); relations(key, record, data); if (key === 'plans') (data.planHistory ||= []).push(structuredClone(data[key][index])); data[key][index] = record; result = record; }
+            if (method === 'PUT') {
+              const record = validate(key, await body(), data[key][index]); relations(key, record, data);
+              if (key === 'plans') { const outcome = commitPlanUpdate(data, parts[2], data[key][index], record); if (outcome.error) throw fail(400, outcome.error); }
+              data[key][index] = record; result = record;
+            }
             else { const [record] = data[key].splice(index, 1); data.trash.push({ id: `trash-${randomHex(16)}`, collection: key, record, deletedAt: new Date(now()).toISOString(), deletedBy: session.username }); result = { success: true, message: '已移至回收站，原素材保留' }; }
           } else throw fail(404, '接口不存在');
         } else if (parts[1] === 'trash' && parts[3] === 'restore' && method === 'POST') {
@@ -189,6 +195,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           if (!Array.isArray(swimIds) || !Array.isArray(mediaIds) || typeof story !== 'string' || story.length > 4000 || typeof confirmedBy !== 'string' || !confirmedBy.trim() || !validDate(confirmedAt) || swimIds.some(id => !data.swim.some(r => r.id === id)) || mediaIds.some(id => !data.media.some(r => r.id === id))) throw fail(400, '发布白名单或确认信息无效');
           result = data.publishing = { swimIds, mediaIds, story, confirmedBy: confirmedBy.slice(0, 100), confirmedAt };
         } else if (endpoint === '/api/restore' && method === 'POST') {
+          planSync = false; // A restore must reproduce the backup exactly, not append a fresh draft.
           const input = await body(); if (input.format !== 'nico-backup-v1') throw fail(400, '请选择平台导出的完整备份');
           let restored; try { restored = normalizeState(input.data); } catch (error) { throw fail(400, error.message); }
           for (const key of COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
@@ -196,6 +203,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); result = { success: true };
         } else if (endpoint === '/api/public-export' && method === 'POST') return json({ success: true, message: '云端公开白名单已生效，访客只读取这些内容；未提交私有数据到GitHub。' });
         else throw fail(404, '接口不存在');
+        if (planSync) syncPlanDraft(current.data, data, { now: new Date(now()).toISOString(), triggeredByRecordId: result?.id ?? (typeof parts[2] === 'string' ? parts[2] : null) });
         preserveDeletedRecords(current.data, data, session.username, new Date(now()).toISOString());
         derivePrdState(data);
         normalizeState(data);

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { emptyState, normalizeState } from '../shared/domain.mjs';
+import { EVIDENCE_COLLECTIONS } from '../shared/plan-engine.mjs';
 import { createApi } from './services/api';
 import { Message } from './components/ui';
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -58,8 +59,13 @@ export default function App() {
       const updated = current[collection].filter(r => r.id !== removedId && r.id !== record?.id);
       return { ...current, [collection]: record ? [...updated, record] : updated };
     });
+    if (removedId || collection === 'plans') { setNotice('上次提交已获服务端确认。'); reload(); return; }
+    if (EVIDENCE_COLLECTIONS.includes(collection)) {
+      setNotice(<>上次提交已获服务端确认，计划草稿已依据本次记录同步更新。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('week')}>查看本周计划草稿</button></>);
+      reload();
+      return;
+    }
     setNotice('上次提交已获服务端确认。');
-    if (removedId || collection === 'plans') reload();
   };
   const readOnly = !privateMode || role === 'viewer';
   const canEditRecords = !readOnly && (role === 'owner' || ['swim', 'trainings'].includes(recordType));
@@ -67,7 +73,7 @@ export default function App() {
     <main id="main" className="container"><div className="status-line"><span>{privateMode ? loaded ? error ? '上次成功读取的记录 · 连接状态待确认' : '事实库：本次读取的服务端记录' : '尚未读取事实库' : `摘要发布日期：${published || '尚未选择公开内容'}`}</span><div className="actions"><button onClick={reload}>刷新记录</button>{adminCapable && (session?.authenticated ? <button onClick={async () => { try { await api.authRequest('logout', {}); reloadController.current?.abort(); api.resetAuth(); setSession(null); setLoaded(false); setData(emptyState()); setNotice('已退出管理员账号'); await reload(); } catch (problem) { setError(problem.message); } }}>退出登录</button> : <button onClick={() => { setAuth(true); setError(''); }}>管理员登录</button>)}</div></div><Message error>{error}</Message><Message>{notice}</Message>
       {session?.authenticated && session.mustChangePassword ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense> : auth ? <Suspense fallback={<Message>正在打开登录页面…</Message>}><AdminLogin api={api} setupRequired={session?.setupRequired} onLoggedIn={reload} onClose={() => setAuth(false)}/></Suspense> : loading ? <Message>正在读取记录…</Message> : !loaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense fallback={<Message>正在打开页面…</Message>}>
         {privateMode && tab === 'today' && <Dashboard data={data} navigate={navigate}/>}
-        {privateMode && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly}/>}
+        {privateMode && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
         {privateMode && tab === 'records' && <><div className="sub-nav" aria-label="记录类型">{recordTypes.map(([key, label]) => <button key={key} aria-pressed={recordType === key} onClick={() => setRecordType(key)}>{label}</button>)}</div><Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords}/></>}
         {privateMode && tab === 'review' && <><div className="sub-nav"><button aria-pressed={reviewTab === 'report'} onClick={() => setReviewTab('report')}>周期报告</button><button aria-pressed={reviewTab === 'media'} onClick={() => setReviewTab('media')}>录像复盘</button></div>{reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>}</>}
         {privateMode && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}

@@ -10,7 +10,7 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : '']));
   const [values, setValues] = useState(blank), [editing, setEditing] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [filter, setFilter] = useState('');
-  const [scoreKind, setScoreKind] = useState('全部');
+  const [scoreKind, setScoreKind] = useState('全部'), [from, setFrom] = useState(''), [to, setTo] = useState(''), [facets, setFacets] = useState({ distance: '', stroke: '', poolLength: '' });
   const [draftFound, setDraftFound] = useState(null);
   const [baseRevision, setBaseRevision] = useState(() => api?.getRevision()), [conflict, setConflict] = useState(false);
   const key = `nico_form_draft_${type}`;
@@ -33,7 +33,18 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
     if (!window.confirm('移入回收站？可以在档案页恢复。')) return;
     try { await api.request(`/api/${type}/${id}`, { method: 'DELETE' }); onSaved(type, null, id); } catch (problem) { setError(problem.message); }
   };
-  const records = ordered(data[type]).reverse().filter(r => (type !== 'swim' || publicMode || scoreKind === '全部' || (r.recordType || '未知') === scoreKind) && (!filter || JSON.stringify(r).includes(filter)));
+  const dateOf = r => String(r.date || r.deadline || '');
+  const hasFilter = Boolean(filter.trim()) || Boolean(from) || Boolean(to) || (!publicMode && type === 'swim' && (scoreKind !== '全部' || Object.values(facets).some(Boolean)));
+  const clearFilters = () => { setFilter(''); setFrom(''); setTo(''); setScoreKind('全部'); setFacets({ distance: '', stroke: '', poolLength: '' }); };
+  const records = ordered(data[type]).reverse().filter(r => {
+    if (type === 'swim' && !publicMode) {
+      if (scoreKind !== '全部' && (r.recordType || '未知') !== scoreKind) return false;
+      for (const [key, value] of Object.entries(facets)) if (value && r[key] !== value) return false;
+    }
+    if (from && dateOf(r) < from) return false;
+    if (to && dateOf(r) > to) return false;
+    return !filter.trim() || JSON.stringify(r).includes(filter.trim());
+  });
   const effective = derivePrdState(structuredClone(data));
   const sessionOptions = data.plans.flatMap(p => (p.sessions || []).map(s => ({ id: `${p.id}/${s.id}`, label: `${s.date} · ${s.title || s.type} · ${p.title} v${p.version}` })));
   const uiField = field => {
@@ -41,7 +52,15 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
     if (type === 'growth' && BODY_FIELDS.includes(field.key)) return { ...field, step: 0.1 };
     return choices ? { ...field, type: 'select', options: choices.map(o => o.id), optionLabels: Object.fromEntries(choices.map(o => [o.id, o.label])) } : field;
   };
-  const simpleKeys = type === 'trainings' ? ['date', 'plannedSessionId', 'durationMinutes', 'totalMeters', 'feeling', 'discomfort', 'coachNotes'] : type === 'nutrition' ? ['date', 'sleepHours', 'fatigue', 'discomfort', 'willingness'] : fields.map(f => f.key);
+  const SIMPLE_KEYS = {
+    trainings: ['date', 'plannedSessionId', 'durationMinutes', 'totalMeters', 'feeling', 'discomfort', 'coachNotes'],
+    nutrition: ['date', 'sleepHours', 'fatigue', 'discomfort', 'willingness'],
+    swim: ['date', 'distance', 'stroke', 'poolLength', 'time', 'startType', 'timingMethod', 'recordType'],
+    growth: ['date', 'height', 'weight', 'measurementMethod', 'recordedBy'],
+    fitness: ['date', 'standingJump', 'plankSeconds', 'sitAndReach', 'measurementMethod', 'recordedBy'],
+  };
+  const simpleKeys = SIMPLE_KEYS[type] || fields.map(f => f.key);
+  const facetOptions = key => FIELDS.swim.find(f => f.key === key)?.options || [];
   return <div className="stack"><header><h1>{names[type]}记录</h1><p className="muted">{publicMode ? '仅展示家长已确认公开的成绩，按距离、泳姿与池长分别查看。' : readOnly ? '查看实际录入的记录，未填写的字段表示未知。' : '填写实际观察；留空表示未记录，0只表示实际为零。'}</p></header>
     {type === 'growth' && <Message>身体测量须保留一位小数。臂长与臂展分别记录，测量方法未确认时请留空。</Message>}
     {type === 'fitness' && <Message>目前只做个人测量记录。体能值不能替代游泳等级标准；具体训练由教练确认。</Message>}
@@ -53,9 +72,10 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
       <form onSubmit={save}><div className="form-grid">{fields.filter(f => simpleKeys.includes(f.key)).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{simpleKeys.length < fields.length && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{fields.filter(f => !simpleKeys.includes(f.key)).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
         <div className="actions"><button disabled={busy} className="apple-btn apple-btn-primary">{busy ? '正在保存…' : '保存到服务端'}</button><button type="button" onClick={reset} className="apple-btn apple-btn-secondary">清空 / 取消</button><button type="button" onClick={() => downloadJSON(`Nico-${type}-未提交草稿.json`, { collection: type, values, editing })} className="apple-btn apple-btn-secondary">导出未提交草稿</button></div><p className="muted">草稿仅在此设备，不会自动覆盖服务端。保存失败时输入保留。</p>
       </form></details>}
-    {type === 'swim' && !publicMode && <><Message>测试年龄组按测试年份减出生年份计算；生日未知时留空。排名、上一次成绩和第一名成绩按实际来源填写，缺失时不自动推算。</Message><label>记录分类<select className="apple-input" value={scoreKind} onChange={e => setScoreKind(e.target.value)}>{['全部', '测试', '比赛', '训练', '未知'].map(kind => <option key={kind}>{kind}</option>)}</select></label></>}
-    <label className="search">查找记录<input className="apple-input" value={filter} onChange={e => setFilter(e.target.value)} placeholder="日期、项目或备注"/></label>
-    {!records.length && <Empty>{publicMode ? '尚无已选择的公开成绩，或没有符合查找条件的成绩。' : '尚无匹配记录；未录入不代表没有训练。'}</Empty>}
+    {type === 'swim' && !publicMode && <><Message>测试年龄组按测试年份减出生年份计算；生日未知时留空。排名、上一次成绩和第一名成绩按实际来源填写，缺失时不自动推算。</Message><div className="form-grid"><label>记录分类<select className="apple-input" value={scoreKind} onChange={e => setScoreKind(e.target.value)}>{['全部', '测试', '比赛', '训练', '未知'].map(kind => <option key={kind}>{kind}</option>)}</select></label><label>距离<select className="apple-input" value={facets.distance} onChange={e => setFacets(current => ({ ...current, distance: e.target.value }))}><option value="">全部</option>{facetOptions('distance').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>泳姿<select className="apple-input" value={facets.stroke} onChange={e => setFacets(current => ({ ...current, stroke: e.target.value }))}><option value="">全部</option>{facetOptions('stroke').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>池长<select className="apple-input" value={facets.poolLength} onChange={e => setFacets(current => ({ ...current, poolLength: e.target.value }))}><option value="">全部</option>{facetOptions('poolLength').map(option => <option key={option} value={option}>{option}</option>)}</select></label></div></>}
+    <div className="form-grid"><label className="search">查找记录<input className="apple-input" value={filter} onChange={e => setFilter(e.target.value)} placeholder="日期、项目或备注"/></label><label>起始日期<input className="apple-input" type="date" value={from} onChange={e => setFrom(e.target.value)}/></label><label>结束日期<input className="apple-input" type="date" value={to} onChange={e => setTo(e.target.value)}/></label></div>
+    {hasFilter && <div className="actions"><span className="muted">已应用筛选：当前显示{records.length}条 / 共{data[type].length}条</span><button type="button" className="apple-btn apple-btn-secondary" onClick={clearFilters}>清除筛选</button></div>}
+    {!data[type].length ? <Empty>{publicMode ? '尚无已选择的公开成绩。' : `尚无${names[type]}记录；未录入不代表没有训练。`}</Empty> : !records.length ? <Empty>没有符合当前筛选条件的记录。<button type="button" className="apple-btn apple-btn-secondary" onClick={clearFilters}>清除筛选</button></Empty> : null}
     <div className="record-list">{records.map(r => <article className="glass-card" key={r.id}><div className="flex-between"><h2>{dateFormat(r.date || r.deadline)} · {type === 'swim' ? `${r.distance}${r.stroke} ${scoreFormat(parseScore(r.time)) || r.time} · ${r.poolLength}池` : type === 'goals' ? '个人目标原始记录' : names[type]}</h2>{!readOnly && <div className="actions"><button onClick={() => edit(r)}>编辑</button><button onClick={() => remove(r.id)}>移入回收站</button></div>}</div>
       {type === 'swim' && !publicMode && <p className="muted">{r.startType || '出发未知'} · {r.timingMethod || '计时未知'} · {r.recordType || '记录性质未知'}</p>}
       <details><summary>{type === 'goals' ? '查看原始目标（规则待复核）' : publicMode ? '查看成绩条件' : '查看完整字段与来源'}</summary><dl className="record-fields">{displayFields.map(f => <div key={f.key}><dt>{f.label}</dt><dd>{type === 'growth' && BODY_FIELDS.includes(f.key) ? bodyFormat(r[f.key]) : f.type === 'date' ? dateFormat(r[f.key]) : valueLabel(r[f.key])}</dd></div>)}<div><dt>记录ID</dt><dd>{r.id}</dd></div></dl></details>

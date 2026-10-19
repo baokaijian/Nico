@@ -1,18 +1,41 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { analysis, best, eventRecords, parseTime, timeLabel, latest, planContext } from '../../shared/domain.mjs';
 import { today } from '../services/files';
 import { Empty, Message } from './ui';
 import RecordSources, { RecordSourceModal } from './RecordSources';
+const projectKey = record => [record.distance || '未知', record.stroke || '未知', record.poolLength || '未知'].join(' · ');
 export default function Dashboard({ data, navigate }) {
-  const result = analysis(data), pb25 = best(data.swim, '25m', '自由泳', '25m'), growth = latest(data.growth);
-  const context = planContext(data, today(), result.version), activePlan = context.current;
-  const values = eventRecords(data.swim);
+  const result = useMemo(() => analysis(data), [data]);
+  const pb25 = useMemo(() => best(data.swim, '25m', '自由泳', '25m'), [data.swim]);
+  const growth = useMemo(() => latest(data.growth), [data.growth]);
+  const context = useMemo(() => planContext(data, today(), result.version), [data, result.version]);
+  const activePlan = context.current;
   const [sourceId, setSourceId] = useState(null);
+  const [project, setProject] = useState('');
+  const projects = useMemo(() => {
+    const counts = new Map();
+    for (const record of data.swim) {
+      if (parseTime(record.time) == null) continue;
+      counts.set(projectKey(record), (counts.get(projectKey(record)) || 0) + 1);
+    }
+    return [...counts.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+  }, [data.swim]);
+  const selectedKey = projects.some(p => p.key === project) ? project : projects.find(p => p.key === '50m · 自由泳 · 50m')?.key || projects[0]?.key || '';
+  const [distance, stroke, poolLength] = selectedKey ? selectedKey.split(' · ') : [];
+  const values = useMemo(() => selectedKey ? eventRecords(data.swim, distance, stroke, poolLength) : [], [data.swim, selectedKey, distance, stroke, poolLength]);
+  const chart = useMemo(() => {
+    const points = values.map(r => parseTime(r.time));
+    if (!points.length) return null;
+    const min = Math.min(...points), max = Math.max(...points);
+    return { min, max, spread: max - min };
+  }, [values]);
   return <div className="stack"><header className="page-header"><div><p className="eyebrow">依据你录入的记录</p><h1>{data.profile.name || 'Nico'}的游泳成长</h1><p className="muted">最近成绩记录：{result.recent?.date || '尚未录入'}</p></div><button className="apple-btn apple-btn-primary" onClick={() => navigate('records', 'trainings')}>记录本次训练</button></header>
     <section className="focus-card"><span className="eyebrow">{activePlan ? '教练已确认的周期重点' : '当前待教练确认的重点'}</span><h2>{activePlan?.focus || result.focus}</h2><p>{activePlan ? `计划${activePlan.title} · 版本${activePlan.version} · 确认人${activePlan.reviewedBy} · ${activePlan.startDate}—${activePlan.endDate}` : '依据成绩、训练反馈和已审核录像生成复核建议；具体课表、练习量和技术判断待教练确认。'}</p><Message>{context.message}</Message>{!activePlan && result.focusEvidence && <><p>{result.focusEvidence.kind}（{result.focusEvidence.date}）：{result.focusEvidence.text}</p><RecordSources data={data} ids={result.focusEvidence.sourceIds}/></>}<button onClick={() => navigate('week')}>查看本周与提升计划 →</button></section>
     <section className="fact-grid"><Fact label="50米自由泳 · 50米池PB" value={result.pb ? timeLabel(parseTime(result.pb.time)) : '未记录'} detail={result.pb?.date}/><Fact label="25米自由泳 · 25米池PB" value={pb25 ? timeLabel(parseTime(pb25.time)) : '未记录'} detail={pb25?.date}/><Fact label="最近身体测量" value={growth?.date || '未记录'} detail="只展示测量，不推断竞技天赋"/></section>
     <section className="glass-card"><h2>数据覆盖</h2><div className="coverage-grid">{[['trainings', '水上训练'], ['fitness', '体能测量'], ['nutrition', '恢复与饮食']].map(([key, label]) => <button key={key} onClick={() => navigate('records', key)}><strong>{data[key].length}条</strong><span>{label}</span><small>{data[key].length ? '查看实际记录' : '未记录 · 未评估'}</small></button>)}</div></section>
-    <section className="glass-card"><h2>50米自由泳成绩 · 50米池</h2><p className="muted">不同项目分别统计。出发与计时条件未知时，只呈现记录变化。</p>{!values.length ? <Empty/> : <><svg className="trend" viewBox="0 0 600 160" role="img" aria-label="已录入的长池50米自由泳成绩变化，具体值见下方列表"><polyline fill="none" stroke="#1764bb" strokeWidth="3" points={values.map((r, i) => `${40 + (i * 520 / Math.max(1, values.length - 1))},${20 + (parseTime(r.time) - Math.min(...values.map(x => parseTime(x.time)))) / Math.max(1, Math.max(...values.map(x => parseTime(x.time))) - Math.min(...values.map(x => parseTime(x.time)))) * 95}`).join(' ')}/>{values.map((r, i) => { const x = 40 + i * 520 / Math.max(1, values.length - 1), y = 20 + (parseTime(r.time) - Math.min(...values.map(x => parseTime(x.time)))) / Math.max(1, Math.max(...values.map(x => parseTime(x.time))) - Math.min(...values.map(x => parseTime(x.time)))) * 95; return <g key={r.id}><circle cx={x} cy={y} r="5" fill="#1764bb"/><text x={x} y={y + 23} textAnchor="middle">{parseTime(r.time).toFixed(2)}s</text></g>; })}</svg><ul className="data-list">{values.map(r => <li key={r.id}><button onClick={() => setSourceId(r.id)}>{r.date} · {r.time} · {r.recordType || '性质未知'} · {r.timingMethod || '计时未知'}</button></li>)}</ul></> }</section>
+    <section className="glass-card"><div className="flex-between"><h2>成绩趋势</h2>{projects.length > 0 && <label>项目<select className="apple-input" value={selectedKey} onChange={e => setProject(e.target.value)} aria-label="选择成绩项目">{projects.map(p => <option key={p.key} value={p.key}>{p.key}（{p.count}条）</option>)}</select></label>}</div>
+      <p className="muted">按"距离 · 泳姿 · 池长"分别统计，未混在一起比较；出发与计时条件未知时只呈现记录变化。</p>
+      {!values.length ? projects.length ? <Empty>该项目尚无成绩记录；可用上方选择器切换到其他项目。</Empty> : <Empty>尚无填写了可解析成绩的成绩记录。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('records', 'swim')}>录入成绩</button></Empty> : <><svg className="trend" viewBox="0 0 600 160" role="img" aria-label={`已录入的${selectedKey}成绩变化，具体值见下方列表`}><polyline fill="none" stroke="#1764bb" strokeWidth="3" points={values.map((r, i) => `${40 + (i * 520 / Math.max(1, values.length - 1))},${20 + (chart.spread ? (parseTime(r.time) - chart.min) / chart.spread * 95 : 0)}`).join(' ')}/>{values.map((r, i) => { const x = 40 + i * 520 / Math.max(1, values.length - 1), y = 20 + (chart.spread ? (parseTime(r.time) - chart.min) / chart.spread * 95 : 0); return <g key={r.id}><circle cx={x} cy={y} r="5" fill="#1764bb" onClick={() => setSourceId(r.id)} style={{ cursor: 'pointer' }}/><text x={x} y={y + 23} textAnchor="middle">{parseTime(r.time).toFixed(2)}s</text></g>; })}</svg><ul className="data-list">{values.map(r => <li key={r.id}><button onClick={() => setSourceId(r.id)}>{r.date} · {r.time} · {r.recordType || '性质未知'} · {r.timingMethod || '计时未知'}</button></li>)}</ul><p className="muted">点击圆点或列表项可查看该条成绩的原始来源。</p></> }</section>
     <section className="glass-card"><h2>当前分析 · {result.version}</h2><p className="muted">事实、原始记录与待验证建议分别标注；没有自动天赋评分或成绩预测。</p><ul className="fact-list">{result.facts.map((fact, i) => <li key={i}><span className="badge">{fact.kind}</span><p>{fact.text}</p><RecordSources data={data} ids={fact.sourceIds}/></li>)}</ul><div className="actions"><button onClick={() => navigate('review')}>生成本周报告 →</button><button onClick={() => navigate('profile')}>查看个人目标 →</button></div></section>
     <RecordSourceModal data={data} sourceId={sourceId} onClose={() => setSourceId(null)}/>
   </div>;
