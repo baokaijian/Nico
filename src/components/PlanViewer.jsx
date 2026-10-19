@@ -15,7 +15,7 @@ function weekBounds(day) {
   return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
 }
 function Dimension({ title, status = 'ok', value, detail, threshold, ids, data }) {
-  return <article className="glass-card"><h3>{title}</h3>{status === 'insufficient'
+  return <article className="metric-card"><h3>{title}</h3>{status === 'insufficient'
     ? <><p className="muted">{value}</p>{threshold && <small>生成门槛：{threshold}</small>}</>
     : <><p>{value}</p>{detail && <p className="muted">{detail}</p>}</>}
     <RecordSources data={data} ids={ids || []}/></article>;
@@ -47,7 +47,7 @@ export default function PlanViewer({ data, api, onSaved, readOnly, navigate }) {
   };
   const triggered = dimensions.rules.filter(rule => rule.triggered);
   const volume = dimensions.volume, intensity = dimensions.intensity;
-  return <div className="stack"><header><h1>本周与训练提升计划</h1><p className="muted">依据当前记录生成的4周管理建议；具体组数、强度、休息由现场教练安排。</p></header>
+  return <div className="stack fade-in"><header><h1>本周与训练提升计划</h1><p className="muted">依据当前记录生成的4周管理建议；具体组数、强度、休息由现场教练安排。</p></header>
     <section className="glass-card"><h2>{displayedPlan ? '本周期确认重点' : '待教练确认的重点'}：{displayedPlan?.focus || result.focus}</h2><Message>{context.message}</Message>
       {context.candidates.length > 1 && <fieldset className="glass-card"><legend>选择本周期采用的确认计划</legend>{context.candidates.map(p => <label key={p.id}><input type="radio" name="active-plan" checked={displayedPlan?.id === p.id} onChange={() => setSelectedPlanId(p.id)}/> {p.title} · 版本{p.version} · {p.startDate}—{p.endDate} · 确认人{p.reviewedBy || '未填写'}</label>)}<p className="muted">重叠周期须由教练明确采用哪一份；此处选择仅用于查看，不改变记录内容。</p></fieldset>}
       {displayedPlan && <p>{displayedPlan.title} · 版本{displayedPlan.version} · 确认人{displayedPlan.reviewedBy} · {displayedPlan.startDate}—{displayedPlan.endDate}</p>}
@@ -62,7 +62,7 @@ export default function PlanViewer({ data, api, onSaved, readOnly, navigate }) {
         <p>数据范围：{draft.generatedBy.dataRange.start || '无'}—{draft.generatedBy.dataRange.end || '无'}（{EVIDENCE_COLLECTIONS.filter(key => draft.generatedBy.dataRange.counts?.[key]).map(key => `${evidenceLabels[key]}${draft.generatedBy.dataRange.counts[key]}条`).join('、') || '无记录'}）</p>
         {draft.generatedBy.manualEdited && <Message>此草稿已被人工编辑，后续录入记录不会再自动覆盖它；下方维度为按当前记录实时重算的参考，如需固定请"以此草稿创建计划"保存新版本。</Message>}
         {!draft.generatedBy.manualEdited && draft.generatedBy.evidenceVersion !== result.version && <Message>记录已更新（草稿依据{draft.generatedBy.evidenceVersion}，当前{result.version}）；服务端会在下一次写入时重算，下方为当前实时重算结果。</Message>}
-        <div className="stage-grid">
+        <div className="draft-grid">
           <Dimension title="周期划分" value={`${dimensions.period.start} — ${dimensions.period.end}，共${dimensions.period.weeks}周`} detail={`${dimensions.period.ranges.map((range, i) => `W${i + 1} ${range.start}—${range.end}`).join('；')}。起止日期由生成时的系统日期推算，不是运动员数据；教练填写正式计划时可改。`} data={data} ids={[]}/>
           <Dimension title="阶段目标" value={triggered.find(rule => rule.id === 'R-GOAL')?.text || result.focus} detail={`四周语义不变：确认基线 → 记录执行 → 录像验证 → 复测调整。当前候选重点：${result.focus}。`} data={data} ids={dimensions.rules.filter(rule => rule.id === 'R-GOAL' || rule.id === 'R-FOCUS').flatMap(rule => rule.sourceIds)}/>
           <Dimension title="训练量参考区间" status={volume.status} data={data} ids={volume.sourceIds} threshold={volume.threshold} value={volume.status === 'ok'
@@ -79,7 +79,7 @@ export default function PlanViewer({ data, api, onSaved, readOnly, navigate }) {
             detail="休息课次与恢复安排只能由教练填写；平台仅提示已录入的恢复观察。"/>
           <Dimension title="执行偏差观察" value={dimensions.rules.find(rule => rule.id === 'R-EXEC')?.text || '执行覆盖率暂不计算。'} detail={`统计口径与复盘报告一致，阈值见门槛说明：${dimensions.rules.find(rule => rule.id === 'R-EXEC')?.threshold || '—'}`} data={data} ids={dimensions.rules.find(rule => rule.id === 'R-EXEC')?.sourceIds || []}/>
         </div>
-        <details><summary>命中规则与生成门槛（{triggered.length}/{dimensions.rules.length}条已触发）</summary><ul className="fact-list">{dimensions.rules.map(rule => <li key={rule.id}><span className="badge">{ruleLabels[rule.id] || rule.id} · {rule.triggered ? '已触发' : '未触发'}</span><p>{rule.text || '未触发，无输出。'}</p><small>门槛：{rule.threshold}</small><RecordSources data={data} ids={rule.sourceIds}/></li>)}</ul></details>
+        <details><summary>命中规则与生成门槛（{triggered.length}/{dimensions.rules.length}条已触发）</summary><div className="rule-list">{dimensions.rules.map(rule => <article className="rule-item" key={rule.id}><span className="badge">{ruleLabels[rule.id] || rule.id} · {rule.triggered ? '已触发' : '未触发'}</span><p>{rule.text || '未触发，无输出。'}</p><small>门槛：{rule.threshold}</small><RecordSources data={data} ids={rule.sourceIds}/></article>)}</div></details>
         {(draft.generatedBy.history?.length || 0) > 0 && <details><summary>草稿更新历史（最近5次）</summary><ul className="data-list">{draft.generatedBy.history.slice(-5).reverse().map((entry, index) => <li key={`${entry.triggeredAt}-${index}`}>{entry.triggeredAt} · 依据{entry.evidenceVersion} · 命中{(entry.rules || []).map(id => ruleLabels[id] || id).join('、') || '无'}</li>)}</ul></details>}
         <div className="actions">{!readOnly && <button className="apple-btn apple-btn-primary" onClick={startFromDraft}>以此草稿创建计划</button>}<span className="muted">创建后为新的草稿版本（自动生成槽位保留），课次与组表仍需教练填写。</span></div>
       </>}</section>
