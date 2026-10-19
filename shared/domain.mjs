@@ -1,6 +1,9 @@
 import { parseScore, validatePrdRecord, validatePrdState, SCORE_DISTANCES, TEST_ITEMS } from './prd.mjs';
 // Shared by the UI, API, reports and tests. Empty measurements stay empty.
-export const COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media'];
+// weakpoints / checkins are the parent-run practice loop: the parent decides what
+// to work on (from coach feedback), then records each completed practice session.
+export const COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media', 'weakpoints', 'checkins'];
+export const LEGACY_COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media'];
 export const STANDARD_SOURCE = 'https://www.sport.gov.cn/rlzx/n5633/c28294142/part/28294152.pdf';
 export const STANDARD_VERSION = '2025-01-01 / 2026-10-06复核';
 export const WOMEN_50 = {
@@ -23,9 +26,12 @@ export const FIELDS = {
   fitness: [date, number('standingJump', '立定跳远（cm）', 0, 400), number('plankSeconds', '平板支撑（秒）', 0, 3600), number('sitAndReach', '坐位体前屈（cm）', -50, 100), text('shoulderFlex', '肩关节活动观察'), text('ankleFlex', '踝关节活动观察'), number('shuttleRun', '折返跑（秒）', 0.01, 600), method, recorder, notes],
   nutrition: [date, number('sleepHours', '总睡眠（小时）', 0, 24), text('bedtime', '入睡时间'), text('appetite', '食欲'), text('fatigue', '疲惫感'), text('discomfort', '疼痛 / 不适'), text('willingness', '训练意愿'), text('preMeal', '实际课前饮食'), text('postMeal', '实际课后饮食'), number('waterMl', '实际饮水量（ml，可不填）', 0, 15000), number('morningPulse', '晨脉（次/分，可不填）', 20, 250, { integer: true }), number('recoveryScore', '个人恢复感受（1–5，可不填）', 1, 5, { integer: true }), ...['calciumTaken', 'ironTaken', 'zincTaken'].map((key, i) => select(key, ['钙补充剂', '铁补充剂', '锌补充剂'][i], ['未服用', '按既有专业建议服用'], { boolean: true })), text('supplementAdvice', '既有专业建议、产品及实际用量'), recorder, notes],
   goals: [text('title', '目标名称', { required: true }), text('category', '类别'), text('targetMetric', '个人目标'), { key: 'deadline', label: '个人目标复核日期（不是已确认赛程）', type: 'date' }, select('status', '状态', ['待确认', '进行中', '已达成', '暂停']), number('currentProgress', '手动填写的进度（可不填）', 0, 100), text('ruleSource', '规则 / 赛事来源'), text('reviewedBy', '确认人'), notes],
-  plans: [text('title', '计划名称', { required: true }), { key: 'startDate', label: '周期开始', type: 'date', required: true }, { key: 'endDate', label: '周期结束', type: 'date', required: true }, text('focus', '一个主要技术重点', { required: true }), text('reviewedBy', '教练确认人'), select('status', '审核状态', ['草稿', '已确认'], { required: true }), notes],
-  annotations: [text('mediaId', '素材ID', { required: true }), text('athleteIdentity', '运动员 / 泳道确认'), number('startSecond', '片段开始（秒）', 0, 86400, { required: true }), number('endSecond', '片段结束（秒）', 0, 86400, { required: true }), text('observation', '可见事实', { required: true, type: 'textarea' }), text('limitation', '证据限制'), text('suggestion', '下一次练习方向（待审核）', { type: 'textarea' }), text('recordId', '关联成绩 / 训练ID'), text('reviewedBy', '教练审核人'), select('status', '审核状态', ['草稿', '已审核'], { required: true })],
+  plans: [text('title', '计划名称', { required: true }), { key: 'startDate', label: '周期开始', type: 'date', required: true }, { key: 'endDate', label: '周期结束', type: 'date', required: true }, text('focus', '一个主要技术重点', { required: true }), text('reviewedBy', '确认人（家长依据教练反馈确认）'), select('status', '审核状态', ['草稿', '已确认'], { required: true }), notes],
+  annotations: [text('mediaId', '素材ID', { required: true }), text('athleteIdentity', '运动员 / 泳道确认'), number('startSecond', '片段开始（秒）', 0, 86400, { required: true }), number('endSecond', '片段结束（秒）', 0, 86400, { required: true }), text('observation', '可见事实', { required: true, type: 'textarea' }), text('limitation', '证据限制'), text('suggestion', '下一次练习方向（待审核）', { type: 'textarea' }), text('recordId', '关联成绩 / 训练ID'), text('reviewedBy', '审核人'), select('status', '审核状态', ['草稿', '已审核'], { required: true })],
   media: [date, text('title', '标题', { required: true }), text('description', '原始说明（与录像批注分开）', { type: 'textarea' }), text('category', '分类'), text('recordId', '关联成绩 / 训练ID')],
+  // Practised by the parent at home or before/after training; never invented by the platform.
+  weakpoints: [date, text('title', '薄弱点（一句话，如“转身后蹬壁不充分”）', { required: true }), select('category', '类别', ['技术动作', '出发与转身', '打腿与腿法', '体能', '节奏与配合', '心理与习惯', '其他'], { required: true }), select('sourceType', '来源', ['教练反馈原话', '已审核录像观察', '成绩对比', '家长观察', '平台建议待确认'], { required: true }), text('sourceRef', '来源记录ID（多个用逗号分隔，可留空）'), text('evidence', '依据原文 / 观察（照录，不改写）', { type: 'textarea' }), number('targetPerWeek', '每周练习目标次数（家长填写，可不填）', 1, 21, { integer: true }), text('drillHint', '练习方式提示（照录教练建议或家长安排，可留空）', { type: 'textarea' }), select('status', '状态', ['待确认', '练习中', '已改善', '暂停'], { required: true }), recorder, notes],
+  checkins: [date, text('weakPointId', '薄弱点ID', { required: true }), number('times', '本次完成次数 / 组数（实际填写，未完成可填0）', 0, 200, { integer: true }), number('durationMinutes', '练习时长（分钟，可不填）', 0, 600), select('quality', '完成质量（家长观察）', ['未完成', '部分完成', '按要求完成', '超出要求']), text('childFeeling', '孩子主观感受（原话，可不填）'), notes, recorder],
 };
 export function validDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -73,9 +79,13 @@ export function validateRecord(collection, input, previous = null) {
   }
   if (collection === 'trainings' && result.kickMeters != null && (result.totalMeters == null || result.kickMeters > result.totalMeters)) throw new Error('打腿泳程不能大于实际总泳程，需同时填写总泳程');
   if (collection === 'nutrition' && [result.calciumTaken, result.ironTaken, result.zincTaken].includes(true) && !result.supplementAdvice) throw new Error('请记录既有专业建议、产品及实际用量');
+  if (collection === 'weakpoints' && result.sourceRef) {
+    const refs = String(result.sourceRef).split(/[,，、\s]+/).filter(Boolean);
+    if (!refs.length || !refs.every(id => /^[A-Za-z0-9_-]{1,64}$/.test(id))) throw new Error('来源记录ID格式无效，请参考提示用逗号分隔');
+  }
   if (collection === 'annotations' && (result.endSecond < result.startSecond || result.status === '已审核' && !result.reviewedBy)) throw new Error('片段结束须不早于开始；已审核须填写审核人');
   if (collection === 'plans') {
-    if (result.endDate < result.startDate || result.status === '已确认' && !result.reviewedBy) throw new Error('周期结束须不早于开始；已确认须填写教练确认人');
+    if (result.endDate < result.startDate || result.status === '已确认' && !result.reviewedBy) throw new Error('周期结束须不早于开始；已确认须填写确认人（家长依据教练反馈确认）');
     result.sessions = validateSessions(input.sessions !== undefined ? input.sessions : previous?.sessions ?? [], result);
     result.version = (previous?.version || 0) + 1;
     if (input.sourceIds !== undefined) {
@@ -200,8 +210,8 @@ export function planContext(state, day, version = analysis(state).version) {
   const stale = candidates.filter(p => p.sourceVersion && p.sourceVersion !== version);
   // Overlapping confirmations need a human choice, rather than array-order priority.
   const current = candidates.length === 1 && !stale.length ? candidates[0] : null;
-  const message = candidates.length > 1 ? '当前周期有多份确认计划，请教练明确采用哪一份。'
-    : stale.length ? '当前周期计划的依据已更新，请教练复核后保存新版本。'
+  const message = candidates.length > 1 ? '当前周期有多份确认计划，请家长明确采用哪一份（可先与教练核对）。'
+    : stale.length ? '当前周期计划的依据已更新，请家长复核后保存新版本。'
       : current && !current.sourceVersion ? '本周期为手动确认计划，尚未关联分析依据。'
         : !current ? '当前日期没有适用的已确认计划；以下为待确认建议。' : '';
   return { day, current, candidates, stale, message };
@@ -225,7 +235,9 @@ export function analysis(state) {
     if (stretch && parseTime(pb.time) > Number(stretch[2])) facts.push({ kind: '待验证建议', text: `原始目标的${stretch[1]}–${stretch[2]}秒范围尚未由当前PB达到；已突破1分钟与达到该范围应分别记录。`, sourceIds: [pb.id, goal.id] });
     if (/国家三级/.test(`${goal.title} ${goal.targetMetric}`) && /39\.50/.test(`${goal.title} ${goal.targetMetric}`)) facts.push({ kind: '待验证建议', text: '原始目标中的国家三级39.50秒口径需纠正。女子50米自由泳现行参考为长池36.00秒、短池34.00秒；先确认档案性别及赛事条件，原文保留。', sourceIds: [goal.id] });
   }
-  for (const [key, name] of [['trainings', '水上训练'], ['fitness', '体能'], ['nutrition', '恢复']]) facts.push({ kind: '事实', text: `${name}已录入${state[key].length}条${state[key].length ? '。' : '，尚不能评估实际状态；未录入不代表未训练。'}`, sourceIds: state[key].map(r => r.id) });
+  for (const [key, name] of [['trainings', '水上训练'], ['fitness', '体能'], ['nutrition', '恢复'], ['checkins', '薄弱点打卡']]) facts.push({ kind: '事实', text: `${name}已录入${state[key].length}条${state[key].length ? '。' : '，尚不能评估实际状态；未录入不代表未训练。'}`, sourceIds: state[key].map(r => r.id) });
+  const practising = (state.weakpoints || []).filter(point => point.status === '练习中');
+  if ((state.weakpoints || []).length) facts.push({ kind: '事实', text: `薄弱点已录入${state.weakpoints.length}条，其中练习中${practising.length}条；薄弱点由家长依据教练反馈、已审核录像观察或已录入成绩确认，平台只提示候选、不自动写入。`, sourceIds: (state.weakpoints || []).map(point => point.id) });
   const growth = ordered(state.growth);
   if (growth.length > 1) {
     const a = growth.at(-2), b = growth.at(-1);
@@ -251,13 +263,13 @@ export function analysis(state) {
   for (const a of reviewed) facts.push({ kind: '已审核观察', text: `${videos.find(m => m.id === a.mediaId).title}，${a.startSecond}–${a.endSecond}秒；运动员/泳道：${a.athleteIdentity}；观察：${a.observation}；限制：${a.limitation || '未填写'}；审核人：${a.reviewedBy}。`, sourceIds: [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])] });
   facts.push({ kind: '事实', text: `已录入视频${videos.length}段；具备运动员确认、有效时间片段和审核人的批注${reviewed.length}条。其余批注不作为个体技术分析依据。`, sourceIds: [...videos.map(m => m.id), ...state.annotations.map(a => a.id)] });
   const candidates = [
-    ...(recent?.notes ? [{ date: recent.date, kind: '原始成绩备注', text: recent.notes, sourceIds: [recent.id], focus: '请教练核对最新成绩备注，确认一个主要技术重点' }] : []),
-    ...(feedback ? [{ date: feedback.date, kind: '原始训练意见', text: [feedback.focusSkills, feedback.coachNotes].filter(Boolean).join('；'), sourceIds: [feedback.id], focus: '请教练复核最近训练的技术提示与原话，确认一个主要技术重点' }] : []),
-    ...reviewed.map(a => ({ date: videos.find(m => m.id === a.mediaId).date, kind: '已审核录像观察', text: a.observation, sourceIds: [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])], focus: '请教练围绕已审核录像观察，确认一个主要技术重点' })),
+    ...(recent?.notes ? [{ date: recent.date, kind: '原始成绩备注', text: recent.notes, sourceIds: [recent.id], focus: '请家长核对最新成绩备注（可结合教练反馈），确认一个主要技术重点' }] : []),
+    ...(feedback ? [{ date: feedback.date, kind: '原始训练意见', text: [feedback.focusSkills, feedback.coachNotes].filter(Boolean).join('；'), sourceIds: [feedback.id], focus: '请家长复核最近训练的技术提示与教练原话，确认一个主要技术重点' }] : []),
+    ...reviewed.map(a => ({ date: videos.find(m => m.id === a.mediaId).date, kind: '已审核录像观察', text: a.observation, sourceIds: [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])], focus: '请家长围绕已审核录像观察（可结合教练反馈），确认一个主要技术重点' })),
   ];
   // Date wins; on the same date a reviewed observation has priority over raw notes.
   const focusEvidence = candidates.map((c, index) => ({ ...c, index })).sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index).at(-1) || null;
-  const focus = focusEvidence?.focus || '请教练依据当前成绩确认一个主要技术重点';
+  const focus = focusEvidence?.focus || '请家长依据当前成绩与教练反馈确认一个主要技术重点';
   const reference = records.at(-1) || null;
   const conditions = [['startType', '出发方式'], ['timingMethod', '计时方式'], ['recordType', '记录性质']];
   const missingConditions = reference ? conditions.filter(([key]) => !reference[key] || reference[key] === '未知').map(([, label]) => label) : [];
@@ -265,9 +277,9 @@ export function analysis(state) {
   const baseline = { recordId: reference?.id || null, missingConditions, comparableIds: comparable.map(r => r.id), text: reference ? `${reference.date} · ${reference.distance}${reference.stroke} · ${reference.poolLength}池 · ${timeLabel(parseTime(reference.time))}；出发${reference.startType || '未知'}，计时${reference.timingMethod || '未知'}，性质${reference.recordType || '未知'}` : '尚无长池50米自由泳成绩，先录入真实参考成绩。' };
   const unique = ids => [...new Set(ids)];
   const stages = [
-    { title: '第1周 · 确认基线', action: `${focus}。参考成绩：${baseline.text}。${missingConditions.length ? `须先补齐${missingConditions.join('、')}，目前不能确认同条件变化。` : reference ? '请教练确认此记录是否适合作为本周期参考；相同项目仍须核对任务与器材。' : '建立真实记录后再比较成绩。'}核实实际课表和休息日。`, delivery: '一个经教练确认的重点 + 有条件说明的基线卡', sourceIds: unique([...(focusEvidence?.sourceIds || []), ...(reference ? [reference.id] : [])]) },
+    { title: '第1周 · 确认基线', action: `${focus}。参考成绩：${baseline.text}。${missingConditions.length ? `须先补齐${missingConditions.join('、')}，目前不能确认同条件变化。` : reference ? '请家长确认此记录是否适合作为本周期参考；相同项目仍须核对任务与器材。' : '建立真实记录后再比较成绩。'}核实实际课表和休息日。`, delivery: '一个经家长确认的重点（依据教练反馈） + 有条件说明的基线卡', sourceIds: unique([...(focusEvidence?.sourceIds || []), ...(reference ? [reference.id] : [])]) },
     { title: '第2周 · 记录执行', action: `${training ? `最近实际训练为${training.date}，时长${training.durationMinutes == null ? '未填' : `${training.durationMinutes}分钟`}、泳程${training.totalMeters == null ? '未填' : `${training.totalMeters}m`}；先核对是否与当前重点有关。` : '尚无实际训练记录，先记录现场教练原课表及本次执行。'}${recovery ? `结合${recovery.date}的恢复原始记录与教练沟通，不从留空项判断可否加量。` : '尚无恢复记录，补记实际睡眠、感受、不适和训练意愿。'}记录时长、泳程和教练原话，不自动追加训练量。`, delivery: '可关联课次的实际记录 + 教练反馈 + 恢复记录', sourceIds: [training?.id, recovery?.id].filter(Boolean) },
-    { title: '第3周 · 录像验证', action: reviewed.length ? `当前有${reviewed.length}条具备身份、时间片段和审核人的观察；围绕已定位片段复核当前重点及证据限制，再由教练确认练习方向。` : videos.length ? `当前有${videos.length}段视频，尚无符合条件的审核观察。先确认运动员与泳道，定位时间片段并请教练审核；不能从素材说明直接得出个体技术结论。` : '尚无视频，选择真实片段并确认运动员、泳道和时间点；缺少证据时保留建议待验证。', delivery: '已定位、已审核的观察或明确的证据缺口', sourceIds: unique(reviewed.length ? reviewed.flatMap(a => [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])]) : videos.map(m => m.id)) },
+    { title: '第3周 · 录像验证', action: reviewed.length ? `当前有${reviewed.length}条具备身份、时间片段和审核人的观察；围绕已定位片段复核当前重点及证据限制，再由家长与教练确认练习方向。` : videos.length ? `当前有${videos.length}段视频，尚无符合条件的审核观察。先确认运动员与泳道，定位时间片段并请教练审核；不能从素材说明直接得出个体技术结论。` : '尚无视频，选择真实片段并确认运动员、泳道和时间点；缺少证据时保留建议待验证。', delivery: '已定位、已审核的观察或明确的证据缺口', sourceIds: unique(reviewed.length ? reviewed.flatMap(a => [a.id, a.mediaId, ...(a.recordId ? [a.recordId] : [])]) : videos.map(m => m.id)) },
     { title: '第4周 · 复测调整', action: `${comparable.length > 1 ? `有${comparable.length}条与参考记录的已填条件一致的成绩，可逐条核对后复盘；记录变化不能直接归因于某个动作。` : reference ? `当前可确认同条件的成绩${comparable.length}条，${missingConditions.length ? '先补齐参考条件，再由教练安排适合的复测' : '需由教练安排同条件复测后再评估变化'}。` : '建立真实基线并由教练安排同条件复测后再评估变化。'}结合实际课次、恢复与已审核观察决定保留或调整重点，不承诺固定提速秒数和晋升时间。`, delivery: '有实际来源的周期复盘 + 教练确认的下一周期重点', sourceIds: unique([...comparable.map(r => r.id), ...(reference ? [reference.id] : []), training?.id, recovery?.id].filter(Boolean)) },
   ];
   // Plans deliberately stay outside their own evidence version, so saving one

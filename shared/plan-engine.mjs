@@ -1,4 +1,5 @@
 import { analysis, best, ordered, parseTime, rangeSummary, validDate, validateRecord } from './domain.mjs';
+import { practiceOverview } from './practice.mjs';
 
 // Deterministic plan-draft engine. Every number it outputs is computed from
 // records the administrator actually entered; insufficient data stays empty.
@@ -85,7 +86,7 @@ function recoveryRules(state, today) {
     const discomfort = recovery.filter(r => (r.discomfort || '').trim() && (r.discomfort || '').trim() !== '无');
     if (discomfort.length) rules.push({
       id: 'R-REC', level: 'adjustment', triggered: true,
-      text: `近${RECOVERY_WINDOW_DAYS / 7}周${recovery.length}条恢复记录中${discomfort.length}条记录了疼痛/不适（${discomfort.map(r => r.date).join('、')}）。强度档位建议先降低并与教练沟通；具体安排由教练确认。`,
+      text: `近${RECOVERY_WINDOW_DAYS / 7}周${recovery.length}条恢复记录中${discomfort.length}条记录了疼痛/不适（${discomfort.map(r => r.date).join('、')}）。强度档位建议先降低并与教练沟通；具体安排由家长结合教练反馈确认。`,
       sourceIds: discomfort.map(r => r.id),
       threshold: `近${RECOVERY_WINDOW_DAYS / 7}周≥${RECOVERY_MIN_RECORDS}条恢复记录且其中1条以上疼痛/不适非“无”`,
     });
@@ -96,7 +97,7 @@ function recoveryRules(state, today) {
       const baseline = average(historical.map(r => r.sleepHours));
       if (baseline - recentMean >= SLEEP_DROP_HOURS) rules.push({
         id: 'R-SLEEP', level: 'adjustment', triggered: true,
-        text: `近${RECOVERY_WINDOW_DAYS / 7}周平均总睡眠${recentMean.toFixed(1)}小时，低于本人此前记录均值${baseline.toFixed(1)}小时${SLEEP_DROP_HOURS}小时以上（仅与本人已录入记录比较）。已录入观察仅供参考，是否调整强度由教练确认。`,
+        text: `近${RECOVERY_WINDOW_DAYS / 7}周平均总睡眠${recentMean.toFixed(1)}小时，低于本人此前记录均值${baseline.toFixed(1)}小时${SLEEP_DROP_HOURS}小时以上（仅与本人已录入记录比较）。已录入观察仅供参考，是否调整强度由家长结合教练反馈确认。`,
         sourceIds: unique([...recentSleepRecords.map(r => r.id), ...historical.map(r => r.id)]),
         threshold: `近${RECOVERY_WINDOW_DAYS / 7}周≥${SLEEP_MIN_RECORDS}条含睡眠记录，且此前≥${SLEEP_MIN_RECORDS}条可作本人基线，均值下降≥${SLEEP_DROP_HOURS}小时`,
       });
@@ -106,7 +107,7 @@ function recoveryRules(state, today) {
   const rpeRecords = ordered(state.trainings).filter(r => r.date >= rpeStart && r.date <= today && typeof r.rpe === 'number' && Number.isFinite(r.rpe));
   if (rpeRecords.length >= RPE_MIN_RECORDS && average(rpeRecords.map(r => r.rpe)) >= RPE_HIGH_THRESHOLD) rules.push({
     id: 'R-RPE', level: 'adjustment', triggered: true,
-    text: `近${VOLUME_WINDOW_DAYS / 7}周${rpeRecords.length}条训练的主观用力感平均${round1(average(rpeRecords.map(r => r.rpe)))}（≥${RPE_HIGH_THRESHOLD}）。已录入观察显示用力偏高；强度安排由教练确认。`,
+    text: `近${VOLUME_WINDOW_DAYS / 7}周${rpeRecords.length}条训练的主观用力感平均${round1(average(rpeRecords.map(r => r.rpe)))}（≥${RPE_HIGH_THRESHOLD}）。已录入观察显示用力偏高；强度安排由家长结合教练反馈确认。`,
     sourceIds: rpeRecords.map(r => r.id),
     threshold: `近${VOLUME_WINDOW_DAYS / 7}周≥${RPE_MIN_RECORDS}条含RPE训练且均值≥${RPE_HIGH_THRESHOLD}`,
   });
@@ -136,7 +137,7 @@ export function planDimensions(state, now = new Date().toISOString()) {
     {
       id: 'R-VOL', level: 'adjustment', triggered: volume.status === 'ok' && volume.previousAverage != null && Math.abs(volume.averagePerActiveWeek - volume.previousAverage) / volume.previousAverage > VOLUME_CHANGE_RATIO,
       text: volume.status === 'ok' && volume.previousAverage != null && Math.abs(volume.averagePerActiveWeek - volume.previousAverage) / volume.previousAverage > VOLUME_CHANGE_RATIO
-        ? `近${VOLUME_WINDOW_DAYS / 7}周实际周均泳程${volume.averagePerActiveWeek}m较上一窗口${volume.previousAverage}m变化超过±${Math.round(VOLUME_CHANGE_RATIO * 100)}%，参考区间已按新窗口重算；是否加量由教练确认。`
+        ? `近${VOLUME_WINDOW_DAYS / 7}周实际周均泳程${volume.averagePerActiveWeek}m较上一窗口${volume.previousAverage}m变化超过±${Math.round(VOLUME_CHANGE_RATIO * 100)}%，参考区间已按新窗口重算；是否加量由家长结合教练反馈确认。`
         : '近两个4周窗口的实际量变化未超过阈值或数据不足，训练量参考维持当前窗口。',
       sourceIds: volume.sourceIds,
       threshold: `两个${VOLUME_WINDOW_DAYS / 7}周窗口各≥${VOLUME_MIN_RECORDS}条且≥${VOLUME_MIN_WEEKS}周，周均变化>±${Math.round(VOLUME_CHANGE_RATIO * 100)}%`,
@@ -159,9 +160,20 @@ export function planDimensions(state, now = new Date().toISOString()) {
     execRule.triggered = summary.coverage != null && summary.coverage < COVERAGE_LOW_THRESHOLD;
     execRule.text = summary.coverage == null
       ? `当前周期有${confirmed.length}份确认计划，但尚未填写课次，覆盖率暂不计算。`
-      : `当前周期计划训练课次覆盖率${summary.coverage}%${summary.coverage < COVERAGE_LOW_THRESHOLD ? `（<${COVERAGE_LOW_THRESHOLD}%），草稿已附执行偏差观察，课次频率参考供教练决定。` : '，未见明显执行偏差。'}`;
+      : `当前周期计划训练课次覆盖率${summary.coverage}%${summary.coverage < COVERAGE_LOW_THRESHOLD ? `（<${COVERAGE_LOW_THRESHOLD}%），草稿已附执行偏差观察，课次频率参考供家长与教练决定。` : '，未见明显执行偏差。'}`;
     execRule.sourceIds = unique(confirmed.flatMap(p => p.sourceIds || []));
   } else execRule.text = '当前日期没有适用的已确认计划，执行覆盖率暂不计算。';
+  // Practice loop: the plan draft points at the weak points the parent is working on.
+  const practice = practiceOverview(state, now);
+  observationRules.push({
+    id: 'R-PRACTICE', level: 'observation',
+    triggered: practice.active.length > 0 && practice.weekTimes === 0,
+    text: !practice.active.length ? '尚未录入练习中的薄弱点；家长可依据教练反馈在打卡页确认薄弱点后再练习。'
+      : practice.weekTimes === 0 ? `本周（${practice.week.start}—${practice.week.end}）有${practice.active.length}个练习中的薄弱点，尚无打卡记录；打卡只记录已发生的练习，未打卡不代表没有练习。`
+        : `本周（${practice.week.start}—${practice.week.end}）已记录${practice.weekTimes}次薄弱点练习${practice.weekTarget ? `，家长设定的周目标${practice.weekTarget}次` : '（未设定周目标）'}；累计打卡${practice.total}条，连续${practice.streak.days}天。`,
+    sourceIds: unique(practice.active.map(point => point.id)),
+    threshold: '—（薄弱点与打卡均为家长录入，无统计门槛；数据不足时不生成提示）',
+  });
   const rules = [...adjustmentRules, ...observationRules];
   return {
     generatedAt: now,
@@ -182,6 +194,17 @@ export function planDimensions(state, now = new Date().toISOString()) {
       warnings: rules.filter(rule => ['R-REC', 'R-SLEEP', 'R-RPE'].includes(rule.id)),
       sourceIds: unique([...recovery.map(r => r.id), ...rpeRecords.map(r => r.id)]),
       threshold: `需要近${RECOVERY_WINDOW_DAYS / 7}周≥${RECOVERY_MIN_RECORDS}条恢复记录，或近${VOLUME_WINDOW_DAYS / 7}周≥${RPE_MIN_RECORDS}条含RPE训练记录；未达标时强度仅展示已录入观察，不作安排建议。`,
+    },
+    practice: {
+      week: practice.week,
+      weekTimes: practice.weekTimes,
+      weekTarget: practice.weekTarget,
+      streakDays: practice.streak.days,
+      total: practice.total,
+      lastDate: practice.lastDate,
+      active: practice.active.map(point => ({ id: point.id, title: point.title, weekTimes: point.weekTimes, targetPerWeek: point.targetPerWeek ?? null, lastDate: point.lastDate })),
+      sourceIds: unique(practice.active.map(point => point.id)),
+      threshold: '—（薄弱点与打卡均为家长录入，无统计门槛）',
     },
     rules,
   };
@@ -220,7 +243,7 @@ export function syncPlanDraft(previous, next, { now = new Date().toISOString(), 
     endDate: dimensions.period.end,
     focus: result.focus,
     status: '草稿',
-    notes: '由平台依据已录入记录自动生成的草稿；课次与组表由教练填写，其中数值均为参考区间或已录入观察，不含虚构训练处方。',
+    notes: '由平台依据已录入记录自动生成的草稿；课次与练习安排由家长依据教练反馈录入，其中数值均为参考区间或已录入观察，不含虚构训练处方。',
     sessions: [],
     sourceIds: result.sourceIds,
     sourceVersion: result.version,
@@ -244,7 +267,7 @@ export function syncPlanDraft(previous, next, { now = new Date().toISOString(), 
 // automatic regeneration; human plan history keeps a bounded tail per plan.
 export function commitPlanUpdate(data, planId, previous, record) {
   if (planId === PLAN_DRAFT_ID) {
-    if (record.status !== '草稿') return { error: '草稿槽位计划须保持草稿状态；请先以此草稿另建正式计划，再由教练确认' };
+    if (record.status !== '草稿') return { error: '草稿槽位计划须保持草稿状态；请先以此草稿另建正式计划，再由家长依据教练反馈确认' };
     if (record.generatedBy) record.generatedBy = { ...record.generatedBy, manualEdited: true };
     return {};
   }

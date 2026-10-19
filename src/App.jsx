@@ -7,13 +7,14 @@ const Dashboard = lazy(() => import('./components/Dashboard'));
 const Plans = lazy(() => import('./components/PlanViewer'));
 const Records = lazy(() => import('./components/Records'));
 const Reports = lazy(() => import('./components/Reports'));
+const Practice = lazy(() => import('./components/Practice'));
 const Gallery = lazy(() => import('./components/MediaGallery'));
 const Showcase = lazy(() => import('./components/Showcase'));
 const Profile = lazy(() => import('./components/Profile'));
 const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'private' || !!import.meta.env.VITE_API_URL;
 const AdminLogin = lazy(() => import('./components/AdminLogin'));
 const ChangePassword = lazy(() => import('./components/ChangePassword'));
-const privateTabs = [['today', '今日'], ['week', '本周'], ['records', '记录'], ['review', '复盘'], ['profile', '档案']];
+const privateTabs = [['today', '今日'], ['week', '本周'], ['practice', '打卡'], ['records', '记录'], ['review', '复盘'], ['profile', '档案']];
 const publicTabs = [['home', '概览'], ['results', '成绩'], ['media', '影像']];
 const recordTypes = [['trainings', '水上训练'], ['swim', '成绩'], ['fitness', '体能'], ['nutrition', '恢复与饮食'], ['growth', '身体测量']];
 export default function App() {
@@ -70,15 +71,16 @@ export default function App() {
   };
   const readOnly = !privateMode || role === 'viewer';
   const canEditRecords = !readOnly && (role === 'owner' || ['swim', 'trainings'].includes(recordType));
-  return <div><a href="#main" className="skip-link">跳到正文</a><nav className="glass-nav" aria-label="主要导航"><div className="nav-brand"><span className="brand-mark" aria-hidden="true">≈</span><div>Nico 游泳成长记录<small>{privateMode ? `${role === 'owner' ? '家长管理' : role === 'coach' ? '教练协作' : '只读访问'} · 私有记录` : '公开精选摘要'}</small></div></div><div className="nav-tabs">{(privateMode ? privateTabs : publicTabs).map(([key, label]) => <button key={key} className={`tab-btn ${tab === key ? 'active' : ''}`} aria-current={tab === key ? 'page' : undefined} onClick={() => navigate(key)}>{label}</button>)}</div></nav>
+  return <div><a href="#main" className="skip-link">跳到正文</a><nav className="glass-nav" aria-label="主要导航"><div className="nav-brand"><span className="brand-mark" aria-hidden="true">≈</span><div>Nico 游泳成长记录<small>{privateMode ? `${role === 'owner' ? '家长管理' : role === 'coach' ? '协作录入' : '只读访问'} · 私有记录` : '公开精选摘要'}</small></div></div><div className="nav-tabs">{(privateMode ? privateTabs : publicTabs).map(([key, label]) => <button key={key} className={`tab-btn ${tab === key ? 'active' : ''}`} aria-current={tab === key ? 'page' : undefined} onClick={() => navigate(key)}>{label}</button>)}</div></nav>
     <main id="main" className="container"><div className="status-line"><span>{privateMode ? loaded ? error ? '上次成功读取的记录 · 连接状态待确认' : '事实库：本次读取的服务端记录' : '尚未读取事实库' : `摘要发布日期：${published || '尚未选择公开内容'}`}</span><div className="actions"><button onClick={reload}>刷新记录</button>{adminCapable && (session?.authenticated ? <button onClick={async () => { try { await api.authRequest('logout', {}); reloadController.current?.abort(); api.resetAuth(); setSession(null); setLoaded(false); setData(emptyState()); setNotice('已退出管理员账号'); await reload(); } catch (problem) { setError(problem.message); } }}>退出登录</button> : <button onClick={() => { setAuth(true); setError(''); }}>管理员登录</button>)}</div></div><Message error>{error}</Message><Message>{notice}</Message>
       {session?.authenticated && session.mustChangePassword ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense> : auth ? <Suspense fallback={<Message>正在打开登录页面…</Message>}><AdminLogin api={api} setupRequired={session?.setupRequired} onLoggedIn={reload} onClose={() => setAuth(false)}/></Suspense> : loading ? <Message>正在读取记录…</Message> : !loaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense fallback={<Message>正在打开页面…</Message>}>
         {privateMode && tab === 'today' && <Dashboard data={data} navigate={navigate}/>}
         {privateMode && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
+        {privateMode && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
         {privateMode && tab === 'records' && <><div className="sub-nav" aria-label="记录类型">{recordTypes.map(([key, label]) => <button key={key} aria-pressed={recordType === key} onClick={() => setRecordType(key)}>{label}</button>)}</div><Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords}/></>}
         {privateMode && tab === 'review' && <><div className="sub-nav"><button aria-pressed={reviewTab === 'report'} onClick={() => setReviewTab('report')}>周期报告</button><button aria-pressed={reviewTab === 'media'} onClick={() => setReviewTab('media')}>录像复盘</button></div>{reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>}</>}
         {privateMode && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
         {!privateMode && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={data} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
       </Suspense>}
-    </main><footer className="app-footer">{privateMode ? '依据录入记录生成分析 · 训练建议需教练确认' : '公开精选内容 · 发布范围由家长确认'} · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer></div>;
+    </main><footer className="app-footer">{privateMode ? '依据录入记录生成分析 · 训练建议由家长依据教练反馈确认' : '公开精选内容 · 发布范围由家长确认'} · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer></div>;
 }

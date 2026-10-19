@@ -55,9 +55,9 @@ test('公开摘要默认空，白名单不包含私有字段', () => {
   assert.equal(snapshot.swim[0].notes, undefined); assert.equal(snapshot.media[0].description, undefined);
   assert.equal(snapshot.growth, undefined); assert.equal(snapshot.nutrition, undefined);
 });
-test('周期报告有全部7章，缺少分母不编覆盖率，安全转义原始文本', () => {
+test('周期报告有全部8章，缺少分母不编覆盖率，安全转义原始文本', () => {
   const summary = rangeSummary(data, '2026-10-01', '2026-10-07'); assert.equal(summary.coverage, null); assert.equal(summary.meters, null); assert.equal(summary.sleep, null);
-  const html = reportHTML(data, '2026-10-01', '2026-10-07'); assert.equal((html.match(/<h2>/g) || []).length, 7); assert.ok(html.includes(best(data.swim).seconds.toFixed(2))); assert.match(html, /未记录/); assert.match(html, /未记录/);
+  const html = reportHTML(data, '2026-10-01', '2026-10-07'); assert.equal((html.match(/<h2>/g) || []).length, 8); assert.ok(html.includes(best(data.swim).seconds.toFixed(2))); assert.match(html, /未记录/); assert.match(html, /未记录/);
   const modified = structuredClone(data); modified.profile.name = '<script>alert(1)</script>';
   assert.ok(!reportHTML(modified, '2026-10-01', '2026-10-07').includes('<script>'));
   assert.equal(WOMEN_50.自由泳['50m'].三级, 36); assert.equal(WOMEN_50.自由泳['25m'].三级, 34);
