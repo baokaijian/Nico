@@ -97,7 +97,7 @@ test('实际泳程较上一窗口变化超过阈值时触发R-VOL调整规则', 
   const rule = dims.rules.find(r => r.id === 'R-VOL');
   assert.equal(rule.triggered, true);
   assert.match(rule.text, /重算/);
-  assert.match(rule.text, /由教练确认/);
+  assert.match(rule.text, /由家长结合教练反馈确认/);
 });
 
 test('草稿同步：创建、幂等跳过、版本递增、历史与触发记录、可过校验', () => {
@@ -175,7 +175,7 @@ test('草稿槽位保持草稿状态，人工计划历史按计划封顶', () =>
   const data = { plans: [], planHistory: [] };
   const draftRecord = { id: PLAN_DRAFT_ID, status: '草稿', version: 1, generatedBy: { engine: 'rules-v1', evidenceVersion: '记录版本-test', generatedAt: now } };
   assert.ok(commitPlanUpdate(data, PLAN_DRAFT_ID, draftRecord, { ...draftRecord, status: '已确认' }).error);
-  const edited = { ...draftRecord, focus: '教练手改重点' };
+  const edited = { ...draftRecord, focus: '家长手改重点' };
   assert.equal(commitPlanUpdate(data, PLAN_DRAFT_ID, draftRecord, edited).error, undefined);
   assert.equal(edited.generatedBy.manualEdited, true);
   assert.equal(data.planHistory.length, 0);

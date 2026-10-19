@@ -5,7 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
+import { COLLECTIONS, LEGACY_COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
 import { commitPlanUpdate } from '../shared/plan-engine.mjs';
 import { openStore } from './store.mjs';
 import { processMedia, inspectMedia } from './media.mjs';
@@ -87,7 +87,8 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   app.use(express.json({ limit: '5mb' }));
   const requireOwner = req => { if (req.role !== 'owner') throw httpError(403, '此操作仅限家长管理者'); };
   const canWrite = (req, collection) => {
-    if (req.role === 'owner' || req.role === 'coach' && ['plans', 'annotations', 'trainings', 'swim'].includes(collection)) return;
+    // Parents are the operators; the collaborator account only enters records.
+    if (req.role === 'owner' || req.role === 'coach' && ['plans', 'annotations', 'trainings', 'swim', 'weakpoints', 'checkins'].includes(collection)) return;
     throw httpError(403, '没有此记录的修改权限');
   };
   const revision = req => {
@@ -112,6 +113,12 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     }
     if (record.recordId && ![...data.swim, ...data.trainings].some(r => r.id === record.recordId)) throw httpError(400, '关联成绩/训练不存在');
     if (collection === 'trainings' && record.plannedSessionId && !data.plans.some(p => p.sessions?.some(s => `${p.id}/${s.id}` === record.plannedSessionId))) throw httpError(400, '关联计划课次不存在');
+    if (collection === 'weakpoints') {
+      const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
+      const refs = String(record.sourceRef || '').split(/[,，、\s]+/).filter(Boolean);
+      if (refs.some(id => !existingIds.has(id))) throw httpError(400, '薄弱点引用的来源记录不存在');
+    }
+    if (collection === 'checkins' && !data.weakpoints.some(point => point.id === record.weakPointId)) throw httpError(400, '打卡关联的薄弱点不存在');
   }
   app.get('/api/snapshot', (req, res) => {
     const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json({ ...current, role: req.role, athleteId: 'nico' });
@@ -140,6 +147,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       reply(res, change(req, data => {
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
+        if (key === 'weakpoints' && data.checkins.some(c => c.weakPointId === req.params.id)) throw httpError(409, '该薄弱点已有打卡记录；请先处理打卡记录，或把状态改为“暂停 / 已改善”');
         const [record] = data[key].splice(index, 1); data.trash ||= [];
         data.trash.push({ id: makeId('trash'), collection: key, record, deletedAt: new Date().toISOString(), deletedBy: req.username });
         return { success: true, message: '已移至回收站，原素材保留，可恢复' };
@@ -181,7 +189,8 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     requireOwner(req);
     if (req.body?.format !== 'nico-backup-v1') throw httpError(400, '请选择平台导出的完整备份');
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
-    for (const key of COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
+    // Backups exported before the practice loop existed simply have no weakpoints/checkins.
+    for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
     reply(res, change(req, data => { const dataVersion = data.schemaVersion; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); return { success: true }; }, { planSync: false }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {

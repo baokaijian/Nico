@@ -666,6 +666,15 @@ dialog::backdrop { background: var(--overlay); backdrop-filter: blur(2px); }
   .glass-card:hover, .pb-card:hover, .timeline-item:hover { transform: none; }
 }
 
+/* ---------- 9. 薄弱点打卡 ---------- */
+/* Heat strip only reflects check-ins the parent already entered. */
+.heat-strip { display: flex; flex-wrap: wrap; gap: 5px; margin-top: var(--s-2); }
+.heat-day { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); }
+.heat-day.level-1 { background: color-mix(in srgb, var(--brand) 28%, var(--surface)); border-color: var(--brand-line, var(--line)); }
+.heat-day.level-2 { background: color-mix(in srgb, var(--brand) 58%, var(--surface)); border-color: var(--brand-line, var(--line)); }
+.heat-day.level-3 { background: var(--brand); border-color: var(--brand); }
+.data-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+
 @media print {
   .no-print, .glass-nav, .nav-tabs, .apple-btn, .status-line, .notice, .app-footer, button { display: none !important; }
   body { background: #fff !important; color: #000 !important; padding: 0 !important; }

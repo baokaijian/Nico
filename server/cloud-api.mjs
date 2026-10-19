@@ -1,5 +1,5 @@
 import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
-import { COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
+import { COLLECTIONS, LEGACY_COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
 import { syncPlanDraft, commitPlanUpdate } from '../shared/plan-engine.mjs';
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
 import { preserveDeletedRecords } from '../shared/deletion.mjs';
@@ -24,6 +24,12 @@ function relations(collection, record, data) {
     if (record.status === '已审核' && !record.athleteIdentity) throw fail(400, '请先确认运动员与泳道');
   }
   if (record.recordId && ![...data.swim, ...data.trainings].some(r => r.id === record.recordId)) throw fail(400, '关联成绩/训练不存在');
+  if (collection === 'weakpoints') {
+    const ids = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
+    const refs = String(record.sourceRef || '').split(/[,，、\s]+/).filter(Boolean);
+    if (refs.some(id => !ids.has(id))) throw fail(400, '薄弱点引用的来源记录不存在');
+  }
+  if (collection === 'checkins' && !data.weakpoints.some(point => point.id === record.weakPointId)) throw fail(400, '打卡关联的薄弱点不存在');
   if (collection === 'trainings' && record.plannedSessionId && !data.plans.some(p => p.sessions?.some(s => `${p.id}/${s.id}` === record.plannedSessionId))) throw fail(400, '关联计划课次不存在');
 }
 
@@ -181,7 +187,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
               if (key === 'plans') { const outcome = commitPlanUpdate(data, parts[2], data[key][index], record); if (outcome.error) throw fail(400, outcome.error); }
               data[key][index] = record; result = record;
             }
-            else { const [record] = data[key].splice(index, 1); data.trash.push({ id: `trash-${randomHex(16)}`, collection: key, record, deletedAt: new Date(now()).toISOString(), deletedBy: session.username }); result = { success: true, message: '已移至回收站，原素材保留' }; }
+            else { if (key === 'weakpoints' && data.checkins.some(c => c.weakPointId === parts[2])) throw fail(409, '该薄弱点已有打卡记录；请先处理打卡记录，或把状态改为“暂停 / 已改善”'); const [record] = data[key].splice(index, 1); data.trash.push({ id: `trash-${randomHex(16)}`, collection: key, record, deletedAt: new Date(now()).toISOString(), deletedBy: session.username }); result = { success: true, message: '已移至回收站，原素材保留' }; }
           } else throw fail(404, '接口不存在');
         } else if (parts[1] === 'trash' && parts[3] === 'restore' && method === 'POST') {
           const index = data.trash.findIndex(item => item.id === parts[2]); if (index < 0) throw fail(404, '回收记录不存在');
@@ -198,7 +204,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           planSync = false; // A restore must reproduce the backup exactly, not append a fresh draft.
           const input = await body(); if (input.format !== 'nico-backup-v1') throw fail(400, '请选择平台导出的完整备份');
           let restored; try { restored = normalizeState(input.data); } catch (error) { throw fail(400, error.message); }
-          for (const key of COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
+          for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
           const dataVersion = data.schemaVersion;
           for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); result = { success: true };
         } else if (endpoint === '/api/public-export' && method === 'POST') return json({ success: true, message: '云端公开白名单已生效，访客只读取这些内容；未提交私有数据到GitHub。' });

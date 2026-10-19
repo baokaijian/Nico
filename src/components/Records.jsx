@@ -63,7 +63,7 @@ export default function Records({ type, data, api, onSaved, readOnly = false, al
   const facetOptions = key => FIELDS.swim.find(f => f.key === key)?.options || [];
   return <div className="stack fade-in"><header><h1>{names[type]}记录</h1><p className="muted">{publicMode ? '仅展示家长已确认公开的成绩，按距离、泳姿与池长分别查看。' : readOnly ? '查看实际录入的记录，未填写的字段表示未知。' : '填写实际观察；留空表示未记录，0只表示实际为零。'}</p></header>
     {type === 'growth' && <Message>身体测量须保留一位小数。臂长与臂展分别记录，测量方法未确认时请留空。</Message>}
-    {type === 'fitness' && <Message>目前只做个人测量记录。体能值不能替代游泳等级标准；具体训练由教练确认。</Message>}
+    {type === 'fitness' && <Message>目前只做个人测量记录。体能值不能替代游泳等级标准；具体训练请与教练沟通后由家长录入。</Message>}
     {type === 'nutrition' && <Message>记录实际睡眠、感受和饮食。晨脉与恢复感受不用于自动判断能否下水；补充剂仅记录既有专业建议。</Message>}
     {type === 'goals' && <Message>历史目标原文完整保留，包含未核实的规则或旧标准。手动进度不代表预测概率；未经确认的原文不作为训练指令。</Message>}
     <Message error>{error}</Message>{conflict && <Message>请先用顶部“刷新记录”读取最新版本，对照下方记录。<button onClick={() => { setBaseRevision(api.getRevision()); setConflict(false); setError('已采用当前版本，请确认输入后再次保存'); }}>已核对最新记录，允许重试</button></Message>}
