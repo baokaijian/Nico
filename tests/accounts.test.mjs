@@ -8,7 +8,7 @@ import { createAccounts } from '../server/accounts.mjs';
 import { createApp } from '../server/server.js';
 import { normalizeState, publicSnapshot } from '../shared/domain.mjs';
 import { raw } from './fixture.mjs';
-test('管理员账号设置、密码哈希、会话、CSRF、退出与过期；匿名只能读公开白名单', async t => {
+test('管理员账号设置、密码哈希、会话、CSRF、退出与过期；匿名可查看全部内容，写入仍需会话', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nico-account-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   let time = Date.now(), changes = 0;
@@ -23,7 +23,9 @@ test('管理员账号设置、密码哈希、会话、CSRF、退出与过期；�
   const base = `http://127.0.0.1:${server.address().port}`;
   const request = (endpoint, method = 'GET', body, cookie = '', csrf = '') => fetch(base + endpoint, { method, headers: { Cookie: cookie, 'X-CSRF-Token': csrf, 'Content-Type': 'application/json', 'If-Match': '1' }, body: body === undefined ? undefined : JSON.stringify(body) });
   assert.deepEqual(await (await request('/api/public-summary')).json(), published);
-  for (const endpoint of ['/api/snapshot', '/api/growth', '/api/backup', `/api/media/${raw.media[0].id}/content/original`]) assert.equal((await request(endpoint)).status, 401);
+  for (const endpoint of ['/api/snapshot', '/api/growth']) assert.equal((await request(endpoint)).status, 200, endpoint);
+  assert.equal((await request('/api/backup')).status, 401);
+  assert.notEqual((await request(`/api/media/${raw.media[0].id}/content/original`)).status, 401);
   for (const method of ['POST', 'PUT', 'DELETE']) assert.equal((await request('/api/swim', method, {})).status, 401);
   const input = { username: 'admin', password: 'isolated-test-only-password', code: fs.readFileSync(setupCodePath, 'utf8').trim() };
   assert.equal((await request('/api/auth/setup', 'POST', { ...input, code: 'invalid' })).status, 403);
@@ -37,10 +39,13 @@ test('管理员账号设置、密码哈希、会话、CSRF、退出与过期；�
   assert.equal((await request('/api/profile', 'PUT', data.profile, cookie, session.csrf)).status, 200); assert.equal(changes, 1);
   const foreign = await fetch(base + '/api/auth/login', { method: 'POST', headers: { Origin: 'https://foreign.example', 'Content-Type': 'application/json' }, body: JSON.stringify(input) }); assert.equal(foreign.status, 403);
   assert.equal((await request('/api/auth/logout', 'POST', {}, cookie, session.csrf)).status, 200);
-  assert.equal((await request('/api/snapshot', 'GET', undefined, cookie)).status, 401);
+  assert.equal((await request('/api/snapshot', 'GET', undefined, cookie)).status, 200, '退出后仍可查看');
+  assert.equal((await request('/api/swim', 'POST', {}, cookie)).status, 401, '退出后不能录入');
   const loggedIn = await request('/api/auth/login', 'POST', input); assert.equal(loggedIn.status, 200);
   const nextCookie = loggedIn.headers.get('set-cookie').split(';')[0];
-  time += 3600001; assert.equal((await request('/api/snapshot', 'GET', undefined, nextCookie)).status, 401);
+  time += 3600001;
+  assert.equal((await request('/api/snapshot', 'GET', undefined, nextCookie)).status, 200, '会话过期后仍可查看');
+  assert.equal((await request('/api/swim', 'POST', {}, nextCookie)).status, 401, '会话过期后不能录入');
   for (let i = 0; i < 5; i++) assert.equal((await request('/api/auth/login', 'POST', { username: 'admin', password: 'wrong' })).status, 401);
   assert.equal((await request('/api/auth/login', 'POST', input)).status, 429);
 });

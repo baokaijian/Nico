@@ -47,5 +47,5 @@ export function reportHTML(state, start, end) {
   <section><h2>6. 等级标准与个人目标</h2><p>档案性别：${escape(state.profile.sex || '未确认')}；原始个人目标${state.goals.length}条保留在档案，不将未确认赛事/晋升规则当作训练指令。</p><p>以下为女子50米项目参考，未确认档案不自动匹配；达线、赛事资格与证书独立。版本${escape(STANDARD_VERSION)}。<a href="${STANDARD_SOURCE}">官方完整标准</a></p>${table(['50米泳姿', '池长', '二级秒', '三级秒'], Object.entries(WOMEN_50).flatMap(([stroke, pools]) => Object.entries(pools).map(([pool, lines]) => [stroke, pool, lines.二级, lines.三级 ?? '请查官方表'])) )}</section>
   <section><h2>7. 恢复与安全边界</h2><p>不布置家庭水下憋气任务、强制限气和统一补充剂处方；家庭额外运动计入总负荷。疼痛、不适或反复疲惫时先沟通现场教练和适当专业人员。体能无实测不评分。长池50米没有半程转身。</p></section>
   <section><h2>8. 薄弱点打卡练习与能力成长</h2><p>薄弱点由家长依据教练反馈、已审核录像观察或已录入成绩确认；打卡只记录已经发生的练习，未打卡不代表没有练习。平台不自动写入薄弱点、不虚构练习内容。</p>${practiceBlock}<h3>8.1 薄弱点候选（需家长确认后才写入）</h3>${candidateBlock}<h3>8.2 能力成长（仅依据已录入成绩与测量）</h3>${growthBlock}</section>
-  <footer>家庭报告包含私有记录，请按所需范围自行保存。公开展示使用独立字段白名单，与完整报告分开。</footer></body></html>`;
+  <footer>本报告由已录入记录直接生成，未填充示例数据。</footer></body></html>`;
 }

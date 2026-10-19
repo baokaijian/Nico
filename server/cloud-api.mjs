@@ -34,7 +34,9 @@ function relations(collection, record, data) {
 }
 
 // Repository contains code only. The adapter holds privileged keys on the server.
-export function createCloudHandler({ backend, origins, now = Date.now, sessionMs = 60 * 60 * 1000 }) {
+export function createCloudHandler({ backend, origins, now = Date.now, sessionMs = 60 * 60 * 1000, requireLoginForRead = false }) {
+  // Viewing is open by default: login only gates entry.
+  const anonymousRead = !requireLoginForRead;
   async function sessionFor(request) {
     const token = /^Bearer ([a-f0-9]{64})$/.exec(request.headers.get('authorization') || '')?.[1];
     if (!token) return null;
@@ -94,9 +96,12 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       }
       const session = await sessionFor(request);
       if (endpoint === '/api/auth/session' && method === 'GET') return json(viewSession(session));
-      if (!session) throw fail(401, '请先登录管理员账号');
-      if (endpoint === '/api/auth/logout' && method === 'POST') { await backend.deleteSession(session.token_hash); return json({ success: true }); }
-      if (endpoint === '/api/auth/password' && method === 'POST') {
+      const openRead = ['GET', 'HEAD'].includes(method) && (endpoint === '/api/snapshot'
+        || (parts[0] === 'api' && COLLECTIONS.includes(parts[1]) && parts.length === 2)
+        || (parts[1] === 'media' && parts[3] === 'content' && parts.length === 5));
+      if (!session && !(anonymousRead && openRead)) throw fail(401, '请先登录管理员账号');
+      if (session && endpoint === '/api/auth/logout' && method === 'POST') { await backend.deleteSession(session.token_hash); return json({ success: true }); }
+      if (session && endpoint === '/api/auth/password' && method === 'POST') {
         const input = await body();
         if (await backend.loginAttempt(await digestHex(`password:${session.username}`)) > 5) throw fail(429, '密码验证次数过多，请稍后再试');
         if (typeof input.currentPassword !== 'string' || input.currentPassword.length > 128 || !constantEqual(await passwordHash(input.currentPassword, session.account.salt), session.account.password_hash)) throw fail(401, '当前密码不正确');
@@ -105,12 +110,12 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
         if (!changed) throw fail(409, '账号状态已改变，请重新登录');
         return json({ success: true, ...await issue(session.username) });
       }
-      if (session.mustChangePassword) throw fail(403, '请先替换临时密码，再管理私有档案');
+      if (session?.mustChangePassword) throw fail(403, '请先替换临时密码，再录入信息');
       if (endpoint === '/api/storage-setup' && method === 'POST') { await backend.ensureBucket(); return json({ success: true }); }
       const current = await backend.read(), data = normalizeState(structuredClone(current.data));
       headers['X-Nico-Revision'] = String(current.revision);
-      if (endpoint === '/api/snapshot' && method === 'GET') return json({ ...current, data, role: 'owner', athleteId: 'nico' });
-      if (endpoint === '/api/backup' && method === 'GET') return json({ format: 'nico-backup-v1', ...current });
+      if (endpoint === '/api/snapshot' && method === 'GET') return json({ ...current, data, role: session ? 'owner' : 'viewer', athleteId: 'nico' });
+      if (endpoint === '/api/backup' && method === 'GET') { if (!session) throw fail(401, '请先登录管理员账号'); return json({ format: 'nico-backup-v1', ...current }); }
       if (endpoint === '/api/public-preview' && method === 'GET') return json(publicSnapshot(data));
       if (method === 'GET' && parts[0] === 'api' && COLLECTIONS.includes(parts[1]) && parts.length === 2) return json(data[parts[1]]);
       if (['GET', 'HEAD'].includes(method) && parts[1] === 'media' && parts[3] === 'content' && parts.length === 5) {

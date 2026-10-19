@@ -36,11 +36,11 @@ const privateSidebar = [
     { label: '薄弱点打卡', short: '打卡', tab: 'practice' },
   ] },
   { title: '系统', items: [
-    { label: '档案与公开', short: '档案', tab: 'profile' },
+    { label: '档案', short: '档案', tab: 'profile' },
   ] },
 ];
 const publicSidebar = [
-  { title: '公开内容', items: [
+  { title: '内容', items: [
     { label: '概览', short: '概览', tab: 'home' },
     { label: '成绩', short: '成绩', tab: 'results' },
     { label: '影像', short: '影像', tab: 'media' },
@@ -51,7 +51,9 @@ export default function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false), [navOpen, setNavOpen] = useState(false), [passwordOpen, setPasswordOpen] = useState(false);
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
-  const privateMode = !!session?.authenticated && !session?.mustChangePassword;
+  // Content is viewable without logging in; a session only unlocks entry.
+  const fullView = adminCapable;
+  const authenticated = !!session?.authenticated && !session?.mustChangePassword;
   const [loaded, setLoaded] = useState(false);
   const reloadController = useRef(null);
   const reload = useCallback(async () => {
@@ -61,20 +63,19 @@ export default function App() {
     try {
       const currentSession = adminCapable ? await api.authRequest('session', undefined, { signal: controller.signal }) : null;
       if (controller.signal.aborted) return;
-      if (currentSession?.authenticated && !currentSession.mustChangePassword) {
+      if (adminCapable) {
+        if (currentSession && !currentSession.authenticated) api.resetAuth();
         const current = await api.request('/api/snapshot', { signal: controller.signal });
         if (controller.signal.aborted || current.revision < api.getRevision()) return;
         setSession(currentSession);
-        setData(normalizeState(current.data)); setRole(current.role); setAuth(false); setLoaded(true);
-        setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? 'today' : currentTab);
+        setData(normalizeState(current.data));
+        setRole(currentSession?.authenticated ? currentSession.role : 'viewer');
+        setAuth(false); setLoaded(true);
+        setTab(currentTab => privateTabs.some(([key]) => key === currentTab) ? currentTab : 'today');
       } else {
-        setSession(currentSession);
-        if (!currentSession?.authenticated) api.resetAuth();
-        const snapshot = adminCapable ? await api.request('/api/public-summary', { signal: controller.signal }) : await (async () => {
-          const response = await fetch(`${import.meta.env.BASE_URL}public-summary.json`, { cache: 'no-store', signal: controller.signal });
-          if (!response.ok) throw new Error('公开摘要加载失败，请重试');
-          return response.json();
-        })();
+        const response = await fetch(`${import.meta.env.BASE_URL}public-summary.json`, { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) throw new Error('摘要加载失败，请重试');
+        const snapshot = await response.json();
         setData({ ...emptyState(), swim: snapshot.swim || [], media: snapshot.media || [] });
         setPublished(snapshot.publishedAt); setStory(snapshot.story || ''); setRole('viewer'); setLoaded(true);
         setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : 'home');
@@ -101,7 +102,7 @@ export default function App() {
     }
     setNotice('上次提交已获服务端确认。');
   };
-  const readOnly = !privateMode || role === 'viewer';
+  const readOnly = !authenticated || role === 'viewer';
   const canEditRecords = !readOnly && (role === 'owner' || ['swim', 'trainings'].includes(recordType));
   const logout = async () => {
     setUserMenuOpen(false);
@@ -115,23 +116,24 @@ export default function App() {
     setNavOpen(false);
     if (query || tab !== 'records') navigate('records');
   };
-  const tabs = privateMode ? privateTabs : publicTabs;
-  const sidebarGroups = privateMode ? privateSidebar : publicSidebar;
-  const tabName = (privateMode ? privateTabs : publicTabs).find(([key]) => key === tab)?.[1] || '';
+  const tabs = fullView ? privateTabs : publicTabs;
+  const sidebarGroups = fullView ? privateSidebar : publicSidebar;
+  const tabName = (fullView ? privateTabs : publicTabs).find(([key]) => key === tab)?.[1] || '';
   const recordTypeName = recordTypes.find(([key]) => key === recordType)?.[1] || '';
-  const statusText = privateMode
-    ? loaded ? error ? '上次成功读取的记录 · 连接状态待确认' : '事实库：本次读取的服务端记录' : '尚未读取事实库'
-    : `摘要发布日期：${published || '尚未选择公开内容'}`;
+  const statusText = !fullView
+    ? published ? `摘要发布：${published}` : ''
+    : !loaded ? '尚未读取事实库'
+      : error ? '上次成功读取的记录 · 连接状态待确认'
+        : authenticated ? '事实库：本次读取的服务端记录' : '只读浏览 · 登录后可录入与修改';
   const itemActive = item => item.tab === tab && (!item.type || item.type === recordType) && (!item.review || item.review === reviewTab);
   return <div className={`app ${navOpen ? 'nav-open' : ''}`}>
     <a href="#main" className="skip-link">跳到正文</a>
     <header className="topbar"><div className="topbar-inner">
       <button type="button" className="nav-toggle" onClick={() => setNavOpen(value => !value)} aria-expanded={navOpen} aria-label={navOpen ? '关闭导航' : '打开导航'}><i/><i/><i/></button>
-      <div className="brand"><span className="brand-mark" aria-hidden="true">≈</span><div><b>Nico 游泳成长记录</b><small>{privateMode ? `${roleLabels[role] || '访问'} · 私有记录` : '公开精选摘要'}</small></div></div>
+      <div className="brand"><span className="brand-mark" aria-hidden="true">≈</span><div><b>Nico 游泳成长记录</b><small>{!fullView ? '精选摘要' : authenticated ? `${roleLabels[role] || '访问'}` : '只读浏览'}</small></div></div>
       <nav className="main-tabs" aria-label="主要导航">{tabs.map(([key, label]) => <button key={key} className={`tab-btn ${tab === key ? 'active' : ''}`} aria-current={tab === key ? 'page' : undefined} onClick={() => navigate(key)}>{label}</button>)}</nav>
       <div className="topbar-right">
-        {privateMode && <form className="topbar-search" onSubmit={runSearch} role="search"><input className="apple-input" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder="查找记录（日期 / 项目 / 备注）" aria-label="查找记录"/><button type="submit">查找</button></form>}
-        {!privateMode && <span className="tag">访客</span>}
+        {fullView && <form className="topbar-search" onSubmit={runSearch} role="search"><input className="apple-input" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder="查找记录（日期 / 项目 / 备注）" aria-label="查找记录"/><button type="submit">查找</button></form>}
         {adminCapable && (session?.authenticated
           ? <div style={{ position: 'relative' }}>
               {userMenuOpen && <div className="pop-backdrop" onClick={() => setUserMenuOpen(false)} aria-hidden="true"/>}
@@ -146,11 +148,11 @@ export default function App() {
       </div>
     </div></header>
     <div className="ctxbar"><div className="ctxbar-inner">
-      <nav className="crumb" aria-label="当前位置"><b>{tabName}</b>{privateMode && tab === 'records' && <> / {recordTypeName}</>}{privateMode && tab === 'review' && <> / {reviewTab === 'report' ? '周期报告' : '录像复盘'}</>}<span className="crumb-sub">{statusText}</span></nav>
-      {privateMode && tab === 'records' && <div className="ctx-tabs" role="group" aria-label="记录类型">{recordTypes.map(([key, label]) => <button key={key} aria-pressed={recordType === key} onClick={() => setRecordType(key)}>{label}</button>)}</div>}
-      {privateMode && tab === 'review' && <div className="ctx-tabs" role="group" aria-label="复盘内容"><button aria-pressed={reviewTab === 'report'} onClick={() => setReviewTab('report')}>周期报告</button><button aria-pressed={reviewTab === 'media'} onClick={() => setReviewTab('media')}>录像复盘</button></div>}
+      <nav className="crumb" aria-label="当前位置"><b>{tabName}</b>{fullView && tab === 'records' && <> / {recordTypeName}</>}{fullView && tab === 'review' && <> / {reviewTab === 'report' ? '周期报告' : '录像复盘'}</>}<span className="crumb-sub">{statusText}</span></nav>
+      {fullView && tab === 'records' && <div className="ctx-tabs" role="group" aria-label="记录类型">{recordTypes.map(([key, label]) => <button key={key} aria-pressed={recordType === key} onClick={() => setRecordType(key)}>{label}</button>)}</div>}
+      {fullView && tab === 'review' && <div className="ctx-tabs" role="group" aria-label="复盘内容"><button aria-pressed={reviewTab === 'report'} onClick={() => setReviewTab('report')}>周期报告</button><button aria-pressed={reviewTab === 'media'} onClick={() => setReviewTab('media')}>录像复盘</button></div>}
       <div className="ctx-actions">
-        {privateMode && tab === 'today' && <button className="apple-btn apple-btn-primary" onClick={() => navigate('records', 'trainings')}>记录本次训练</button>}
+        {fullView && !readOnly && tab === 'today' && <button className="apple-btn apple-btn-primary" onClick={() => navigate('records', 'trainings')}>记录本次训练</button>}
         <button onClick={() => { setNavOpen(false); reload(); }}>刷新记录</button>
       </div>
     </div></div>
@@ -167,17 +169,17 @@ export default function App() {
         {session?.authenticated && session.mustChangePassword
           ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
           : loading ? <Message>正在读取记录…</Message> : !loaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense fallback={<Message>正在打开页面…</Message>}>
-            {privateMode && tab === 'today' && <Dashboard data={data} navigate={navigate}/>}
-            {privateMode && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
-            {privateMode && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
-            {privateMode && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} initialFilter={searchSeed}/>}
-            {privateMode && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>)}
-            {privateMode && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
-            {!privateMode && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={data} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
+            {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate}/>}
+            {fullView && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
+            {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
+            {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} initialFilter={searchSeed}/>}
+            {fullView && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>)}
+            {fullView && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
+            {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={data} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
         {passwordOpen && session?.authenticated && <Suspense fallback={<Message>正在打开账号设置…</Message>}><Modal title="修改管理员密码" onClose={() => setPasswordOpen(false)}><ChangePassword api={api} onChanged={async () => { setPasswordOpen(false); await reload(); }}/></Modal></Suspense>}
       </main>
     </div>
-    <footer className="app-footer">{privateMode ? '依据录入记录生成分析 · 训练建议由家长依据教练反馈确认' : '公开精选内容 · 发布范围由家长确认'} · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer>
+    <footer className="app-footer">内容依据已录入的记录生成 · 登录仅用于录入与修改 · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer>
   </div>;
 }

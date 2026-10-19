@@ -28,13 +28,18 @@ test('API可靠保存、同ID更新、权限、冲突、回收站和恢复', asy
     const next = response.headers.get('X-Nico-Revision'); if (next) rev = Number(next);
     return { status: response.status, data: await response.json() };
   };
-  assert.equal((await request('/api/snapshot', 'GET', undefined, '')).status, 401);
+  // Viewing is open: an anonymous visitor reads the same records, plans and analysis. Login gates entry only.
+  const anonymous = await request('/api/snapshot', 'GET', undefined, '');
+  assert.equal(anonymous.status, 200);
+  assert.equal(anonymous.data.role, 'viewer');
+  assert.equal(anonymous.data.data.growth.length, fixture.growth.length);
   assert.equal((await request('/api/snapshot', 'GET', undefined, viewer)).status, 200);
+  assert.equal((await request('/api/backup', 'GET', undefined, '')).status, 401, '导出备份仍需登录');
   assert.equal((await request('/api/profile', 'PUT', { name: 'Nico', sex: '', birthDate: '' }, coach)).status, 403);
   assert.equal((await request('/api/backup', 'GET', undefined, viewer)).status, 403);
   const foreign = await fetch(base + '/api/snapshot', { headers: { Authorization: `Bearer ${owner}`, Origin: 'https://unapproved.example' } }); assert.equal(foreign.status, 403);
   const mediaPath = `/api/media/${fixture.media[0].id}/content/original`;
-  assert.equal((await fetch(base + mediaPath)).status, 401);
+  assert.notEqual((await fetch(base + mediaPath)).status, 401, '素材读取不再要求登录');
   const upload = async (token, title, revision = rev, filename = 'protocol-test.png', mime = 'image/png') => {
     const body = new FormData(); body.append('date', '2026-10-06'); body.append('title', title);
     // Fixed protocol bytes in the isolated test server; media probing is disabled here.
