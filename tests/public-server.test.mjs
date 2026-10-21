@@ -71,6 +71,17 @@ test('公网入口兼容根路径部署且不会重定向循环', async t => {
   t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
   assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/`)).status, 200);
 });
+test('云端构建不允许夹带静态业务副本，兼容独立静态发布', t => {
+  const directory = fixture(t);
+  const manifestPath = path.join(directory, 'nico-build.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, contentSource: 'api' }));
+  assert.throws(() => validatePublicDirectory(directory), /不得嵌入静态业务数据/);
+  fs.writeFileSync(path.join(directory, 'public-summary.json'), JSON.stringify({ publishedAt: null, story: '', swim: [], media: [] }));
+  assert.throws(() => validatePublicDirectory(directory), /未允许文件/);
+  fs.rmSync(path.join(directory, 'uploads'), { recursive: true });
+  assert.equal(validatePublicDirectory(directory).manifest.contentSource, 'api');
+});
 test('私有维护服务误设远程监听也强制只读，环境变量不能关闭保护', () => {
   for (const host of ['0.0.0.0', '::', '192.168.1.10', 'public.example']) assert.deepEqual(maintenanceMode(host, { NICO_AUTH_REQUIRED: 'false', NICO_READ_ONLY: 'false' }), { authRequired: true, readOnly: true });
   for (const host of ['127.0.0.1', 'localhost', '::1']) assert.deepEqual(maintenanceMode(host, {}), { authRequired: false, readOnly: false });

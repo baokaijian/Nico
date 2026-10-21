@@ -1,6 +1,5 @@
 name: Deploy Nico cloud API
-# The public site and the private app both read from this function. Without this job the
-# deployed function keeps old code (anonymous reads rejected) while the repository is already fixed.
+# Deploy the API separately from Pages; verify the public/private boundary afterwards.
 on:
   push:
     branches: [master]
@@ -16,17 +15,39 @@ concurrency:
   group: nico-function
   cancel-in-progress: false
 jobs:
-  deploy:
-    # Skipped (not failed) until the repository owner adds the SUPABASE_ACCESS_TOKEN secret.
-    if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
+  check:
     runs-on: ubuntu-latest
+    env:
+      NICO_TEST_PROTOCOL_ONLY: 'true'
+      VITE_APP_MODE: public
+      VITE_API_URL: https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
     steps:
       - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: actions/setup-node@v4
         with:
-          version: latest
-      - run: supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+        with:
+          version: 2.121.0
+      - run: supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit --no-verify-jwt --use-api
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+      - name: No deployment credential configured
+        if: env.SUPABASE_ACCESS_TOKEN == ''
+        run: echo 'API deployment skipped; deploy the tested function separately with the connected Supabase tool.'
       - name: Guest read check against the deployed function
+        if: env.SUPABASE_ACCESS_TOKEN != ''
         run: node scripts/verify-guest-read.mjs https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api

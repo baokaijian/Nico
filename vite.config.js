@@ -5,7 +5,7 @@ if (!['public', 'private'].includes(appMode)) throw new Error('VITE_APP_MODE须�
 const basePath = process.env.VITE_BASE_PATH || '/Nico/';
 if (!/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(basePath)) throw new Error('VITE_BASE_PATH须为以/开头和结束的本机路径');
 export default defineConfig({
-  plugins: [react(), { name: 'nico-build-mode', generateBundle() { this.emitFile({ type: 'asset', fileName: 'nico-build.json', source: JSON.stringify({ schema: 1, mode: appMode, readOnly: appMode === 'public', basePath }) + '\n' }); } }],
+  plugins: [react(), { name: 'nico-build-mode', generateBundle() { this.emitFile({ type: 'asset', fileName: 'nico-build.json', source: JSON.stringify({ schema: 1, mode: appMode, readOnly: appMode === 'public', basePath, contentSource: process.env.VITE_API_URL ? 'api' : 'static' }) + '\n' }); } }],
   base: basePath,
   define: { 'import.meta.env.VITE_APP_MODE': JSON.stringify(appMode) },
   publicDir: '.generated-public',

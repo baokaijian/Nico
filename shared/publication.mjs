@@ -24,6 +24,8 @@ export function validatePublicDirectory(directory, privateIds = []) {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'nico-build.json'), 'utf8'));
   if (manifest.mode !== 'public' || manifest.readOnly !== true || manifest.schema !== 1 || typeof manifest.basePath !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(manifest.basePath)) throw new Error('此目录不是经过标记的公网只读构建，禁止发布或启动');
   const summary = validatePublicSummary(JSON.parse(fs.readFileSync(path.join(root, 'public-summary.json'), 'utf8')));
+  if (manifest.contentSource && !['api', 'static'].includes(manifest.contentSource)) throw new Error('公开内容来源无效');
+  if (manifest.contentSource === 'api' && (summary.publishedAt || summary.story || summary.swim.length || summary.media.length)) throw new Error('云端模式不得嵌入静态业务数据');
   const mediaFiles = new Set(summary.media.flatMap(record => [record.url, record.posterUrl].filter(Boolean).map(url => url.slice(1))));
   const visited = new Set();
   function inspect(current) {

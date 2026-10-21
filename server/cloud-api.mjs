@@ -1,6 +1,6 @@
 import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
 import { COLLECTIONS, LEGACY_COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
-import { syncPlanDraft, commitPlanUpdate } from '../shared/plan-engine.mjs';
+import { syncPlanDraft, commitPlanUpdate, retainPlanHistory } from '../shared/plan-engine.mjs';
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
 import { preserveDeletedRecords } from '../shared/deletion.mjs';
 import { digestBytes, inspectPlayback, inspectPoster, validateVariantMetadata, MEDIA_MAX_BYTES, POSTER_MAX_BYTES } from '../shared/media-variants.mjs';
@@ -34,9 +34,7 @@ function relations(collection, record, data) {
 }
 
 // Repository contains code only. The adapter holds privileged keys on the server.
-export function createCloudHandler({ backend, origins, now = Date.now, sessionMs = 60 * 60 * 1000, requireLoginForRead = false }) {
-  // Viewing is open by default: login only gates entry.
-  const anonymousRead = !requireLoginForRead;
+export function createCloudHandler({ backend, origins, now = Date.now, sessionMs = 60 * 60 * 1000 }) {
   async function sessionFor(request) {
     const token = /^Bearer ([a-f0-9]{64})$/.exec(request.headers.get('authorization') || '')?.[1];
     if (!token) return null;
@@ -96,10 +94,8 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       }
       const session = await sessionFor(request);
       if (endpoint === '/api/auth/session' && method === 'GET') return json(viewSession(session));
-      const openRead = ['GET', 'HEAD'].includes(method) && (endpoint === '/api/snapshot'
-        || (parts[0] === 'api' && COLLECTIONS.includes(parts[1]) && parts.length === 2)
-        || (parts[1] === 'media' && parts[3] === 'content' && parts.length === 5));
-      if (!session && !(anonymousRead && openRead)) throw fail(401, '请先登录管理员账号');
+      // Only the explicit public routes above may bypass authentication.
+      if (!session) throw fail(401, '完整档案需要登录后查看');
       if (session && endpoint === '/api/auth/logout' && method === 'POST') { await backend.deleteSession(session.token_hash); return json({ success: true }); }
       if (session && endpoint === '/api/auth/password' && method === 'POST') {
         const input = await body();
@@ -211,7 +207,8 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           let restored; try { restored = normalizeState(input.data); } catch (error) { throw fail(400, error.message); }
           for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
           const dataVersion = data.schemaVersion;
-          for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); result = { success: true };
+          const retained = retainPlanHistory(data, restored);
+          for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(retained).data : retained); result = { success: true };
         } else if (endpoint === '/api/public-export' && method === 'POST') return json({ success: true, message: '云端公开白名单已生效，访客只读取这些内容；未提交私有数据到GitHub。' });
         else throw fail(404, '接口不存在');
         if (planSync) syncPlanDraft(current.data, data, { now: new Date(now()).toISOString(), triggeredByRecordId: result?.id ?? (typeof parts[2] === 'string' ? parts[2] : null) });

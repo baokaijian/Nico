@@ -28,18 +28,17 @@ test('API可靠保存、同ID更新、权限、冲突、回收站和恢复', asy
     const next = response.headers.get('X-Nico-Revision'); if (next) rev = Number(next);
     return { status: response.status, data: await response.json() };
   };
-  // Viewing is open: an anonymous visitor reads the same records, plans and analysis. Login gates entry only.
+  // Guests see only confirmed publication routes, never the full fact store.
   const anonymous = await request('/api/snapshot', 'GET', undefined, '');
-  assert.equal(anonymous.status, 200);
-  assert.equal(anonymous.data.role, 'viewer');
-  assert.equal(anonymous.data.data.growth.length, fixture.growth.length);
+  assert.equal(anonymous.status, 401);
+  assert.equal(anonymous.data.data, undefined);
   assert.equal((await request('/api/snapshot', 'GET', undefined, viewer)).status, 200);
   assert.equal((await request('/api/backup', 'GET', undefined, '')).status, 401, '导出备份仍需登录');
   assert.equal((await request('/api/profile', 'PUT', { name: 'Nico', sex: '', birthDate: '' }, coach)).status, 403);
   assert.equal((await request('/api/backup', 'GET', undefined, viewer)).status, 403);
   const foreign = await fetch(base + '/api/snapshot', { headers: { Authorization: `Bearer ${owner}`, Origin: 'https://unapproved.example' } }); assert.equal(foreign.status, 403);
   const mediaPath = `/api/media/${fixture.media[0].id}/content/original`;
-  assert.notEqual((await fetch(base + mediaPath)).status, 401, '素材读取不再要求登录');
+  assert.equal((await fetch(base + mediaPath)).status, 401, '原片需要登录');
   const upload = async (token, title, revision = rev, filename = 'protocol-test.png', mime = 'image/png') => {
     const body = new FormData(); body.append('date', '2026-10-06'); body.append('title', title);
     // Fixed protocol bytes in the isolated test server; media probing is disabled here.
@@ -75,7 +74,10 @@ test('API可靠保存、同ID更新、权限、冲突、回收站和恢复', asy
   const backup = (await request('/api/backup')).data;
   const deleted = await request(`/api/trainings/${zero.data.id}`, 'DELETE'); assert.equal(deleted.status, 200);
   const trash = store.read().data.trash.at(-1); assert.equal((await request(`/api/trash/${trash.id}/restore`, 'POST')).status, 200);
-  assert.equal((await request('/api/restore', 'POST', backup)).status, 200); assert.deepEqual(store.read().data, backup.data);
+  assert.equal((await request('/api/restore', 'POST', backup)).status, 200);
+  const restored = store.read().data;
+  for (const key of ['trainings', 'swim', 'growth']) assert.deepEqual(restored[key], backup.data[key]);
+  for (const plan of backup.data.planHistory) assert.ok(restored.planHistory.some(item => JSON.stringify(item) === JSON.stringify(plan)));
   assert.equal((await request('/api/publishing', 'PUT', { swimIds: [fixture.swim[0].id], mediaIds: [], story: '测试导出范围', confirmedBy: '测试确认人', confirmedAt: '2026-10-06' })).status, 200);
   assert.equal((await request('/api/public-export', 'POST')).status, 200);
   const release = JSON.parse(fs.readFileSync(path.join(directory, 'release/public-summary.json'), 'utf8'));

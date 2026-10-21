@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { emptyState, normalizeState, analysis } from '../shared/domain.mjs';
-import { PLAN_DRAFT_ID, planDimensions, syncPlanDraft, commitPlanUpdate } from '../shared/plan-engine.mjs';
+import { PLAN_DRAFT_ID, planDimensions, syncPlanDraft, commitPlanUpdate, retainPlanHistory, nextPlanVersion } from '../shared/plan-engine.mjs';
 import { openStore } from '../server/store.mjs';
 
 // Fixed protocol cases only; never imported by the app or written into real archives.
@@ -171,18 +171,40 @@ test('仅档案字段变化不触发草稿，计划集合变化也不触发', ()
   assert.equal(syncPlanDraft(withPlan, next, { now }).reason, 'evidence-unchanged');
 });
 
-test('草稿槽位保持草稿状态，人工计划历史按计划封顶', () => {
+test('草稿槽位保持草稿状态，手动和正式计划版本历史不裁剪', () => {
   const data = { plans: [], planHistory: [] };
   const draftRecord = { id: PLAN_DRAFT_ID, status: '草稿', version: 1, generatedBy: { engine: 'rules-v1', evidenceVersion: '记录版本-test', generatedAt: now } };
   assert.ok(commitPlanUpdate(data, PLAN_DRAFT_ID, draftRecord, { ...draftRecord, status: '已确认' }).error);
   const edited = { ...draftRecord, focus: '家长手改重点' };
   assert.equal(commitPlanUpdate(data, PLAN_DRAFT_ID, draftRecord, edited).error, undefined);
   assert.equal(edited.generatedBy.manualEdited, true);
-  assert.equal(data.planHistory.length, 0);
+  assert.equal(data.planHistory.length, 1);
   for (let version = 1; version <= 25; version++) commitPlanUpdate(data, 'manual-plan', { id: 'manual-plan', version }, { id: 'manual-plan', version: version + 1, status: '草稿' });
-  assert.equal(data.planHistory.length, 20);
-  assert.equal(data.planHistory[0].version, 6);
+  assert.equal(data.planHistory.length, 26);
+  assert.equal(data.planHistory[1].version, 1);
   assert.equal(data.planHistory.at(-1).version, 25);
+});
+
+test('旧备份恢复保留较新历史、同版本冲突和已删计划，后续版本单调', () => {
+  const v1 = { id: 'protocol-plan', version: 1, focus: '原安排' };
+  const v2 = { ...v1, version: 2, focus: '后续安排' };
+  const conflictingV1 = { ...v1, focus: '另一个版本1' };
+  const current = { plans: [v2], planHistory: [v1, conflictingV1], trash: [{ collection: 'plans', record: { id: 'deleted-plan', version: 8 } }] };
+  const restored = { plans: [structuredClone(v1)], planHistory: [] };
+  retainPlanHistory(current, restored);
+  assert.equal(restored.plans[0].version, 3);
+  assert.equal(restored.plans[0].focus, v1.focus);
+  for (const value of [v1, v2, conflictingV1, current.trash[0].record]) assert.ok(restored.planHistory.some(item => JSON.stringify(item) === JSON.stringify(value)));
+  assert.equal(nextPlanVersion(restored, v1.id), 4);
+  assert.equal(nextPlanVersion(restored, 'deleted-plan'), 9);
+  const stable = structuredClone(restored);
+  retainPlanHistory(restored, stable);
+  assert.deepEqual(stable, restored, '重复恢复相同内容不重复历史');
+  assert.equal(current.plans[0].version, 2, '不修改输入快照');
+  const unchanged = { plans: [structuredClone(v1)] };
+  retainPlanHistory({ plans: [v1] }, unchanged);
+  assert.equal(unchanged.plans[0].version, 1, '首次版本原样恢复不升版');
+  assert.deepEqual(unchanged.planHistory, []);
 });
 
 test('写入事务自动生成并更新计划草稿，恢复备份不追加新草稿', () => {

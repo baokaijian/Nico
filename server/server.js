@@ -6,12 +6,11 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { COLLECTIONS, LEGACY_COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
-import { commitPlanUpdate } from '../shared/plan-engine.mjs';
+import { commitPlanUpdate, retainPlanHistory } from '../shared/plan-engine.mjs';
 import { openStore } from './store.mjs';
 import { processMedia, inspectMedia } from './media.mjs';
 import { exportPublic } from './public-export.mjs';
 import { createAccounts } from './accounts.mjs';
-import { validatePublicSummary } from '../shared/publication.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let sequence = 0;
@@ -45,12 +44,12 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
-  const publicSummary = () => validatePublicSummary(JSON.parse(fs.readFileSync(path.join(releaseDir, 'public-summary.json'), 'utf8')));
+  const publicSummary = () => publicSnapshot(store.read().data);
   app.get('/api/public-summary', (_req, res) => res.json(publicSummary()));
   app.get('/api/public-media/:file', (req, res) => {
     const files = publicSummary().media.flatMap(item => [item.url, item.posterUrl].filter(Boolean).map(url => path.basename(url)));
     if (!files.includes(req.params.file)) throw httpError(404, '此素材未对外开放');
-    res.sendFile(path.join(releaseDir, 'uploads', req.params.file));
+    res.sendFile(path.resolve(uploadsDir, req.params.file));
   });
   const cookieToken = req => /(?:^|;\s*)nico_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1];
   const sessionFor = req => accounts?.readSession(cookieToken(req));
@@ -75,18 +74,13 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     });
     app.post('/api/auth/logout', (req, res) => { requireCSRF(req); accounts.logout(cookieToken(req)); cookie(req, res, '', 0); res.json({ success: true }); });
   }
-  // Viewing is open: login only gates entry. Set NICO_REQUIRE_LOGIN_FOR_READ=1 to require a session for reads as well.
-  const anonymousReadAllowed = !/^(?:1|true|yes|on)$/i.test(String(process.env.NICO_REQUIRE_LOGIN_FOR_READ || '').trim());
-  const openReadEndpoints = new Set(['/api/snapshot', ...COLLECTIONS.map(key => `/api/${key}`)]);
-  const isOpenRead = req => req.method === 'GET' && (openReadEndpoints.has(req.path) || /^\/api\/media\/[^/]+\/content\/[^/]+$/.test(req.path));
   app.use((req, _res, next) => {
     const credential = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
     const session = sessionFor(req);
     let role = session?.role || '';
     if (credential) role = Object.entries(tokens).find(([, token]) => token && timingSafeEqual(digest(token), digest(credential)))?.[0] || '';
     if (!role) {
-      if (!anonymousReadAllowed || !isOpenRead(req)) return next(httpError(401, '请先登录管理员账号'));
-      req.role = 'viewer'; req.username = 'visitor'; return next();
+      return next(httpError(401, '完整档案需要登录后查看'));
     }
     if (session && !credential && !['GET', 'HEAD'].includes(req.method)) { try { requireCSRF(req); } catch (error) { return next(error); } }
     req.role = role; req.username = credential ? role : session?.username || role; next();
@@ -198,7 +192,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
     // Backups exported before the practice loop existed simply have no weakpoints/checkins.
     for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
-    reply(res, change(req, data => { const dataVersion = data.schemaVersion; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(restored).data : restored); return { success: true }; }, { planSync: false }));
+    reply(res, change(req, data => { const dataVersion = data.schemaVersion; const retained = retainPlanHistory(data, restored); for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(retained).data : retained); return { success: true }; }, { planSync: false }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
     const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };

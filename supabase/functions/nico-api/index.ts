@@ -38,7 +38,6 @@ const backend = {
   download: (name: string, range: string | null, method: string) => fetch(`${base}/storage/v1/object/authenticated/${bucket}/${encodeURIComponent(name)}`, { method, headers: { apikey: secret, Authorization: `Bearer ${secret}`, ...(range ? { Range: range } : {}) } }),
   removeFile: async (name: string) => { const response = await fetch(`${base}/storage/v1/object/${bucket}`, { method: 'DELETE', headers, body: JSON.stringify({ prefixes: [name] }) }); if (!response.ok) throw new Error('Upload cleanup failed'); },
 };
-// Reading is intentionally anonymous (login only gates entry); setting
-// NICO_REQUIRE_LOGIN_FOR_READ=1 restores a session requirement for reads as well.
-// Write routes always validate a hashed, expiring, server-revocable session.
-Deno.serve(createCloudHandler({ backend, origins: ['https://baokaijian.github.io', 'http://127.0.0.1:5173', 'http://localhost:5173'], requireLoginForRead: /^(?:1|true|yes|on)$/i.test((Deno.env.get('NICO_REQUIRE_LOGIN_FOR_READ') || '').trim()) }));
+// Only the confirmed public summary and selected playback assets are anonymous.
+// Full archives and writes require a hashed, expiring, server-revocable session.
+Deno.serve(createCloudHandler({ backend, origins: ['https://baokaijian.github.io', 'http://127.0.0.1:5173', 'http://localhost:5173'] }));
