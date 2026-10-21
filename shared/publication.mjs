@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { validTimeMs, formatMilliseconds, VALIDITY_STATUSES } from './performance.ts';
 import path from 'node:path';
 import { validDate, parseTime } from './domain.mjs';
 
@@ -11,7 +12,10 @@ export function validatePublicSummary(summary) {
     if (summary.story || summary.swim.length || summary.media.length) throw new Error('尚未确认发布范围，不能生成非空公开摘要');
   } else if (!validDate(summary.publishedAt)) throw new Error('公开摘要确认日期无效');
   for (const record of summary.swim) {
-    if (!hasOnly(record, ['id', 'date', 'distance', 'stroke', 'poolLength', 'time', 'seconds']) || !text(record.id) || !validDate(record.date) || !/^\d{1,4}m$/.test(record.distance) || !['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳', '打腿'].includes(record.stroke) || !['25m', '50m', '其他'].includes(record.poolLength) || parseTime(record.time) === null || typeof record.seconds !== 'number' || !Number.isFinite(record.seconds) || record.seconds !== parseTime(record.time)) throw new Error('公开成绩格式无效或包含私有字段');
+    if (!hasOnly(record, ['id', 'date', 'distance', 'stroke', 'poolLength', 'time', 'seconds', 'timeMs', 'validityStatus', 'timingMethod']) || !text(record.id) || !validDate(record.date) || !/^\d{1,4}m$/.test(record.distance) || !['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳', '打腿'].includes(record.stroke) || !['25m', '50m', '其他'].includes(record.poolLength) || parseTime(record.time) === null || typeof record.seconds !== 'number' || !Number.isFinite(record.seconds) || record.seconds !== parseTime(record.time)) throw new Error('公开成绩格式无效或包含私有字段');
+    if (record.timeMs !== undefined && (!validTimeMs(record.timeMs) || formatMilliseconds(record.timeMs) !== record.time)) throw new Error('公开成绩整数毫秒与展示值不一致');
+    if (record.validityStatus !== undefined && !VALIDITY_STATUSES.includes(record.validityStatus)) throw new Error('公开成绩有效性无效');
+    if (record.timingMethod !== undefined && !['自动计时', '手动计时', '未知'].includes(record.timingMethod)) throw new Error('公开成绩计时方式无效');
   }
   for (const record of summary.media) {
     if (!hasOnly(record, ['id', 'date', 'title', 'type', 'url', 'posterUrl', 'duration']) || !text(record.id) || !validDate(record.date) || !text(record.title) || !['video', 'photo'].includes(record.type) || !mediaPath(record.url) || record.posterUrl && !mediaPath(record.posterUrl) || record.duration != null && (typeof record.duration !== 'number' || !Number.isFinite(record.duration) || record.duration <= 0)) throw new Error('公开素材格式或路径无效');

@@ -1,4 +1,5 @@
-import { analysis, best, ordered, parseTime, rangeSummary, validDate, validateRecord } from './domain.mjs';
+import { performanceMilliseconds } from './performance.ts';
+import { analysis, best, ordered, rangeSummary, validDate, validateRecord } from './domain.mjs';
 import { practiceOverview } from './practice.mjs';
 
 // Deterministic plan-draft engine. Every number it outputs is computed from
@@ -209,7 +210,7 @@ export function planDimensions(state, now = new Date().toISOString()) {
   };
 }
 
-const pbKey = state => { const pb = best(state.swim); return pb ? `${pb.id}:${parseTime(pb.time)}` : ''; };
+const pbKey = state => { const pb = best(state.swim); return pb ? `${pb.id}:${performanceMilliseconds(pb)}` : ''; };
 
 // Runs inside the same write transaction as the administrator's save. Never
 // fabricates values: the draft only quotes computed references and the exact

@@ -1,4 +1,5 @@
-import { ordered, latest, parseTime, validDate, timeLabel } from './domain.mjs';
+import { performanceMilliseconds, performanceLabel, eligiblePerformance } from './performance.ts';
+import { ordered, latest, validDate } from './domain.mjs';
 
 // Parent-run practice loop. The platform never invents a weak point or a
 // practice result: it only turns records the parent already entered into
@@ -13,7 +14,7 @@ const dayOfToday = now => validDate(String(now).slice(0, 10)) ? String(now).slic
 // Monday-based week, same convention as the training-volume windows.
 const weekStart = date => addDays(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7));
 const splitRefs = value => String(value || '').split(/[,，、\s]+/).filter(Boolean);
-const signed = value => `${value > 0 ? '+' : ''}${value.toFixed(2)}秒`;
+const signed = value => `${value > 0 ? '+' : ''}${value.toFixed(3)}秒`;
 
 function streakOf(dates, today) {
   const set = new Set(dates.filter(date => date <= today));
@@ -106,13 +107,13 @@ export function weakPointCandidates(state) {
   }
   const groups = new Map();
   for (const record of ordered(state.swim || [])) {
-    if (parseTime(record.time) == null) continue;
+    if (!eligiblePerformance(record)) continue;
     const key = [record.distance, record.stroke, record.poolLength].join(' · ');
     groups.set(key, [...(groups.get(key) || []), record]);
   }
   for (const [key, records] of groups) {
     if (records.length < STAGNANT_MIN_RECORDS) continue;
-    const best = records.reduce((pb, record) => !pb || parseTime(record.time) < parseTime(pb.time) ? record : pb, null);
+    const best = records.reduce((pb, record) => !pb || performanceMilliseconds(record) < performanceMilliseconds(pb) ? record : pb, null);
     const recent = records.at(-1);
     if (!best || best.id === recent.id || takenRefs.has(recent.id)) continue;
     out.push({
@@ -121,7 +122,7 @@ export function weakPointCandidates(state) {
       category: '技术动作',
       sourceType: '成绩对比',
       title: `${key}：最近一次成绩未刷新该项目已录入最好成绩`,
-      evidence: `最近${recent.date}为${recent.time}（${timeLabel(parseTime(recent.time))}），该项目已录入最好成绩为${best.time}（${best.date}），相差${signed(parseTime(recent.time) - parseTime(best.time))}。仅比较同一距离/泳姿/池长的已录入记录，不归因于任何动作。`,
+      evidence: `最近${recent.date}为${recent.time}（${performanceLabel(recent)}），该项目已录入最好成绩为${best.time}（${best.date}），相差${signed((performanceMilliseconds(recent) - performanceMilliseconds(best)) / 1000)}。仅比较同一距离/泳姿/池长的已录入记录，不归因于任何动作。`,
       sourceRef: [recent.id, best.id].join(','),
       sourceIds: [recent.id, best.id],
     });
@@ -133,20 +134,20 @@ export function weakPointCandidates(state) {
 export function growthTimeline(state) {
   const groups = new Map();
   for (const record of ordered(state.swim || [])) {
-    if (parseTime(record.time) == null) continue;
+    if (!eligiblePerformance(record)) continue;
     const key = [record.distance, record.stroke, record.poolLength].join(' · ');
     groups.set(key, [...(groups.get(key) || []), record]);
   }
   const projects = [...groups.entries()].map(([key, records]) => {
-    const first = records[0], best = records.reduce((pb, record) => !pb || parseTime(record.time) < parseTime(pb.time) ? record : pb, null);
+    const first = records[0], best = records.reduce((pb, record) => !pb || performanceMilliseconds(record) < performanceMilliseconds(pb) ? record : pb, null);
     const last = records.at(-1);
     return {
       key, count: records.length,
-      first: { date: first.date, time: first.time, seconds: parseTime(first.time) },
-      best: { date: best.date, time: best.time, seconds: parseTime(best.time) },
-      last: { date: last.date, time: last.time, seconds: parseTime(last.time) },
-      improved: parseTime(first.time) - parseTime(best.time),
-      sinceLast: parseTime(last.time) - parseTime(best.time),
+      first: { date: first.date, time: first.time, seconds: performanceMilliseconds(first) / 1000 },
+      best: { date: best.date, time: best.time, seconds: performanceMilliseconds(best) / 1000 },
+      last: { date: last.date, time: last.time, seconds: performanceMilliseconds(last) / 1000 },
+      improved: records.length >= 2 ? (performanceMilliseconds(first) - performanceMilliseconds(best)) / 1000 : null,
+      sinceLast: (performanceMilliseconds(last) - performanceMilliseconds(best)) / 1000,
       start: first.date, end: last.date,
     };
   }).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));

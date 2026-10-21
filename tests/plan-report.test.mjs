@@ -8,7 +8,7 @@ import { syncPlanDraft } from '../shared/plan-engine.mjs';
 // the same fixture inputs, so the report can never pass with fabricated values.
 const now = '2026-10-19T08:00:00.000Z';
 const end = '2026-10-19';
-const score = (id, date, time) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m' });
+const score = (id, date, time) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m', validityStatus: '有效' });
 const training = (id, date, totalMeters) => ({ id, date, totalMeters });
 const build = overrides => { const state = emptyState(); Object.assign(state, overrides); return state; };
 const scores = [score('t-score-1', '2026-08-01', '00:40.00'), score('t-score-2', '2026-09-15', '00:38.00')];

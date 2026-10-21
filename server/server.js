@@ -1,4 +1,5 @@
 import { upgradePrdState } from '../shared/prd.mjs';
+import { upgradePerformanceState } from '../shared/performance.ts';
 import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
@@ -192,7 +193,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
     // Backups exported before the practice loop existed simply have no weakpoints/checkins.
     for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
-    reply(res, change(req, data => { const dataVersion = data.schemaVersion; const retained = retainPlanHistory(data, restored); for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(retained).data : retained); return { success: true }; }, { planSync: false }));
+    reply(res, change(req, data => { const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion; const retained = retainPlanHistory(data, restored); let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained; if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); return { success: true }; }, { planSync: false }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
     const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };

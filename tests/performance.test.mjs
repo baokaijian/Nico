@@ -1,0 +1,61 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { parseMilliseconds, formatMilliseconds, performanceMilliseconds, performanceInput, improvementRateLabel, eligiblePerformance, upgradePerformanceState, performanceGroups } from '../shared/performance.ts';
+import { best, emptyState, validateRecord, normalizeState } from '../shared/domain.mjs';
+
+const input = { date: '2000-01-01', distance: '50m', stroke: '自由泳', poolLength: '50m', time: '56.171', validityStatus: '有效' };
+test('成绩按十进制精确转换为整数毫秒，百分秒显示支持进位与小时', () => {
+  for (const [text, ms] of [['56.171', 56171], ['00:56.171', 56171], ['00:56:17', 56170], ['01:02:03:45', 3723450], ['24:00:00:00', 86400000]]) assert.equal(parseMilliseconds(text), ms);
+  for (const text of ['00:60:00', '1:2:3', '56.1711', 'NaN', 'Infinity', '-1', '0', '0.001', '86400.001', '01:60:00:00']) assert.equal(parseMilliseconds(text), null);
+  assert.equal(formatMilliseconds(56171), '00:56:17');
+  assert.equal(formatMilliseconds(59999), '01:00:00');
+  assert.equal(formatMilliseconds(3723450), '01:02:03:45');
+  assert.equal(parseMilliseconds('0', true), 0);
+  assert.equal(formatMilliseconds(0), '00:00:00');
+});
+test('保存、改备注、回填精确输入和兼容展示都不会丢失1毫秒', () => {
+  const record = validateRecord('swim', input);
+  assert.equal(record.timeMs, 56171); assert.equal(record.time, '00:56:17'); assert.equal(record.seconds, 56.17);
+  assert.equal(record.timeInput, input.time); assert.equal(performanceInput(record), input.time);
+  const edited = validateRecord('swim', { notes: '协议备注' }, record);
+  assert.equal(edited.timeMs, 56171); assert.equal(edited.timeInput, input.time);
+  const displayed = validateRecord('swim', { time: record.time }, edited);
+  assert.equal(displayed.timeMs, 56171, '旧客户端提交同一展示值不覆盖精度');
+  const changed = validateRecord('swim', { time: '56.172' }, displayed);
+  assert.equal(changed.timeMs, 56172); assert.equal(changed.timeInput, '56.172');
+  const numeric = validateRecord('swim', { ...input, time: '00:56:17', timeMs: 56173 });
+  assert.equal(numeric.timeMs, 56173); assert.equal(performanceInput(numeric), '56.173');
+  assert.throws(() => validateRecord('swim', { ...input, timeMs: 57000 }), /不一致/);
+  assert.throws(() => validateRecord('swim', { ...input, timeMs: 56171.5 }), /整数|毫秒|有效成绩/);
+});
+test('PB只包含有效同项目同池长，以毫秒区分同百分秒显示值', () => {
+  const slow = { ...validateRecord('swim', input), id: 'slow' };
+  const fast = { ...validateRecord('swim', { ...input, date: '2000-01-02', time: '56.170' }), id: 'fast' };
+  const excluded = ['未核验', '失格', '无效'].map((validityStatus, i) => ({ ...validateRecord('swim', { ...input, time: '40', validityStatus }), id: `excluded-${i}` }));
+  const short = { ...fast, id: 'short', poolLength: '25m', timeMs: 30000 };
+  const other = { ...fast, id: 'other', stroke: '蛙泳', timeMs: 30000 };
+  assert.equal(best([slow, ...excluded, short, other, fast]).id, 'fast');
+  assert.equal(best(excluded), null);
+  assert.equal(eligiblePerformance({ ...fast, poolLength: '其他' }), false);
+  assert.equal(performanceMilliseconds({ ...fast, timeMs: -1 }), null, '损坏的权威值不回退展示字符串');
+  assert.equal(performanceMilliseconds({ ...fast, timeMs: null }), null);
+  const group = performanceGroups([slow, ...excluded, fast])[0];
+  assert.equal(group.improvementMs, 1); assert.equal(group.best.id, 'fast');
+  assert.equal(group.improvementRate, 1 / 56171 * 100);
+  assert.equal(improvementRateLabel(group.improvementRate), '小于0.01%');
+  assert.equal(performanceGroups([slow])[0].improvementRate, null, '单样本不计算改善率');
+});
+test('毫秒迁移可重复、保留原件与删除记录，不自动认定旧成绩有效', () => {
+  const before = emptyState();
+  before.swim = [{ id: 'legacy-score', date: input.date, distance: input.distance, stroke: input.stroke, poolLength: input.poolLength, time: '00:56.17', seconds: 56.17 }];
+  before.trash = [{ id: 'trash-test', collection: 'swim', record: { ...before.swim[0], id: 'deleted-score' } }];
+  const original = structuredClone(before);
+  const first = upgradePerformanceState(before);
+  assert.equal(first.data.swim[0].timeMs, 56170); assert.equal(first.data.swim[0].validityStatus, '未核验');
+  assert.equal(first.data.trash[0].record.timeMs, 56170); assert.equal(first.data.swim[0].timeInput, '00:56.17');
+  assert.equal(best(first.data.swim), null); normalizeState(first.data);
+  const repeated = upgradePerformanceState(first.data);
+  assert.deepEqual(repeated.data, first.data); assert.deepEqual(repeated.corrections, []);
+  assert.deepEqual(before, original); assert.deepEqual(first.data.media, before.media); assert.deepEqual(first.data.publishing, before.publishing);
+  assert.throws(() => normalizeState({ ...first.data, swim: [{ ...first.data.swim[0], timeMs: 56000 }] }), /不一致/);
+});

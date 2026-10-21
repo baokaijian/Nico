@@ -125,7 +125,7 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
       {!growth.projects.length ? <Empty>尚无成绩记录，不能描述能力变化；未录入不代表没有进步。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('records', 'swim')}>录入成绩</button></Empty> : <div className="draft-grid">{growth.projects.map(project => <article className="metric-card" key={project.key}>
         <h3>{project.key}</h3>
         <p>已录入 {project.count} 条：{project.first.date} {project.first.time} → 最好 {project.best.date} {project.best.time}</p>
-        <p>{project.improved > 0 ? `首条到最好快 ${project.improved.toFixed(2)} 秒` : project.improved === 0 ? '首条即已录入最好成绩' : `首条到最好慢 ${Math.abs(project.improved).toFixed(2)} 秒`}；最近一次 {project.last.date} {project.last.time}{project.sinceLast > 0 ? `，比最好慢 ${project.sinceLast.toFixed(2)} 秒` : '，即该项目已录入最好成绩'}。</p>
+        <p>{project.improved === null ? '有效样本不足两条，暂不计算改善' : project.improved > 0 ? `首条到最好快 ${project.improved.toFixed(3)} 秒` : project.improved === 0 ? '首条即已录入最好成绩' : `首条到最好慢 ${Math.abs(project.improved).toFixed(3)} 秒`}；最近一次 {project.last.date} {project.last.time}{project.sinceLast > 0 ? `，比最好慢 ${project.sinceLast.toFixed(3)} 秒` : '，即该项目已录入最好成绩'}。</p>
       </article>)}</div>}
       {growth.height || growth.weight ? <p className="muted">身体测量（仅记录，不推断天赋）：{[growth.height ? `身高 ${growth.height.start}→${growth.height.end}cm（${growth.height.from}—${growth.height.to}，${growth.height.delta > 0 ? '+' : ''}${growth.height.delta}cm）` : '', growth.weight ? `体重 ${growth.weight.start}→${growth.weight.end}kg（${growth.weight.from}—${growth.weight.to}，${growth.weight.delta > 0 ? '+' : ''}${growth.weight.delta}kg）` : ''].filter(Boolean).join('；')}</p> : <p className="muted">身体测量不足两次，不计算变化。</p>}
     </section>

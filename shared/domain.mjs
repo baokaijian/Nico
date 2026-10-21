@@ -1,3 +1,4 @@
+import { PERFORMANCE_VERSION, TIME_FIELDS, VALIDITY_STATUSES, validTimeMs, formatMilliseconds, parseMilliseconds, normalizePerformanceRecord, performanceMilliseconds, performanceSeconds, validityLabel, eligiblePerformance } from './performance.ts';
 import { parseScore, validatePrdRecord, validatePrdState, SCORE_DISTANCES, TEST_ITEMS } from './prd.mjs';
 // Shared by the UI, API, reports and tests. Empty measurements stay empty.
 // weakpoints / checkins are the parent-run practice loop: the parent decides what
@@ -20,7 +21,7 @@ const notes = text('notes', '备注 / 原始观察', { type: 'textarea' });
 const method = text('measurementMethod', '测量方法 / 器材');
 const recorder = text('recordedBy', '记录者');
 export const FIELDS = {
-  swim: [date, select('distance', '测试 / 比赛长度', SCORE_DISTANCES, { required: true }), select('stroke', '泳姿', ['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳', '打腿'], { required: true }), select('poolLength', '池长', ['25m', '50m', '其他'], { required: true }), text('time', '成绩（分:秒:百分秒，如00:56:17）', { required: true }), select('startType', '出发方式', ['跳台', '蹬壁', '水中', '未知']), select('timingMethod', '计时方式', ['自动计时', '手动计时', '未知']), select('recordType', '记录性质', ['训练', '比赛', '测试', '未知']), select('testItem', '测试项目（固定选项）', TEST_ITEMS), text('location', '测试 / 比赛地点'), text('testedBy', '测试人员'), text('ageGroup', '比赛年龄组'), text('team', '代表队伍'), text('competitionSession', '比赛场次'), select('isFinal', '是否决赛', ['否', '是'], { boolean: true }), number('preliminaryRank', '预赛排名（决赛时填写）', 1, 100000, { integer: true }), text('eventName', '赛事 / 比赛项目名称'), text('heat', '比赛组别'), number('lane', '比赛道次', 1, 100, { integer: true }), text('previousTime', '上一次成绩（分:秒:百分秒）'), number('rank', '测试 / 比赛排名', 1, 100000, { integer: true }), text('winnerTime', '第一名成绩（分:秒:百分秒）'), text('task', '测试任务与器材'), text('certificate', '等级证书 / 凭证（如有）'), recorder, notes],
+  swim: [date, select('distance', '测试 / 比赛长度', SCORE_DISTANCES, { required: true }), select('stroke', '泳姿', ['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳', '打腿'], { required: true }), select('poolLength', '池长', ['25m', '50m', '其他'], { required: true }), text('time', '成绩（分:秒:百分秒，如00:56:17）', { required: true }), select('startType', '出发方式', ['跳台', '蹬壁', '水中', '未知']), select('timingMethod', '计时方式', ['自动计时', '手动计时', '未知']), select('recordType', '记录性质', ['训练', '比赛', '测试', '未知']), select('validityStatus', '有效性（仅有效成绩计入PB）', VALIDITY_STATUSES), text('validityNote', '有效性依据 / 失格说明'), select('testItem', '测试项目（固定选项）', TEST_ITEMS), text('location', '测试 / 比赛地点'), text('testedBy', '测试人员'), text('ageGroup', '比赛年龄组'), text('team', '代表队伍'), text('competitionSession', '比赛场次'), select('isFinal', '是否决赛', ['否', '是'], { boolean: true }), number('preliminaryRank', '预赛排名（决赛时填写）', 1, 100000, { integer: true }), text('eventName', '赛事 / 比赛项目名称'), text('heat', '比赛组别'), number('lane', '比赛道次', 1, 100, { integer: true }), text('previousTime', '上一次成绩（分:秒:百分秒）'), number('rank', '测试 / 比赛排名', 1, 100000, { integer: true }), text('winnerTime', '第一名成绩（分:秒:百分秒）'), text('task', '测试任务与器材'), text('certificate', '等级证书 / 凭证（如有）'), recorder, notes],
   growth: [date, number('height', '身高（cm）', 20, 250), number('armLength', '臂长（cm，测量口径须确认）', 1, 280), number('armSpan', '臂展（cm，历史字段）', 20, 280), number('weight', '体重（kg）', 1, 250), number('handLength', '手长（cm）', 1, 40), number('handWidth', '手宽（cm）', 1, 30), number('footLength', '脚长（cm）', 1, 50), number('sitAndReach', '坐位体前屈（cm）', -50, 100), method, recorder, notes],
   trainings: [date, text('session', '课次名称'), text('plannedSessionId', '关联计划课次ID'), number('durationMinutes', '实际时长（分钟）', 0, 600), number('totalMeters', '实际总泳程（m）', 0, 50000), number('kickMeters', '其中打腿（m）', 0, 50000), text('trainingType', '训练内容'), text('intensity', '强度说明（教练原话）'), text('focusSkills', '本次技术提示'), number('rpe', '主观用力感（1–10）', 1, 10, { integer: true }), number('completionRate', '完成度（0–100%）', 0, 100), text('feeling', '课后感受'), text('discomfort', '疼痛 / 不适（没有请明确填无）'), text('coachNotes', '教练原话', { type: 'textarea' }), recorder],
   fitness: [date, number('standingJump', '立定跳远（cm）', 0, 400), number('plankSeconds', '平板支撑（秒）', 0, 3600), number('sitAndReach', '坐位体前屈（cm）', -50, 100), text('shoulderFlex', '肩关节活动观察'), text('ankleFlex', '踝关节活动观察'), number('shuttleRun', '折返跑（秒）', 0.01, 600), method, recorder, notes],
@@ -39,12 +40,24 @@ export function validDate(value) {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 export const parseTime = parseScore;
-export const timeLabel = (seconds) => seconds == null ? '未记录' : `${Number(seconds).toFixed(2)}秒`;
+export const timeLabel = seconds => seconds == null ? '未记录' : formatMilliseconds(Math.round(seconds * 1000));
 export function validateRecord(collection, input, previous = null) {
   const fields = FIELDS[collection];
   if (!fields || !input || typeof input !== 'object' || Array.isArray(input)) throw new Error('记录格式无效');
   const result = { ...previous };
-  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy']);
+  if (collection === 'swim') {
+    input = { ...input };
+    for (const field of TIME_FIELDS) {
+      const msKey = `${field}Ms`;
+      if (Object.hasOwn(input, msKey)) {
+        result[msKey] = input[msKey]; delete result[`${field}Input`];
+        if (input[field] === undefined) input[field] = formatMilliseconds(input[msKey]);
+      } else if (Object.hasOwn(input, field) && input[field] !== previous?.[field]) {
+        delete result[msKey]; delete result[`${field}Input`];
+      }
+    }
+  }
+  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy', ...(collection === 'swim' ? TIME_FIELDS.map(key => `${key}Ms`) : [])]);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`不支持的字段：${key}`);
   for (const field of fields) {
     if (previous && input[field.key] === undefined) continue;
@@ -74,8 +87,7 @@ export function validateRecord(collection, input, previous = null) {
   }
   if (collection === 'swim') {
     if (!/^\d{1,4}m$/.test(result.distance) || parseInt(result.distance) < 1 || parseInt(result.distance) > 5000) throw new Error('距离须填写1–5000米范围，如25m');
-    result.seconds = parseTime(result.time);
-    if (result.seconds == null) throw new Error('成绩格式无效，请填写正数秒数或分:秒（秒须小于60）');
+    normalizePerformanceRecord(result, true);
   }
   if (collection === 'trainings' && result.kickMeters != null && (result.totalMeters == null || result.kickMeters > result.totalMeters)) throw new Error('打腿泳程不能大于实际总泳程，需同时填写总泳程');
   if (collection === 'nutrition' && [result.calciumTaken, result.ironTaken, result.zincTaken].includes(true) && !result.supplementAdvice) throw new Error('请记录既有专业建议、产品及实际用量');
@@ -155,6 +167,7 @@ export function emptyState() {
 }
 export function normalizeState(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('数据文件格式无效，禁止用空库覆盖');
+  if (raw.performanceSchemaVersion !== undefined && raw.performanceSchemaVersion !== PERFORMANCE_VERSION) throw new Error('不支持的成绩结构版本');
   if (raw.schemaVersion !== undefined && ![1, 2].includes(raw.schemaVersion)) throw new Error('不支持的数据结构版本，请勿覆盖事实库');
   const state = { ...emptyState(), ...raw };
   for (const key of COLLECTIONS) {
@@ -173,6 +186,11 @@ export function normalizeState(raw) {
     if (!Array.isArray(plan.sessions)) throw new Error('计划课次格式无效');
   }
   for (const annotation of state.annotations) validateRecord('annotations', Object.fromEntries(FIELDS.annotations.map(f => [f.key, annotation[f.key]])));
+  for (const record of [...state.swim, ...state.trash.filter(item => item.collection === 'swim').map(item => item.record)]) {
+    if (record.validityStatus && !VALIDITY_STATUSES.includes(record.validityStatus)) throw new Error('成绩有效性状态无效');
+    if (state.performanceSchemaVersion === PERFORMANCE_VERSION && (!validTimeMs(record.timeMs) || !VALIDITY_STATUSES.includes(record.validityStatus))) throw new Error('毫秒成绩迁移不完整');
+    if (record.timeMs !== undefined) normalizePerformanceRecord(record);
+  }
   if (state.schemaVersion === 2) validatePrdState(state);
   return state;
 }
@@ -191,10 +209,10 @@ function validateStoredFields(collection, record) {
 export const ordered = (records = []) => [...records].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.id).localeCompare(String(b.id)));
 export const latest = records => ordered(records).at(-1) || null;
 export function eventRecords(records, distance = '50m', stroke = '自由泳', poolLength = '50m') {
-  return ordered(records).filter(r => r.distance === distance && r.stroke === stroke && r.poolLength === poolLength && parseTime(r.time) != null);
+  return ordered(records).filter(r => r.distance === distance && r.stroke === stroke && r.poolLength === poolLength && eligiblePerformance(r));
 }
 export function best(records, distance = '50m', stroke = '自由泳', poolLength = '50m') {
-  return eventRecords(records, distance, stroke, poolLength).reduce((pb, r) => !pb || parseTime(r.time) < parseTime(pb.time) ? r : pb, null);
+  return eventRecords(records, distance, stroke, poolLength).reduce((pb, r) => !pb || performanceMilliseconds(r) < performanceMilliseconds(pb) ? r : pb, null);
 }
 export function fingerprint(data) {
   let hash = 2166136261;
@@ -221,18 +239,22 @@ export function analysis(state) {
   const pb = best(state.swim);
   const recent = latest(state.swim);
   const facts = [];
-  if (pb) facts.push({ kind: '事实', text: `50米自由泳（50米池）已录入PB ${timeLabel(parseTime(pb.time))}，日期${pb.date}。`, sourceIds: [pb.id] });
-  if (records.length > 1) facts.push({ kind: '计算', text: `从首条${timeLabel(parseTime(records[0].time))}到已录入PB，共缩短${(parseTime(records[0].time) - parseTime(pb.time)).toFixed(2)}秒。计时与出发条件未补齐时，不能归因于某个训练动作。`, sourceIds: [records[0].id, pb.id] });
-  if (recent && recent.id !== pb?.id) facts.push({ kind: '事实', text: `最新${recent.distance}${recent.stroke}为${timeLabel(parseTime(recent.time))}（${recent.poolLength}池，${recent.date}），与主项PB分别展示。`, sourceIds: [recent.id] });
+  if (pb) facts.push({ kind: '事实', text: `50米自由泳（50米池）已录入PB ${timeLabel(performanceSeconds(pb))}，日期${pb.date}。`, sourceIds: [pb.id] });
+  if (records.length > 1) facts.push({ kind: '计算', text: `从首条${timeLabel(performanceSeconds(records[0]))}到已录入PB，共缩短${((performanceMilliseconds(records[0]) - performanceMilliseconds(pb)) / 1000).toFixed(3)}秒。计时与出发条件未补齐时，不能归因于某个训练动作。`, sourceIds: [records[0].id, pb.id] });
+  if (recent && recent.id !== pb?.id) facts.push({ kind: '事实', text: `最新${recent.distance}${recent.stroke}为${timeLabel(performanceSeconds(recent))}（${recent.poolLength}池，${recent.date}，${validityLabel(recent)}），与主项PB分别展示。`, sourceIds: [recent.id] });
+  const unverified = state.swim.filter(record => validityLabel(record) === '未核验');
+  if (unverified.length) facts.push({ kind: '待核验', text: `${unverified.length}条成绩尚未确认有效性，保留在历史中，不计入PB、改善率或有效成绩趋势。`, sourceIds: unverified.map(record => record.id) });
   if (recent?.notes) facts.push({ kind: '原始记录', text: recent.notes, sourceIds: [recent.id] });
   if (pb) for (const goal of state.goals) {
     const threshold = /(?:<\s*|^)(\d+(?:\.\d+)?)\s*(?:s|秒)/.exec(goal.targetMetric || '');
     if (threshold) {
-      const target = Number(threshold[1]), gap = parseTime(pb.time) - target;
-      if (gap > 0) facts.push({ kind: '计算', text: `原始个人目标${target.toFixed(2)}秒与当前长池50米PB相差${gap.toFixed(2)}秒（约${(gap / parseTime(pb.time) * 100).toFixed(1)}%）。这是差距，不是提速预测；对应赛事与晋升条件待确认。`, sourceIds: [pb.id, goal.id] });
+      const targetMs = parseMilliseconds(threshold[1]);
+      const target = targetMs === null ? null : targetMs / 1000, gapMs = targetMs === null ? 0 : performanceMilliseconds(pb) - targetMs;
+      const gap = gapMs / 1000;
+      if (gap > 0) facts.push({ kind: '计算', text: `原始个人目标${target.toFixed(2)}秒与当前长池50米PB相差${gap.toFixed(2)}秒（约${(gapMs / performanceMilliseconds(pb) * 100).toFixed(1)}%）。这是差距，不是提速预测；对应赛事与晋升条件待确认。`, sourceIds: [pb.id, goal.id] });
     }
     const stretch = /(\d+)\s*[-~～]\s*(\d+)秒/.exec(goal.targetMetric || '');
-    if (stretch && parseTime(pb.time) > Number(stretch[2])) facts.push({ kind: '待验证建议', text: `原始目标的${stretch[1]}–${stretch[2]}秒范围尚未由当前PB达到；已突破1分钟与达到该范围应分别记录。`, sourceIds: [pb.id, goal.id] });
+    if (stretch && parseMilliseconds(stretch[2]) !== null && performanceMilliseconds(pb) > parseMilliseconds(stretch[2])) facts.push({ kind: '待验证建议', text: `原始目标的${stretch[1]}–${stretch[2]}秒范围尚未由当前PB达到；已突破1分钟与达到该范围应分别记录。`, sourceIds: [pb.id, goal.id] });
     if (/国家三级/.test(`${goal.title} ${goal.targetMetric}`) && /39\.50/.test(`${goal.title} ${goal.targetMetric}`)) facts.push({ kind: '待验证建议', text: '原始目标中的国家三级39.50秒口径需纠正。女子50米自由泳现行参考为长池36.00秒、短池34.00秒；先确认档案性别及赛事条件，原文保留。', sourceIds: [goal.id] });
   }
   for (const [key, name] of [['trainings', '水上训练'], ['fitness', '体能'], ['nutrition', '恢复'], ['checkins', '薄弱点打卡']]) facts.push({ kind: '事实', text: `${name}已录入${state[key].length}条${state[key].length ? '。' : '，尚不能评估实际状态；未录入不代表未训练。'}`, sourceIds: state[key].map(r => r.id) });
@@ -274,7 +296,7 @@ export function analysis(state) {
   const conditions = [['startType', '出发方式'], ['timingMethod', '计时方式'], ['recordType', '记录性质']];
   const missingConditions = reference ? conditions.filter(([key]) => !reference[key] || reference[key] === '未知').map(([, label]) => label) : [];
   const comparable = reference && !missingConditions.length ? records.filter(r => conditions.every(([key]) => r[key] === reference[key]) && ['testItem', 'task'].every(key => (r[key] || '') === (reference[key] || ''))) : [];
-  const baseline = { recordId: reference?.id || null, missingConditions, comparableIds: comparable.map(r => r.id), text: reference ? `${reference.date} · ${reference.distance}${reference.stroke} · ${reference.poolLength}池 · ${timeLabel(parseTime(reference.time))}；出发${reference.startType || '未知'}，计时${reference.timingMethod || '未知'}，性质${reference.recordType || '未知'}` : '尚无长池50米自由泳成绩，先录入真实参考成绩。' };
+  const baseline = { recordId: reference?.id || null, missingConditions, comparableIds: comparable.map(r => r.id), text: reference ? `${reference.date} · ${reference.distance}${reference.stroke} · ${reference.poolLength}池 · ${timeLabel(performanceSeconds(reference))}；出发${reference.startType || '未知'}，计时${reference.timingMethod || '未知'}，性质${reference.recordType || '未知'}` : '尚无长池50米自由泳成绩，先录入真实参考成绩。' };
   const unique = ids => [...new Set(ids)];
   const stages = [
     { title: '第1周 · 确认基线', action: `${focus}。参考成绩：${baseline.text}。${missingConditions.length ? `须先补齐${missingConditions.join('、')}，目前不能确认同条件变化。` : reference ? '请家长确认此记录是否适合作为本周期参考；相同项目仍须核对任务与器材。' : '建立真实记录后再比较成绩。'}核实实际课表和休息日。`, delivery: '一个经家长确认的重点（依据教练反馈） + 有条件说明的基线卡', sourceIds: unique([...(focusEvidence?.sourceIds || []), ...(reference ? [reference.id] : [])]) },
@@ -301,5 +323,5 @@ export function rangeSummary(state, start, end) {
 }
 export function publicSnapshot(state, selection = state.publishing) {
   if (!selection.confirmedBy || !validDate(selection.confirmedAt)) return { publishedAt: null, story: '', swim: [], media: [] };
-  return { publishedAt: selection.confirmedAt, story: selection.story || '', swim: state.swim.filter(r => selection.swimIds.includes(r.id)).map(r => Object.fromEntries(['id', 'date', 'distance', 'stroke', 'poolLength', 'time', 'seconds'].map(k => [k, r[k]]))), media: state.media.filter(r => selection.mediaIds.includes(r.id)).map(r => ({ id: r.id, date: r.date, title: r.title, type: r.type, url: r.playbackUrl || r.url, posterUrl: r.posterUrl || '', duration: r.duration ?? null })) };
+  return { publishedAt: selection.confirmedAt, story: selection.story || '', swim: state.swim.filter(r => selection.swimIds.includes(r.id)).map(r => ({ ...Object.fromEntries(['id', 'date', 'distance', 'stroke', 'poolLength'].map(k => [k, r[k]])), time: formatMilliseconds(performanceMilliseconds(r)), seconds: parseTime(formatMilliseconds(performanceMilliseconds(r))), timeMs: performanceMilliseconds(r), validityStatus: validityLabel(r), timingMethod: r.timingMethod || '未知' })), media: state.media.filter(r => selection.mediaIds.includes(r.id)).map(r => ({ id: r.id, date: r.date, title: r.title, type: r.type, url: r.playbackUrl || r.url, posterUrl: r.posterUrl || '', duration: r.duration ?? null })) };
 }

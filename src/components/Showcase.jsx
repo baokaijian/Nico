@@ -1,3 +1,4 @@
+import { performanceGroups, performanceMilliseconds, performanceLabel, performanceInput, improvementRateLabel, eligiblePerformance, validityLabel } from '../../shared/performance.ts';
 import { useMemo, useState } from 'react';
 import { Modal } from './ui';
 
@@ -12,13 +13,13 @@ const dayLabel = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? `${value.sli
 const assetUrl = (api, relative) => api?.publicMediaUrl ? api.publicMediaUrl(relative) : `${import.meta.env.BASE_URL}${String(relative).replace(/^\//, '')}`;
 
 function Sparkline({ points, label }) {
-  if (points.length < 2) return <p className="pb-meta">{points.length ? '该项目仅1条记录，暂无趋势线。' : ''}</p>;
-  const seconds = points.map(p => p.seconds);
-  const min = Math.min(...seconds), max = Math.max(...seconds), spread = max - min || 1;
+  if (points.length < 2) return <p className="pb-meta">{points.length ? '该项目仅1条有效记录，暂无趋势线。' : '尚无已核验有效成绩，暂不绘制趋势。'}</p>;
+  const seconds = points.map(p => performanceMilliseconds(p));
+  const min = Math.min(...seconds), max = Math.max(...seconds), spread = Math.max(max - min, 1000);
   const step = 100 / (points.length - 1);
   return <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label={label}>
-    <polyline fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" points={points.map((p, i) => `${i * step},${4 + (p.seconds - min) / spread * 20}`).join(' ')}/>
-    {points.map((p, i) => <circle key={p.id} cx={i * step} cy={4 + (p.seconds - min) / spread * 20} r="1.6" fill="currentColor"/>)}
+    <polyline fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" points={points.map((p, i) => `${i * step},${4 + (performanceMilliseconds(p) - min) / spread * 20}`).join(' ')}/>
+    {points.map((p, i) => <circle key={p.id} cx={i * step} cy={4 + (performanceMilliseconds(p) - min) / spread * 20} r="1.6" fill="currentColor"><title>{p.date} · 精确计时{performanceInput(p)}</title></circle>)}
   </svg>;
 }
 
@@ -39,22 +40,13 @@ function EmptyPublic({ children }) { return <div className="glass-card"><p class
 export default function Showcase({ data, published, story = '', view = 'home', api, onNavigate }) {
   const swim = data.swim || NO_RECORDS, media = data.media || NO_RECORDS;
   const [active, setActive] = useState(null), [event, setEvent] = useState('');
-  const events = useMemo(() => {
-    const groups = new Map();
-    for (const record of [...swim].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))) {
-      const key = eventKey(record);
-      const group = groups.get(key) || { key, label: strokeLabel(record), records: [] };
-      group.records.push(record);
-      groups.set(key, group);
-    }
-    return [...groups.values()].map(group => ({ ...group, best: group.records.reduce((pb, r) => !pb || r.seconds < pb.seconds ? r : pb, null) }))
-      .sort((a, b) => b.records.length - a.records.length || a.label.localeCompare(b.label));
-  }, [swim]);
+  const events = useMemo(() => performanceGroups(swim).map(group => ({ ...group, label: strokeLabel(group.records[0]) }))
+    .sort((a, b) => b.records.length - a.records.length || a.label.localeCompare(b.label)), [swim]);
   const timeline = useMemo(() => {
-    const bestOf = new Map(events.map(group => [group.key, group.best.seconds]));
+    const bestOf = new Map(events.filter(group => group.best).map(group => [group.key, performanceMilliseconds(group.best)]));
     return [...swim].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
       .filter(record => !event || eventKey(record) === event)
-      .map(record => ({ ...record, gap: record.seconds - bestOf.get(eventKey(record)) }));
+      .map(record => ({ ...record, gapMs: eligiblePerformance(record) && bestOf.has(eventKey(record)) ? performanceMilliseconds(record) - bestOf.get(eventKey(record)) : null }));
   }, [swim, events, event]);
   const selected = media.find(item => item.id === active) || null;
   const nothing = !swim.length && !media.length;
@@ -79,9 +71,9 @@ export default function Showcase({ data, published, story = '', view = 'home', a
       <div className="timeline">{timeline.map(record => <article className="timeline-item" key={record.id}>
         <span className="timeline-date">{dayLabel(record.date)}</span>
         <span className="timeline-event">{strokeLabel(record)}</span>
-        <span className="timeline-value">{record.time}{record.gap === 0 ? <small className="timeline-delta"><span className="badge">该项目个人最佳</span></small> : <small className="timeline-delta">较该项目最好成绩慢{record.gap.toFixed(2)}秒</small>}</span>
+        <span className="timeline-value">{performanceLabel(record)}<small className="timeline-delta">{validityLabel(record)} · {record.timingMethod || '计时未知'}</small>{record.gapMs === 0 ? <small className="timeline-delta"><span className="badge">该项目个人最佳</span></small> : record.gapMs !== null ? <small className="timeline-delta">较该项目最好成绩慢{(record.gapMs / 1000).toFixed(3)}秒</small> : null}</span>
       </article>)}</div>
-      <p className="showcase-note">“个人最佳”与差距均由上方成绩直接计算，不是预测；不同项目不合并比较。</p>
+      <p className="showcase-note">个人最佳、差距和趋势仅使用已核验有效成绩；按距离、泳姿、池长分别统计。未核验、失格或无效记录仍显示于历史。</p>
     </>}
   </div>;
   return <div className="stack fade-in">
@@ -104,9 +96,10 @@ export default function Showcase({ data, published, story = '', view = 'home', a
       <div className="section-head"><h2>各项目最好成绩</h2><p className="muted">同一项目内比较，不跨项目换算。</p></div>
       <div className="pb-grid">{events.map(group => <article className="pb-card" key={group.key}>
         <span className="pb-title">{group.label}</span>
-        <span className="pb-time">{group.best.time}</span>
-        <span className="pb-meta">{dayLabel(group.best.date)} · 该项目{group.records.length}条记录</span>
-        <Sparkline points={group.records} label={`${group.label}成绩变化：最快${group.best.time}`}/>
+        <span className="pb-time">{group.best ? performanceLabel(group.best) : '待核验'}</span>
+        <span className="pb-meta">{group.best ? dayLabel(group.best.date) : '尚无已核验有效成绩'} · {group.valid.length}条有效 / 共{group.records.length}条</span>
+        <Sparkline points={group.valid} label={`${group.label}有效成绩变化；计时条件见成绩列表`}/>
+        {group.improvementRate !== null && <span className="pb-meta">首条有效成绩到PB改善{improvementRateLabel(group.improvementRate)}（{group.improvementMs}毫秒）</span>}
       </article>)}</div>
     </section>}
     {media.length > 0 && <section>
