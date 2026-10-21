@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { emptyState, normalizeState } from '../shared/domain.mjs';
 import { EVIDENCE_COLLECTIONS } from '../shared/plan-engine.mjs';
 import { createApi } from './services/api';
+import { loadPublicSummary } from './services/public-summary';
 import { Message, Modal } from './components/ui';
 import LoginPanel from './components/LoginPanel';
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -51,12 +52,10 @@ export default function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false), [navOpen, setNavOpen] = useState(false), [passwordOpen, setPasswordOpen] = useState(false);
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
-  // Content is viewable without logging in; a session only unlocks entry.
-  // When the service itself refuses anonymous reads, guests still get the published summary instead of a login wall.
   const [publicFallback, setPublicFallback] = useState(false);
-  const fullView = adminCapable && !publicFallback;
   const authenticated = !!session?.authenticated && !session?.mustChangePassword;
   const [loaded, setLoaded] = useState(false);
+  const fullView = adminCapable && authenticated && loaded && !publicFallback;
   const reloadController = useRef(null);
   // Only a request made with credentials can mean "session lost"; an anonymous 401 is a server-side read policy, not a login prompt.
   const hadSession = useRef(false);
@@ -65,9 +64,8 @@ export default function App() {
     const controller = new AbortController(); reloadController.current = controller;
     setError('');
     const publishedFallback = async () => {
-      const response = await fetch(`${import.meta.env.BASE_URL}public-summary.json`, { cache: 'no-store', signal: controller.signal });
-      if (!response.ok) throw new Error('摘要加载失败，请重试');
-      const snapshot = await response.json();
+      const snapshot = await loadPublicSummary(api, { live: adminCapable, base: import.meta.env.BASE_URL, signal: controller.signal });
+      if (controller.signal.aborted) return;
       setData({ ...emptyState(), swim: snapshot.swim || [], media: snapshot.media || [] });
       setPublished(snapshot.publishedAt); setStory(snapshot.story || ''); setRole('viewer'); setLoaded(true); setPublicFallback(true);
       setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : 'home');
@@ -75,25 +73,25 @@ export default function App() {
     try {
       const currentSession = adminCapable ? await api.authRequest('session', undefined, { signal: controller.signal }) : null;
       if (controller.signal.aborted) return;
-      if (adminCapable) {
-        hadSession.current = !!currentSession?.authenticated;
-        if (currentSession && !currentSession.authenticated) api.resetAuth();
+      setSession(currentSession);
+      hadSession.current = !!currentSession?.authenticated;
+      if (!currentSession?.authenticated) {
+        api.resetAuth(); setData(emptyState()); setLoaded(false); setPublicFallback(true);
+        await publishedFallback();
+      } else if (currentSession.mustChangePassword) {
+        setData(emptyState()); setLoaded(false); setAuth(false); setRole(currentSession.role);
+      } else {
         const current = await api.request('/api/snapshot', { signal: controller.signal });
         if (controller.signal.aborted || current.revision < api.getRevision()) return;
-        setSession(currentSession);
         setData(normalizeState(current.data));
         setRole(currentSession?.authenticated ? currentSession.role : 'viewer');
         setAuth(false); setLoaded(true); setPublicFallback(false);
         setTab(currentTab => privateTabs.some(([key]) => key === currentTab) ? currentTab : 'today');
-      } else await publishedFallback();
+      }
     } catch (problem) {
       if (problem.name === 'AbortError') return;
-      // A guest refused by the service still gets the published summary; the login button stays available for entry.
-      if (adminCapable && !hadSession.current) { try { await publishedFallback(); setError('当前按展示摘要浏览；完整记录需要服务开放只读后刷新查看。'); return; } catch { /* report the original failure below */ } }
       if (controller.signal.aborted) return;
       if (problem.status === 401 && hadSession.current) { api.resetAuth(); setSession(null); setAuth(true); setData(emptyState()); setLoaded(false); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); }
-      // Guests keep whatever is already rendered; a server that still requires a session for reads must not force the login layer open.
-      else if (problem.status === 401) setError('此服务当前要求登录后才能查看内容。可登录后录入，或由管理员关闭“读取也需登录”限制后刷新。');
       else setError(problem.message);
     }
     finally { if (!controller.signal.aborted) setLoading(false); }
@@ -101,6 +99,12 @@ export default function App() {
   useEffect(() => { api.setOnUnauthorized(() => { reloadController.current?.abort(); api.resetAuth(); setSession(null); setData(emptyState()); setRole('viewer'); setLoaded(false); setAuth(true); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); }); return () => api.setOnUnauthorized(() => {}); }, [api]);
   useEffect(() => { if (!session?.expiresAt) return; const timer = setTimeout(() => { api.resetAuth(); setSession(null); setData(emptyState()); setNotice('登录已到期，请重新登录。'); setAuth(true); reload(); }, Math.max(0, session.expiresAt - Date.now())); return () => clearTimeout(timer); }, [session?.expiresAt, api, reload]);
   useEffect(() => { reload(); return () => reloadController.current?.abort(); }, [reload]);
+  useEffect(() => {
+    if (!navOpen) return;
+    const close = event => { if (event.key === 'Escape') { setNavOpen(false); document.querySelector('.nav-toggle')?.focus(); } };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [navOpen]);
   const navigate = (next, type) => { setTab(next); if (type) setRecordType(type); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const goSidebar = item => { setTab(item.tab); if (item.type) setRecordType(item.type); if (item.review) setReviewTab(item.review); setNavOpen(false); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const onSaved = (collection, record, removedId) => {
@@ -195,6 +199,6 @@ export default function App() {
         {passwordOpen && session?.authenticated && <Suspense fallback={<Message>正在打开账号设置…</Message>}><Modal title="修改管理员密码" onClose={() => setPasswordOpen(false)}><ChangePassword api={api} onChanged={async () => { setPasswordOpen(false); await reload(); }}/></Modal></Suspense>}
       </main>
     </div>
-    <footer className="app-footer">内容依据已录入的记录生成 · 登录仅用于录入与修改 · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer>
+    <footer className="app-footer">公开内容经家长授权 · 完整档案需登录 · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer>
   </div>;
 }

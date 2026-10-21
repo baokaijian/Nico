@@ -13,6 +13,7 @@ dist-private
 dist-ssr
 *.local
 .generated-public/
+supabase/.temp/
 release.stage/
 release.previous/
 data/

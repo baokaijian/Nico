@@ -2,7 +2,7 @@
 
 围绕计划、实际记录、录像复盘和周期报告管理单个儿童的游泳成长。分析是可追溯的规则汇总，训练建议是待家长依据教练反馈确认的草稿；没有随机生成的成绩、体能、恢复评分、天赋分或达级预测。
 
-内容与训练方案默认可直接查看，不需要登录；登录只作为信息录入入口。管理员账号用于录入、修改、导出与恢复记录，未登录时页面只读。网站仍由GitHub Pages提供，账号、记录与素材由Supabase承接。详见[管理员登录说明](ADMIN_LOGIN.md)。
+访客无需登录即可查看公开成长概览、家长选定的成绩和授权影像；完整档案、训练计划、分析及原片需登录。管理员账号用于录入、修改、导出与恢复记录。网站仍由GitHub Pages提供，账号、记录与素材由Supabase承接。详见[管理员登录说明](ADMIN_LOGIN.md)。
 
 ## 数据与运行方式
 
@@ -41,7 +41,7 @@ npm run media:prepare
 
 ## 界面结构
 
-页面采用传统网页布局：顶部状态栏（Logo、主导航、记录查找、登录入口/用户信息）+ 上下文条（当前位置、记录类型子导航、主操作）+ 内容区（左侧分区导航 + 主内容）。未登录同样展示全部记录、AI训练方案与数据分析报告，只是不能录入或修改；页面不额外标注授权来源。登录不设独立页面：状态栏右端的「登录」按钮就地展开弹层（含首次设置密码表单），已登录后变为用户胶囊（修改密码 / 退出登录）；会话失效时在同一位置重开弹层，页面与滚动位置不变。窄屏下分区导航收为抽屉、登录改为底部弹层。视觉为纸白底 + 墨色文字 + 泳道蓝主色，层级靠结构与留白区分，数值一律等宽对齐；不使用外部字体或图库。
+页面采用传统网页布局：顶部状态栏（Logo、主导航、记录查找、登录入口/用户信息）+ 上下文条（当前位置、记录类型子导航、主操作）+ 内容区（左侧分区导航 + 主内容）。未登录显示概览、成绩和影像三个公开入口；登录后显示今日、本周、打卡、记录、复盘、档案。登录不设独立页面：状态栏右端的「登录」按钮就地展开弹层（含首次设置密码表单），已登录后变为用户胶囊（修改密码 / 退出登录）；会话失效时在同一位置重开弹层，页面与滚动位置不变。窄屏下分区导航收为抽屉、登录改为底部弹层。视觉为纸白底 + 墨色文字 + 泳道蓝主色，层级靠结构与留白区分，数值一律等宽对齐；不使用外部字体或图库。
 
 ## 使用流程
 
@@ -86,7 +86,7 @@ npm run media:prepare
 
 ## 本机维护与私有服务
 
-当前公网同时支持匿名查看与经过认证的管理员管理，由Supabase后台承接：读取（记录、AI训练方案、数据分析报告、素材）默认开放，写入、导出备份、恢复与发布仍需管理员会话。若部署环境需要连读取也受控，设置 `NICO_REQUIRE_LOGIN_FOR_READ=1` 即可恢复“读取也需登录”。独立本机维护服务默认只监听回环地址；以下密钥角色配置仅用于现有维护API的兼容调用。
+当前公网由 Supabase 承接实时公开白名单和经过认证的完整档案管理。完整快照、集合列表、原片、训练计划、分析、写入及导出均需有效会话；不再提供匿名完整读取开关。独立本机维护服务默认只监听回环地址；以下密钥角色配置仅用于现有维护API的兼容调用。
 
 - 私有维护服务误设 `NICO_HOST=0.0.0.0` 或其他非回环地址时，强制身份验证和只读；即使管理者密钥有效也不能写入。缺少管理者密钥则拒绝启动。本机也可使用 `NICO_READ_ONLY=true` 禁止修改。
 - 配置 `NICO_OWNER_TOKEN`、可选 `NICO_COACH_TOKEN`、`NICO_VIEWER_TOKEN`，每个至少32字符，分别用于家长管理、协助录入（同一家庭的第二位录入者）、授权只读访问。平台不由教练本人操作：教练的反馈由家长照录。不要写进源码、Vite变量或公开包。
@@ -96,36 +96,20 @@ npm run media:prepare
 - `.env.example` 提供字段说明。Node不自动读取`.env`，由部署环境注入变量，或使用 `node --env-file=.env server/server.js`。
 - 默认Dockerfile提供公网只读构建，不提供私有数据维护接口。管理员远程服务使用Supabase Edge Function；Docker仅用于独立静态展示预览。
 
-## 游客只读访问（未登录浏览）
+## 访客范围与认证访问
 
-未登录访客可直接浏览记录、AI 训练优化方案与数据分析报告；登录只用于录入与修改。规则由四处共同决定，改动任一处都要重新核对：
+访客可读取 `/api/public-summary` 和家长白名单中的 `/api/public-media/:file`；会话查询及登录入口保持开放。`/api/snapshot`、全部集合、原片、备份、发布预览和所有修改均在后端验证会话。退出、过期及失效令牌不能读取完整档案。不能只靠前端隐藏按钮限制权限。
 
-| 位置 | 文件 | 只读（GET/HEAD） | 写入与身份功能 |
-| --- | --- | --- | --- |
-| 后端鉴权中间件 | `server/server.js` | `/api/snapshot`、`/api/<集合>`、`/api/media/:id/content/:variant` 匿名放行，角色置 `viewer` | POST/PUT/DELETE、`/api/backup`、`/api/restore`、`/api/public-export`、`/api/public-preview`、`/api/publishing`、`/api/profile` 仍需会话 |
-| 云端适配层 | `server/cloud-api.mjs` | 同上，`openRead` 白名单；`/api/auth/session`、`/api/public-summary`、`/api/public-media` 始终开放 | 同上，`requireLoginForRead` 为 true 时读取也要登录 |
-| 前端登录态判断 | `src/App.jsx`、`src/services/api.js` | `fullView` 只看是否有后端，不看登录态；未登录同样渲染今日/本周/打卡/记录/复盘/档案 | `readOnly` 跟随登录态，隐藏录入、修改、删除、上传、备份恢复、改密码等入口 |
-| 组件写控件 | `Records`/`PlanViewer`/`Practice`/`Profile`/`MediaGallery` | 列表与详情只读展示 | `readOnly` 或 `role !== 'owner'` 时表单不渲染 |
+前端访客只加载公开摘要；管理员登录后才加载完整快照。初始密码需要替换时先进入改密流程。实时 API 故障显示错误，不回退旧静态发布包。云端模式（配置 `VITE_API_URL`）构建不复制任何业务数据或视频；授权与撤回通过后端即时生效。独立静态模式保留发布包兼容，其撤回须重新发布；已被他人下载的公开文件无法远程收回。
 
-本机与云端都保留一个开关：设置 `NICO_REQUIRE_LOGIN_FOR_READ=1`（本机环境变量 / Supabase 项目 secret）即可恢复“读取也需登录”。默认不设置，即开放只读。前端遇到匿名 401 时只提示“此服务当前要求登录”，不会强制弹出登录层；只有携带凭据的请求失效才提示重新登录。
-
-验证未登录浏览（不带 cookie、不带 Authorization）：
-
-```sh
-npm run server                                   # 或已部署的云端地址
-npm run verify:guest                             # 默认 http://127.0.0.1:3001
+```bash
+npm run verify:guest
 npm run verify:guest -- https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
 ```
 
-脚本只读检查 22 项：会话查询 200 且未登录、快照 200 且 `role=viewer`、各集合列表 200、素材内容不返回 401；写入、导出备份与发布预览必须 401。浏览器验证：用无痕窗口打开站点，能直接翻看各页；尝试提交任意记录会提示登录，接口返回 401。
+检查会话未登录、公开摘要及授权媒体可读；完整快照、各集合、原片、备份、预览和写操作拒绝；未授权素材 404。同时覆盖 GET 和 HEAD，不写业务数据。新增授权媒体会增加检查项。
 
-云端函数需要单独部署才会生效，GitHub Pages 工作流不会部署它。配置仓库 secret `SUPABASE_ACCESS_TOKEN` 后，`.github/workflows/deploy-function.yml` 在 `server/`、`shared/`、`supabase/functions/` 变更时自动部署并跑上述游客校验；也可手动执行：
-
-```sh
-supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit
-```
-
-部署后确认线上没有遗留 `NICO_REQUIRE_LOGIN_FOR_READ=1`（`supabase secrets list`），否则线上仍会拒绝游客读取。
+Pages 与云 API 是两次独立发布。`.github/workflows/deploy-function.yml` 在配置仓库 secret `SUPABASE_ACCESS_TOKEN` 后部署经过测试的 API；未配置时显示跳过，需要用已连接的 Supabase 工具单独部署。不得将 secret 写入公开仓库或 Vite 变量。发布后分别核对 Pages 产物、云函数版本和访客权限，不能以 Pages 成功推断 API 已更新。
 
 ## 验证
 

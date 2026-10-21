@@ -9,6 +9,17 @@ import { normalizeState, publicSnapshot } from '../shared/domain.mjs';
 import { applyDeletionFlags, preserveDeletedRecords } from '../shared/deletion.mjs';
 import { seedBytes, raw } from './fixture.mjs';
 
+test('云端旧九集合快照无需写回即可读取，新增集合按空状态兼容', () => {
+  const legacy = normalizeState(structuredClone(raw));
+  delete legacy.weakpoints; delete legacy.checkins;
+  const original = JSON.stringify(legacy);
+  const result = applyDeletionFlags(structuredClone(legacy), []);
+  assert.deepEqual(result.weakpoints, []); assert.deepEqual(result.checkins, []);
+  assert.deepEqual(result.swim, legacy.swim);
+  assert.equal(JSON.stringify(legacy), original, '读取不改原始快照');
+  assert.throws(() => applyDeletionFlags({ ...legacy, weakpoints: null }, []), '损坏集合不能被空数据掩盖');
+});
+
 test('旧SQLite无损迁移，逐条逻辑删除/恢复、回滚冲突和禁止物理删除', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nico-soft-delete-'));
   const filename = path.join(directory, 'state.sqlite'), seedPath = path.join(directory, 'seed.json');

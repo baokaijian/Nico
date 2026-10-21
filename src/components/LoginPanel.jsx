@@ -31,7 +31,7 @@ export default function LoginPanel({ api, setupRequired, onLoggedIn, onClose }) 
           <p className="login-pop-hint">初始化码位于本机的 data/admin-setup-code.txt，仅首次设置时使用，设置完成后自动删除。</p>
         </>}
         <button className="apple-btn apple-btn-primary" disabled={busy}>{busy ? '正在验证…' : setupRequired ? '创建账号并登录' : '登录'}</button>
-        <p className="login-pop-hint">不登录也能查看全部记录、训练方案与数据分析报告；登录仅用于录入与修改。按 Esc 或点击弹层外部可关闭。</p>
+        <p className="login-pop-hint">不登录可查看公开概览、成绩和授权影像；完整档案、训练计划和录入需登录。按 Esc 或点击弹层外部可关闭。</p>
       </form>
     </div>
   </>;

@@ -5,7 +5,6 @@ import { practiceOverview } from './practice.mjs';
 // records the administrator actually entered; insufficient data stays empty.
 export const PLAN_DRAFT_ID = 'plan-draft';
 export const PLAN_ENGINE_VERSION = 'rules-v1';
-export const PLAN_HISTORY_LIMIT = 20;
 export const DRAFT_HISTORY_LIMIT = 50;
 export const EVIDENCE_COLLECTIONS = ['swim', 'trainings', 'growth', 'fitness', 'nutrition', 'goals', 'media', 'annotations'];
 export const VOLUME_MIN_RECORDS = 6;
@@ -224,6 +223,7 @@ export function syncPlanDraft(previous, next, { now = new Date().toISOString(), 
   if (existing?.generatedBy?.evidenceVersion === result.version) return { changed: false, reason: 'version-current' };
   if (!next.swim.length) {
     if (existing) {
+      archivePlan(next, existing);
       next.plans.splice(next.plans.indexOf(existing), 1);
       return { changed: true, removed: true };
     }
@@ -258,26 +258,46 @@ export function syncPlanDraft(previous, next, { now = new Date().toISOString(), 
     },
   }, existing || null);
   const record = { ...validated, id: PLAN_DRAFT_ID };
+  record.version = nextPlanVersion(next, PLAN_DRAFT_ID);
+  if (existing) archivePlan(next, existing);
   if (existing) next.plans[next.plans.indexOf(existing)] = record;
   else next.plans.push(record);
   return { changed: true, record, dimensions };
 }
 
-// Client plan updates: the reserved draft slot stays a draft; manual edits stop
-// automatic regeneration; human plan history keeps a bounded tail per plan.
+// Archive full snapshots without trimming or silently overwriting same-version conflicts.
+export function archivePlan(data, plan) {
+  data.planHistory ||= [];
+  const value = canonical(plan);
+  if (!data.planHistory.some(item => canonical(item) === value)) data.planHistory.push(structuredClone(plan));
+}
+export function nextPlanVersion(data, id) {
+  const snapshots = [...(data.plans || []), ...(data.planHistory || []), ...(data.trash || []).filter(item => item.collection === 'plans').map(item => item.record)];
+  return Math.max(0, ...snapshots.filter(item => item.id === id).map(item => item.version || 0)) + 1;
+}
+// Restore the requested content while retaining everything known before restore.
+// Restored older/conflicting content becomes a new version, never a rewind.
+export function retainPlanHistory(current, restored) {
+  restored.planHistory ||= [];
+  const before = [...(current.planHistory || []), ...(current.plans || []), ...(current.trash || []).filter(item => item.collection === 'plans').map(item => item.record)];
+  for (const plan of before) if (!restored.plans.some(item => canonical(item) === canonical(plan))) archivePlan(restored, plan);
+  for (const plan of restored.plans) {
+    const known = restored.planHistory.filter(item => item.id === plan.id);
+    const max = Math.max(0, ...known.map(item => item.version));
+    if (max > plan.version || known.some(item => item.version === plan.version && canonical(item) !== canonical(plan))) {
+      archivePlan(restored, plan);
+      plan.version = nextPlanVersion(restored, plan.id);
+    }
+  }
+  return restored;
+}
+// The reserved draft stays a draft; manual edits stop automatic regeneration.
 export function commitPlanUpdate(data, planId, previous, record) {
   if (planId === PLAN_DRAFT_ID) {
     if (record.status !== '草稿') return { error: '草稿槽位计划须保持草稿状态；请先以此草稿另建正式计划，再由家长依据教练反馈确认' };
     if (record.generatedBy) record.generatedBy = { ...record.generatedBy, manualEdited: true };
-    return {};
   }
-  data.planHistory ||= [];
-  data.planHistory.push(structuredClone(previous));
-  const seen = new Map();
-  data.planHistory = data.planHistory.slice().reverse().filter(item => {
-    const count = (seen.get(item.id) || 0) + 1;
-    seen.set(item.id, count);
-    return count <= PLAN_HISTORY_LIMIT;
-  }).reverse();
+  record.version = Math.max(previous.version || 0, nextPlanVersion(data, planId) - 1) + 1;
+  archivePlan(data, previous);
   return {};
 }

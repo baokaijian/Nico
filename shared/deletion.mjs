@@ -4,7 +4,7 @@ import { COLLECTIONS } from './domain.mjs';
 // directly. Read a consistent snapshot plus ledger in the same DB statement.
 export function applyDeletionFlags(data, rows) {
   const deleted = new Map(rows.map(row => [`${row.collection}/${row.record_id}`, row]));
-  for (const key of COLLECTIONS) data[key] = data[key].filter(record => !deleted.has(`${key}/${record.id}`));
+  for (const key of COLLECTIONS) data[key] = (data[key] === undefined ? [] : data[key]).filter(record => !deleted.has(`${key}/${record.id}`));
   const trash = new Map((data.trash || []).map(item => [`${item.collection}/${item.record.id}`, item]));
   for (const [key, row] of deleted) {
     if (!COLLECTIONS.includes(row.collection) || row.payload?.id !== row.record_id) throw new Error('删除记录索引与原内容不一致');

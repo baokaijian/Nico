@@ -23,7 +23,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     let result;
     try { result = await response.json(); } catch { throw new ApiError('服务返回格式异常，未确认保存成功', response.status); }
     if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧会话响应', 'AbortError');
-    // Reading is open, so an anonymous 401 must not force the login panel open; only a lost session does.
+    // Public browsing remains available; only an authenticated request can signal a lost session.
     if (!response.ok) { if (response.status === 401 && (token || csrf)) onUnauthorized(); throw new ApiError(result.error || '请求失败，输入已保留', response.status); }
     const next = response.headers.get('X-Nico-Revision');
     if (next && (revision == null || Number(next) >= revision)) revision = Number(next);

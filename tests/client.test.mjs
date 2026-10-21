@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApi } from '../src/services/api.js';
+import { loadPublicSummary } from '../src/services/public-summary.js';
+test('公开摘要以实时 API 为准，故障不回退旧静态数据；独立静态模式可用', async () => {
+  let staticReads = 0;
+  const fetcher = async () => { staticReads++; return new Response(JSON.stringify({ swim: [], media: [] })); };
+  const offline = { request: async () => { throw new Error('连接失败'); } };
+  await assert.rejects(loadPublicSummary(offline, { live: true, base: '/Nico/', fetcher }), /连接失败/);
+  assert.equal(staticReads, 0);
+  const revoked = { publishedAt: '2026-10-21', swim: [], media: [] };
+  assert.deepEqual(await loadPublicSummary({ request: async path => { assert.equal(path, '/api/public-summary'); return revoked; } }, { live: true, fetcher }), revoked);
+  assert.deepEqual(await loadPublicSummary(null, { live: false, base: '/Nico/', fetcher }), { swim: [], media: [] });
+  assert.equal(staticReads, 1);
+});
 test('客户端不会把断网或错误响应当成成功，且发送表单原版本', async () => {
   const original = globalThis.fetch;
   const api = createApi('', () => 'test-only-token');
