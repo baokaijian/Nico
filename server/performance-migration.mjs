@@ -2,6 +2,16 @@ import { normalizeState, COLLECTIONS } from '../shared/domain.mjs';
 import { upgradePerformanceState } from '../shared/performance.ts';
 import { derivePrdState } from '../shared/prd.mjs';
 import { applyDeletionFlags } from '../shared/deletion.mjs';
+import { isDeepStrictEqual } from 'node:util';
+
+export function commitPerformanceMigration(store, inspected) {
+  return store.change(inspected.revision, data => {
+    if (!isDeepStrictEqual(data, inspected.before)) throw Object.assign(new Error('快照或逻辑删除标记已改变，请刷新后重新迁移'), { status: 409 });
+    for (const key of Object.keys(data)) delete data[key];
+    Object.assign(data, inspected.data);
+    return { migrated: true };
+  }, 'performance-ms-v1', { planSync: false });
+}
 
 export function inspectPerformanceMigration(snapshot) {
   if (!Number.isSafeInteger(snapshot?.revision) || snapshot.revision < 1) throw new Error('需要包含真实版本的完整快照');
@@ -26,18 +36,18 @@ export function inspectPerformanceMigration(snapshot) {
 const jsonLiteral = data => `'${JSON.stringify(data).replace(/'/g, "''")}'::jsonb`;
 export function performanceMigrationSQL(snapshot, inspected = inspectPerformanceMigration(snapshot)) {
   if (!inspected.changed) return { up: '', rollback: '' };
-  const after = jsonLiteral(inspected.data), original = jsonLiteral(snapshot.data);
+  const after = jsonLiteral(inspected.data), original = jsonLiteral(snapshot.data), rollbackTarget = jsonLiteral(inspected.before);
   const expected = inspected.revision;
   const deletedBefore = jsonLiteral((snapshot.deleted_records || []).map(item => ({ collection: item.collection, record_id: item.record_id, payload: item.payload })));
   const deletedAfter = jsonLiteral(inspected.data.trash.map(item => ({ collection: item.collection, record_id: item.record.id, payload: item.record })));
   const tombstones = "(SELECT coalesce(jsonb_agg(jsonb_build_object('collection',collection,'record_id',record_id,'payload',payload)),'[]'::jsonb) FROM public.nico_records WHERE is_deleted)";
   const block = (name, revision, source, target, deleted, actor) => {
     let tag = `$nico_performance_${name}$`, counter = 0;
-    while ((after + original + deletedBefore + deletedAfter).includes(tag)) tag = `$nico_performance_${name}_${++counter}$`;
+    while ((after + original + rollbackTarget + deletedBefore + deletedAfter).includes(tag)) tag = `$nico_performance_${name}_${++counter}$`;
     return `DO ${tag}\nBEGIN\n  PERFORM set_config('lock_timeout','5s',true);\n  PERFORM 1 FROM public.nico_state WHERE id=1 AND revision=${revision} AND data=${source} FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION '记录已更新，禁止整库覆盖；请刷新并向前修复'; END IF;\n  PERFORM 1 FROM public.nico_records FOR UPDATE;\n  IF NOT (${tombstones} @> ${deleted} AND ${tombstones} <@ ${deleted}) THEN RAISE EXCEPTION '逻辑删除标记已更新，禁止覆盖'; END IF;\n  PERFORM public.nico_save_state(${revision}, ${target}, '${actor}');\nEND;\n${tag};\n`;
   };
   return {
     up: `-- Private data migration: checks revision, snapshot and tombstones; writes a backup.\nSET standard_conforming_strings = on;\n${block('upgrade', expected, original, after, deletedBefore, 'performance-ms-v1')}`,
-    rollback: `-- Forward rollback refuses subsequent writes, snapshot edits or deletion changes.\nSET standard_conforming_strings = on;\n${block('rollback', expected + 1, after, original, deletedAfter, 'rollback-performance-ms-v1')}`,
+    rollback: `-- Forward rollback preserves pre-existing tombstones and refuses subsequent changes.\nSET standard_conforming_strings = on;\n${block('rollback', expected + 1, after, rollbackTarget, deletedAfter, 'rollback-performance-ms-v1')}`,
   };
 }

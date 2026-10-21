@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { emptyState, normalizeState } from '../shared/domain.mjs';
-import { inspectPerformanceMigration, performanceMigrationSQL } from '../server/performance-migration.mjs';
+import { inspectPerformanceMigration, performanceMigrationSQL, commitPerformanceMigration } from '../server/performance-migration.mjs';
+import { DatabaseSync } from 'node:sqlite';
 import { openStore } from '../server/store.mjs';
 import { upgradePrdState } from '../shared/prd.mjs';
 
@@ -39,7 +40,7 @@ test('SQLite毫秒迁移先备份，CAS拒绝过期覆盖，原件字节不变�
   const store = openStore({ filename: path.join(dir, 'state.sqlite'), seedPath, backupDir: path.join(dir, 'backups') });
   try {
     const before = store.read(), inspected = inspectPerformanceMigration(before);
-    store.change(before.revision, next => Object.assign(next, inspected.data), 'protocol-ms-migration', { planSync: false });
+    commitPerformanceMigration(store, inspected);
     const after = store.read();
     normalizeState(after.data); assert.equal(after.data.swim[0].timeMs, 56170);
     assert.deepEqual(after.data.plans, []); assert.equal(after.revision, before.revision + 1);
@@ -48,4 +49,33 @@ test('SQLite毫秒迁移先备份，CAS拒绝过期覆盖，原件字节不变�
     assert.deepEqual(store.read(), after); assert.equal(fs.readFileSync(seedPath, 'utf8'), bytes);
     assert.equal(inspectPerformanceMigration(after).changed, false);
   } finally { store.close(); }
+});
+test('本机迁移拒绝未递增版本的外部逻辑删除变化，不复活已删记录', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nico-ms-race-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const seed = path.join(dir, 'seed.json'), filename = path.join(dir, 'state.sqlite'); fs.writeFileSync(seed, JSON.stringify(legacy()));
+  const store = openStore({ filename, seedPath: seed, backupDir: path.join(dir, 'backups') });
+  try {
+    const before = store.read(), inspected = inspectPerformanceMigration(before);
+    const external = new DatabaseSync(filename);
+    external.prepare("UPDATE records SET is_deleted=1,deleted_at=?,deleted_by=? WHERE collection='swim' AND record_id='protocol-legacy'").run('2000-01-02T00:00:00Z', 'protocol-manual');
+    external.close();
+    const deleted = store.read(); assert.equal(deleted.revision, before.revision);
+    assert.throws(() => commitPerformanceMigration(store, inspected), /删除标记已改变/);
+    assert.deepEqual(store.read(), deleted); assert.equal(store.read().data.swim.length, 0);
+    assert.ok(store.read().data.trash.some(item => item.record.id === 'protocol-legacy'));
+  } finally { store.close(); }
+});
+test('云端向前回滚使用原有逻辑删除视图，不能从原始快照复活隐藏记录', () => {
+  const data = legacy(), score = structuredClone(data.swim[0]);
+  const snapshot = { data, revision: 3, deleted_records: [{ collection: 'swim', record_id: score.id, payload: score, deleted_at: '2000-01-02T00:00:00Z', deleted_by: 'protocol-parent' }] };
+  const sql = performanceMigrationSQL(snapshot);
+  const call = sql.rollback.slice(sql.rollback.lastIndexOf('PERFORM public.nico_save_state'));
+  const literal = call.match(/'((?:''|[^'])*)'::jsonb/)[1];
+  const target = JSON.parse(literal.replace(/''/g, "'"));
+  assert.equal(target.swim.length, 0);
+  assert.equal(target.trash[0].record.id, score.id);
+  assert.equal(target.trash[0].deletedBy, 'protocol-parent');
+  assert.match(sql.up, /逻辑删除标记已更新/);
+  assert.match(sql.up, /public.nico_records FOR UPDATE/);
 });
