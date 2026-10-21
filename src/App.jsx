@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { emptyState, normalizeState } from '../shared/domain.mjs';
 import { EVIDENCE_COLLECTIONS } from '../shared/plan-engine.mjs';
 import { createApi } from './services/api';
-import { loadPublicSummary } from './services/public-summary';
+import { loadAppView } from './services/app-view';
 import { Message, Modal } from './components/ui';
 import LoginPanel from './components/LoginPanel';
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -24,53 +24,67 @@ export default function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false), [passwordOpen, setPasswordOpen] = useState(false);
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
-  const [publicFallback, setPublicFallback] = useState(false);
+  const [mode, setMode] = useState(() => api.getMode());
+  const modeRef = useRef(mode);
+  const [publicSnapshot, setPublicSnapshot] = useState(null);
+  const lastTabs = useRef({ view: 'home', manage: 'today' });
   const authenticated = !!session?.authenticated && !session?.mustChangePassword;
   const [loaded, setLoaded] = useState(false);
-  const fullView = adminCapable && authenticated && loaded && !publicFallback;
+  const fullView = adminCapable && authenticated && mode === 'manage';
+  const selectedLoaded = fullView ? loaded : !!publicSnapshot;
+  const publicData = useMemo(() => ({ ...emptyState(), swim: publicSnapshot?.swim || [], media: publicSnapshot?.media || [] }), [publicSnapshot]);
   const reloadController = useRef(null);
-  // Only a request made with credentials can mean "session lost"; an anonymous 401 is a server-side read policy, not a login prompt.
   const hadSession = useRef(false);
   const reload = useCallback(async () => {
     reloadController.current?.abort();
     const controller = new AbortController(); reloadController.current = controller;
-    setError('');
-    const publishedFallback = async () => {
-      const snapshot = await loadPublicSummary(api, { live: adminCapable, base: import.meta.env.BASE_URL, signal: controller.signal });
-      if (controller.signal.aborted) return;
-      setData({ ...emptyState(), swim: snapshot.swim || [], media: snapshot.media || [] });
-      setPublished(snapshot.publishedAt); setStory(snapshot.story || ''); setRole('viewer'); setLoaded(true); setPublicFallback(true);
-      setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : 'home');
-    };
+    setError(''); setLoading(true);
     try {
-      const currentSession = adminCapable ? await api.authRequest('session', undefined, { signal: controller.signal }) : null;
+      const result = await loadAppView(api, { mode: modeRef.current, adminCapable, base: import.meta.env.BASE_URL, signal: controller.signal, onSession: current => {
+        if (controller.signal.aborted) return;
+        setSession(current); setRole(current?.role || 'viewer');
+        if (!current?.authenticated || current.mustChangePassword) { setData(emptyState()); setLoaded(false); }
+        if (hadSession.current && !current?.authenticated) { setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); setAuth(modeRef.current === 'manage'); }
+        hadSession.current = !!current?.authenticated;
+      } });
       if (controller.signal.aborted) return;
-      setSession(currentSession);
-      hadSession.current = !!currentSession?.authenticated;
-      if (!currentSession?.authenticated) {
-        api.resetAuth(); setData(emptyState()); setLoaded(false); setPublicFallback(true);
-        await publishedFallback();
-      } else if (currentSession.mustChangePassword) {
-        setData(emptyState()); setLoaded(false); setAuth(false); setRole(currentSession.role);
+      if (result.session?.mustChangePassword) { setAuth(false); return; }
+      if (result.privateSnapshot) {
+        const current = result.privateSnapshot;
+        if (current.revision < api.getRevision()) return;
+        setData(normalizeState(current.data)); setLoaded(true); setAuth(false);
+        setTab(currentTab => privateTabs.some(([key]) => key === currentTab) ? currentTab : lastTabs.current.manage);
       } else {
-        const current = await api.request('/api/snapshot', { signal: controller.signal });
-        if (controller.signal.aborted || current.revision < api.getRevision()) return;
-        setData(normalizeState(current.data));
-        setRole(currentSession?.authenticated ? currentSession.role : 'viewer');
-        setAuth(false); setLoaded(true); setPublicFallback(false);
-        setTab(currentTab => privateTabs.some(([key]) => key === currentTab) ? currentTab : 'today');
+        setPublicSnapshot(result.publicSnapshot);
+        setPublished(result.publicSnapshot.publishedAt); setStory(result.publicSnapshot.story || '');
+        setTab(currentTab => publicTabs.some(([key]) => key === currentTab) ? currentTab : lastTabs.current.view);
       }
     } catch (problem) {
-      if (problem.name === 'AbortError') return;
-      if (controller.signal.aborted) return;
-      if (problem.status === 401 && hadSession.current) { api.resetAuth(); setSession(null); setAuth(true); setData(emptyState()); setLoaded(false); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); }
-      else setError(problem.message);
-    }
-    finally { if (!controller.signal.aborted) setLoading(false); }
+      if (problem.name !== 'AbortError' && !controller.signal.aborted) setError(problem.message);
+    } finally { if (!controller.signal.aborted) setLoading(false); }
   }, [api]);
-  useEffect(() => { api.setOnUnauthorized(() => { reloadController.current?.abort(); api.resetAuth(); setSession(null); setData(emptyState()); setRole('viewer'); setLoaded(false); setAuth(true); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); }); return () => api.setOnUnauthorized(() => {}); }, [api]);
-  useEffect(() => { if (!session?.expiresAt) return; const timer = setTimeout(() => { api.resetAuth(); setSession(null); setData(emptyState()); setNotice('登录已到期，请重新登录。'); setAuth(true); reload(); }, Math.max(0, session.expiresAt - Date.now())); return () => clearTimeout(timer); }, [session?.expiresAt, api, reload]);
+  useEffect(() => {
+    api.setOnUnauthorized(() => {
+      reloadController.current?.abort(); setSession(null); setData(emptyState()); setLoaded(false); setRole('viewer');
+      setAuth(modeRef.current === 'manage'); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。');
+      void reload();
+    });
+    return () => api.setOnUnauthorized(() => {});
+  }, [api, reload]);
+  useEffect(() => {
+    if (!session?.expiresAt) return;
+    const timer = setTimeout(() => {
+      api.resetAuth(); setSession(null); setData(emptyState()); setLoaded(false);
+      setNotice('登录已到期，请重新登录。'); setAuth(modeRef.current === 'manage'); void reload();
+    }, Math.max(0, session.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [session?.expiresAt, api, reload]);
   useEffect(() => { reload(); return () => reloadController.current?.abort(); }, [reload]);
+  const switchMode = next => {
+    lastTabs.current[fullView ? 'manage' : 'view'] = tab;
+    modeRef.current = next; api.setMode(next); setMode(next); setUserMenuOpen(false); setNotice('');
+    setTab(lastTabs.current[next]); void reload();
+  };
   const navigate = (next, type) => { setTab(next); if (type) setRecordType(type); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const onSaved = (collection, record, removedId) => {
     setData(current => {
@@ -90,8 +104,14 @@ export default function App() {
   const canEditRecords = !readOnly && (role === 'owner' || ['swim', 'trainings'].includes(recordType));
   const logout = async () => {
     setUserMenuOpen(false);
-    try { await api.authRequest('logout', {}); reloadController.current?.abort(); api.resetAuth(); setSession(null); setLoaded(false); setData(emptyState()); setNotice('已退出管理员账号'); await reload(); }
-    catch (problem) { setError(problem.message); }
+    let failed = false;
+    try { await api.authRequest('logout', {}); } catch {
+      if (api.usesCookieSession) { setError('退出未获服务端确认，请恢复连接后重试。'); return; }
+      failed = true;
+    }
+    reloadController.current?.abort(); api.resetAuth(); setSession(null); setLoaded(false); setData(emptyState());
+    modeRef.current = 'view'; api.setMode('view'); setMode('view'); setPasswordOpen(false); setAuth(false);
+    setNotice(failed ? '已清除本机登录；连接中断，服务端会话将在有效期结束后失效。' : '已退出管理员账号'); await reload();
   };
   const runSearch = event => {
     event.preventDefault();
@@ -110,21 +130,22 @@ export default function App() {
   return <div className="app">
     <a href="#main" className="skip-link">跳到正文</a>
     <header className="topbar"><div className="topbar-inner">
-      <div className="brand"><span className="brand-mark" aria-hidden="true">≈</span><div><b>Nico 游泳成长记录</b><small>{!fullView ? '精选摘要' : authenticated ? `${roleLabels[role] || '访问'}` : '只读浏览'}</small></div></div>
+      <div className="brand"><span className="brand-mark" aria-hidden="true">≈</span><div><b>Nico 游泳成长记录</b><small>{!fullView ? (authenticated ? '查看模式 · 已登录' : '精选摘要') : authenticated ? `${roleLabels[role] || '访问'}` : '只读浏览'}</small></div></div>
       <nav className="main-tabs" aria-label="主要导航">{tabs.map(([key, label]) => <button key={key} className={`tab-btn ${tab === key ? 'active' : ''}`} aria-current={tab === key ? 'page' : undefined} onClick={() => navigate(key)}>{label}</button>)}</nav>
       <div className="topbar-right">
         <button type="button" className="refresh-trigger" onClick={reload} disabled={loading}>刷新记录</button>
         {adminCapable && (session?.authenticated
           ? <div style={{ position: 'relative' }}>
               {userMenuOpen && <div className="pop-backdrop" onClick={() => setUserMenuOpen(false)} aria-hidden="true"/>}
-              <button type="button" className="user-chip" onClick={() => setUserMenuOpen(value => !value)} aria-expanded={userMenuOpen} aria-haspopup="menu"><span className="user-avatar" aria-hidden="true">{(roleLabels[role] || '访')[0]}</span>{roleLabels[role] || '访问'} ▾</button>
+              <button type="button" className="user-chip" onClick={() => setUserMenuOpen(value => !value)} aria-expanded={userMenuOpen} aria-haspopup="menu" aria-label={`${session.username || '管理员'}，已登录，${fullView ? '管理模式' : '查看模式'}`}><span className="user-avatar" aria-hidden="true">{(roleLabels[role] || '访')[0]}</span>{fullView ? '管理模式' : '查看模式'} ▾</button>
               {userMenuOpen && <div className="user-menu" role="menu">
+                {authenticated && <button type="button" role="menuitem" onClick={() => switchMode(fullView ? 'view' : 'manage')}>{fullView ? '切换到查看模式' : '返回管理模式'}</button>}
                 <button type="button" role="menuitem" onClick={() => { setUserMenuOpen(false); setPasswordOpen(true); }}>修改密码</button>
                 <button type="button" role="menuitem" className="danger" onClick={logout}>退出登录</button>
               </div>}
             </div>
           : <button type="button" className="login-trigger" onClick={() => { setAuth(true); setError(''); }}>登录</button>)}
-        {auth && adminCapable && <LoginPanel api={api} setupRequired={session?.setupRequired} onLoggedIn={async () => { setAuth(false); await reload(); }} onClose={() => setAuth(false)}/>}
+        {auth && adminCapable && <LoginPanel api={api} setupRequired={session?.setupRequired} onLoggedIn={async () => { setAuth(false); setNotice(''); modeRef.current = 'manage'; api.setMode('manage'); setMode('manage'); await reload(); }} onClose={() => setAuth(false)}/>}
       </div>
     </div></header>
     {fullView && <div className="ctxbar"><div className="ctxbar-inner">
@@ -141,14 +162,14 @@ export default function App() {
         <Message error>{error}</Message><Message>{notice}</Message>
         {session?.authenticated && session.mustChangePassword
           ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
-          : loading ? <Message>正在读取记录…</Message> : !loaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense fallback={<Message>正在打开页面…</Message>}>
+          : loading && !selectedLoaded ? <Message>正在读取记录…</Message> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense fallback={<Message>正在打开页面…</Message>}>
             {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate} readOnly={readOnly}/>}
             {fullView && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
             {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
             {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} manageTemplates={role === 'owner'} initialFilter={searchSeed}/>}
             {fullView && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>)}
             {fullView && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
-            {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={data} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
+            {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
         {passwordOpen && session?.authenticated && <Suspense fallback={<Message>正在打开账号设置…</Message>}><Modal title="修改管理员密码" onClose={() => setPasswordOpen(false)}><ChangePassword api={api} onChanged={async () => { setPasswordOpen(false); await reload(); }}/></Modal></Suspense>}
       </main>

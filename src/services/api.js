@@ -1,14 +1,18 @@
+import { createSessionPersistence } from './session.js';
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
-export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = () => '') {
-  let revision = null, csrf = '', accessToken = '', generation = 0, onUnauthorized = () => {};
+export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = () => '', options = {}) {
+  const persistence = createSessionPersistence(base, options);
+  let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {};
+  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; persistence.clear(); };
+  const unauthorized = () => { resetAuth(); onUnauthorized(); };
   const credential = () => accessToken || getToken();
   const credentials = base ? 'omit' : 'same-origin';
-  async function request(path, { method = 'GET', body, signal, expectedRevision } = {}) {
+  async function request(path, { method = 'GET', body, signal, expectedRevision, anonymous = false } = {}) {
     const started = generation;
     const headers = {};
-    const token = credential();
+    const token = anonymous ? '' : credential();
     if (token) headers.Authorization = `Bearer ${token}`;
     if (method !== 'GET') {
       if (revision == null) throw new ApiError('请先加载数据再保存', 428);
@@ -18,15 +22,15 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     const multipart = body instanceof FormData;
     if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
     let response;
-    try { response = await fetch(`${base}${path}`, { method, credentials, headers, body: body === undefined ? undefined : multipart ? body : JSON.stringify(body), signal }); }
+    try { response = await fetch(`${base}${path}`, { method, credentials: anonymous ? 'omit' : credentials, headers, body: body === undefined ? undefined : multipart ? body : JSON.stringify(body), signal }); }
     catch (error) { if (error.name === 'AbortError') throw error; throw new ApiError('连接失败，输入已保留，尚未确认是否写入。请先刷新核对，再重试或导出草稿。', 0); }
     let result;
     try { result = await response.json(); } catch { throw new ApiError('服务返回格式异常，未确认保存成功', response.status); }
     if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧会话响应', 'AbortError');
     // Public browsing remains available; only an authenticated request can signal a lost session.
-    if (!response.ok) { if (response.status === 401 && (token || csrf)) onUnauthorized(); throw new ApiError(result.error || '请求失败，输入已保留', response.status); }
+    if (!response.ok) { if (!anonymous && response.status === 401 && (token || csrf)) unauthorized(); throw new ApiError(result.error || '请求失败，输入已保留', response.status); }
     const next = response.headers.get('X-Nico-Revision');
-    if (next && (revision == null || Number(next) >= revision)) revision = Number(next);
+    if (!anonymous && next && (revision == null || Number(next) >= revision)) revision = Number(next);
     return result;
   }
   function upload(body, onProgress) {
@@ -44,7 +48,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       xhr.onload = () => {
         if (started !== generation) return reject(new DOMException('登录状态已改变，已忽略旧上传响应', 'AbortError'));
         let result; try { result = JSON.parse(xhr.responseText); } catch { return reject(new ApiError('上传响应无效', xhr.status)); }
-        if (xhr.status < 200 || xhr.status >= 300) { if (xhr.status === 401 && (token || csrf)) onUnauthorized(); return reject(new ApiError(result.error || '上传失败', xhr.status)); }
+        if (xhr.status < 200 || xhr.status >= 300) { if (xhr.status === 401 && (token || csrf)) unauthorized(); return reject(new ApiError(result.error || '上传失败', xhr.status)); }
         const next = xhr.getResponseHeader('X-Nico-Revision'); if (next && Number(next) >= revision) revision = Number(next);
         resolve(result);
       };
@@ -56,7 +60,8 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     const token = credential();
     try {
       const res = await fetch(`${base}/api/media/${encodeURIComponent(id)}/content/${variant}`, { credentials, headers: token ? { Authorization: `Bearer ${token}` } : {}, signal });
-      if (res.status === 401 && token) onUnauthorized();
+      if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧素材响应', 'AbortError');
+      if (res.status === 401 && (token || csrf)) unauthorized();
       if (!res.ok) throw new ApiError('素材暂不可用，请刷新处理状态或选择原片', res.status);
       const blob = await res.blob();
       if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧素材响应', 'AbortError');
@@ -73,12 +78,13 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     const response = await fetch(`${base}/api/auth/${action}`, { method: body === undefined ? 'GET' : 'POST', signal, credentials, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
     let result; try { result = await response.json(); } catch { throw new ApiError('登录服务暂不可用，请稍后重试', response.status); }
     if (started !== generation) throw new DOMException('登录状态已改变', 'AbortError');
-    if (!response.ok) throw new ApiError(result.error || '账号操作失败', response.status);
+    if (!response.ok) { if (action === 'session' && response.status === 401) resetAuth(); throw new ApiError(result.error || '账号操作失败', response.status); }
+    if (action === 'logout' || (action === 'session' && !result.authenticated)) resetAuth();
+    if (result.accessToken) { generation++; revision = null; accessToken = result.accessToken; }
     if (result.csrf) csrf = result.csrf;
-    if (result.accessToken) accessToken = result.accessToken; // Memory only; never persist credentials in browser storage.
+    if (accessToken && result.expiresAt) persistence.save(accessToken, result.expiresAt);
     return result;
   }
-  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; };
-  return { cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), request, upload, mediaBlob, mediaFile, authRequest, resetAuth, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
+  return { cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };
 }

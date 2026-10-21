@@ -2,6 +2,53 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApi } from '../src/services/api.js';
 import { loadPublicSummary } from '../src/services/public-summary.js';
+const memoryStorage = () => { const data = new Map(); return { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key), values: () => [...data.values()] }; };
+test('有效云端会话可在同一标签页刷新后恢复，退出后不再恢复', async () => {
+  const original = globalThis.fetch, storage = memoryStorage(), token = 'a'.repeat(64), expiresAt = Date.now() + 60000;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ authenticated: true, accessToken: token, expiresAt, password: 'never-store-this' }));
+    const first = createApi('https://test.invalid', () => '', { storage });
+    await first.authRequest('login', { username: 'admin', password: 'protocol-password' });
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, `Bearer ${token}`); return new Response(JSON.stringify({ authenticated: true, expiresAt })); };
+    const restored = createApi('https://test.invalid', () => '', { storage });
+    await restored.authRequest('session');
+    assert.ok(!storage.values().join('').includes('password'));
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, `Bearer ${token}`); return new Response(JSON.stringify({ success: true })); };
+    await restored.authRequest('logout', {});
+    assert.equal(storage.values().length, 0);
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, undefined); return new Response(JSON.stringify({ authenticated: false })); };
+    await createApi('https://test.invalid', () => '', { storage }).authRequest('session');
+  } finally { globalThis.fetch = original; }
+});
+test('已过期的缓存不能继续恢复，接口地址之间会话隔离', async () => {
+  const original = globalThis.fetch, storage = memoryStorage(), token = 'b'.repeat(64); let now = 1000;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ authenticated: true, accessToken: token, expiresAt: 2000 }));
+    await createApi('https://one.invalid', () => '', { storage, now: () => now }).authRequest('login', {});
+    assert.ok(storage.values().join('').includes(token));
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, undefined); return new Response(JSON.stringify({ authenticated: false })); };
+    await createApi('https://two.invalid', () => '', { storage, now: () => now }).authRequest('session');
+    now = 2001;
+    await createApi('https://one.invalid', () => '', { storage, now: () => now }).authRequest('session');
+    assert.equal(storage.values().length, 0);
+  } finally { globalThis.fetch = original; }
+});
+test('旧素材请求的401不能清除后来建立的新登录', async () => {
+  const original = globalThis.fetch, api = createApi('https://test.invalid'); let expired = 0;
+  api.setOnUnauthorized(() => expired++);
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ accessToken: 'c'.repeat(64), expiresAt: Date.now() + 60000 }));
+    await api.authRequest('login', {});
+    let resolve;
+    globalThis.fetch = () => new Promise(done => { resolve = done; });
+    const old = api.mediaFile('protocol', 'poster');
+    api.resetAuth();
+    globalThis.fetch = async () => new Response(JSON.stringify({ accessToken: 'd'.repeat(64), expiresAt: Date.now() + 60000 }));
+    await api.authRequest('login', {});
+    resolve(new Response('', { status: 401 }));
+    await assert.rejects(old, { name: 'AbortError' }); assert.equal(expired, 0);
+  } finally { globalThis.fetch = original; }
+});
 test('公开摘要以实时 API 为准，故障不回退旧静态数据；独立静态模式可用', async () => {
   let staticReads = 0;
   const fetcher = async () => { staticReads++; return new Response(JSON.stringify({ swim: [], media: [] })); };
@@ -32,7 +79,7 @@ test('客户端不会把断网或错误响应当成成功，且发送表单原�
     await assert.rejects(api.mediaBlob('protocol-only-media', 'poster'), { name: 'AbortError' });
   } finally { globalThis.fetch = original; }
 });
-test('管理员凭据只保存在内存，退出后忽略旧会话响应且下次登录重置记录版本', async () => {
+test('退出后忽略旧会话响应且下次登录重置记录版本', async () => {
   const original = globalThis.fetch, api = createApi('https://test.invalid');
   try {
     globalThis.fetch = async (_url, options) => { assert.equal(options.credentials, 'omit'); assert.equal(options.headers['If-Match'], undefined); return new Response(JSON.stringify({ accessToken: 'test-session', expiresAt: Date.now() + 1000 })); };
@@ -59,5 +106,32 @@ test('游客只读请求被拒时不强制弹出登录层，只有带凭据的�
     member.setOnUnauthorized(() => prompted++);
     await assert.rejects(member.request('/api/snapshot'), { status: 401 });
     assert.equal(prompted, 1, '会话失效仍然提示重新登录');
+  } finally { globalThis.fetch = original; }
+});
+
+test('断网不会清除已登录会话；服务端撤销会清除缓存，公开请求不携带凭据或污染记录版本', async () => {
+  const original = globalThis.fetch, storage = memoryStorage(), token = 'e'.repeat(64), base = 'https://protocol.invalid';
+  try {
+    const api = createApi(base, () => '', { storage });
+    globalThis.fetch = async () => new Response(JSON.stringify({ accessToken: token, expiresAt: Date.now() + 60000 }));
+    await api.authRequest('login', {});
+    globalThis.fetch = async () => { throw new TypeError('network failure'); };
+    await assert.rejects(api.authRequest('session')); assert.ok(storage.values().join('').includes(token));
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, undefined); assert.equal(options.credentials, 'omit'); return new Response('{}', { headers: { 'X-Nico-Revision': '99' } }); };
+    await api.request('/api/public-summary', { anonymous: true }); assert.equal(api.getRevision(), null);
+    globalThis.fetch = async (_url, options) => { assert.equal(options.headers.Authorization, `Bearer ${token}`); return new Response(JSON.stringify({ authenticated: false })); };
+    await api.authRequest('session'); assert.equal(storage.values().length, 0);
+  } finally { globalThis.fetch = original; }
+});
+
+test('浏览器存储损坏或被禁用不阻断登录；本机 Cookie 模式不写入会话凭据', async () => {
+  const original = globalThis.fetch;
+  try {
+    const storage = memoryStorage(); storage.setItem('nico.session.v1:https://protocol.invalid', 'invalid-json');
+    createApi('https://protocol.invalid', () => '', { storage }); assert.equal(storage.values().length, 0);
+    const blocked = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } };
+    globalThis.fetch = async () => new Response(JSON.stringify({ authenticated: true, accessToken: 'f'.repeat(64), expiresAt: Date.now() + 60000 }));
+    await createApi('https://protocol.invalid', () => '', { storage: blocked }).authRequest('login', {});
+    await createApi('', () => '', { storage }).authRequest('login', {}); assert.equal(storage.values().length, 0);
   } finally { globalThis.fetch = original; }
 });
