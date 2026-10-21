@@ -1,5 +1,6 @@
 import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
 import { upgradePerformanceState } from '../shared/performance.ts';
+import { trainingCollection, creationRequest, creationReplay, stampTraining, trainingRelations } from '../shared/training-records.mjs';
 import { COLLECTIONS, LEGACY_COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
 import { syncPlanDraft, commitPlanUpdate, retainPlanHistory } from '../shared/plan-engine.mjs';
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
@@ -12,7 +13,7 @@ const safeFile = value => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(value);
 const fileFor = url => typeof url === 'string' && /^\/uploads\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(url) ? url.slice(9) : null;
 const publicFiles = data => publicSnapshot(data).media.flatMap(item => [fileFor(item.url), fileFor(item.posterUrl)].filter(Boolean));
 const privateFiles = data => data.media.flatMap(item => [fileFor(item.url), fileFor(item.playbackUrl), fileFor(item.posterUrl)].filter(Boolean));
-function relations(collection, record, data) {
+function relations(collection, record, data, previous = null) {
   if (collection === 'plans') {
     const ids = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
     if ((record.sourceIds || []).some(id => !ids.has(id))) throw fail(400, '计划引用的来源记录不存在');
@@ -31,7 +32,7 @@ function relations(collection, record, data) {
     if (refs.some(id => !ids.has(id))) throw fail(400, '薄弱点引用的来源记录不存在');
   }
   if (collection === 'checkins' && !data.weakpoints.some(point => point.id === record.weakPointId)) throw fail(400, '打卡关联的薄弱点不存在');
-  if (collection === 'trainings' && record.plannedSessionId && !data.plans.some(p => p.sessions?.some(s => `${p.id}/${s.id}` === record.plannedSessionId))) throw fail(400, '关联计划课次不存在');
+  trainingRelations(collection, record, data, previous);
 }
 
 // Repository contains code only. The adapter holds privileged keys on the server.
@@ -131,6 +132,12 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       if (!['POST', 'PUT', 'DELETE'].includes(method)) throw fail(404, '接口不存在');
       const expected = request.headers.get('if-match');
       if (!/^\d+$/.test(expected || '')) throw fail(428, '请先加载最新记录，再提交修改');
+      let trainingInput, receipt;
+      if (method === 'POST' && parts.length === 2 && parts[0] === 'api' && trainingCollection(parts[1])) {
+        trainingInput = await body(); receipt = await creationRequest(trainingInput, session.username);
+        const replay = creationReplay(data, parts[1], receipt);
+        if (replay) return json(replay);
+      }
       if (Number(expected) !== current.revision) throw fail(409, '记录已被更新，请刷新后核对并重试；当前输入已保留');
       let result, uploadedFile;
       const uploadedVariants = [];
@@ -181,11 +188,16 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           }
         } else if (COLLECTIONS.includes(parts[1]) && parts[0] === 'api') {
           const key = parts[1];
-          if (method === 'POST' && parts.length === 2 && key !== 'media') { const record = { ...validate(key, await body()), id: `${key}-${randomHex(16)}` }; relations(key, record, data); data[key].push(record); result = record; }
+          if (method === 'POST' && parts.length === 2 && key !== 'media') {
+            const record = { ...validate(key, trainingInput ?? await body()), id: `${key}-${randomHex(16)}` };
+            if (trainingCollection(key)) stampTraining(record, null, session.username, new Date(now()).toISOString(), receipt);
+            relations(key, record, data); data[key].push(record); result = record;
+          }
           else if (['PUT', 'DELETE'].includes(method) && parts.length === 3) {
             const index = data[key].findIndex(record => record.id === parts[2]); if (index < 0) throw fail(404, '记录不存在');
             if (method === 'PUT') {
-              const record = validate(key, await body(), data[key][index]); relations(key, record, data);
+              const previous = data[key][index], record = validate(key, await body(), previous); relations(key, record, data, previous);
+              if (trainingCollection(key)) stampTraining(record, previous, session.username, new Date(now()).toISOString());
               if (key === 'plans') { const outcome = commitPlanUpdate(data, parts[2], data[key][index], record); if (outcome.error) throw fail(400, outcome.error); }
               data[key][index] = record; result = record;
             }

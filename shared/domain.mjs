@@ -1,9 +1,10 @@
 import { PERFORMANCE_VERSION, TIME_FIELDS, VALIDITY_STATUSES, validTimeMs, formatMilliseconds, parseMilliseconds, normalizePerformanceRecord, performanceMilliseconds, performanceSeconds, validityLabel, eligiblePerformance } from './performance.ts';
+import { TRAINING_STROKES, TRAINING_STATUSES, normalizeTraining, trainingSummary } from './training.ts';
 import { parseScore, validatePrdRecord, validatePrdState, SCORE_DISTANCES, TEST_ITEMS } from './prd.mjs';
 // Shared by the UI, API, reports and tests. Empty measurements stay empty.
 // weakpoints / checkins are the parent-run practice loop: the parent decides what
 // to work on (from coach feedback), then records each completed practice session.
-export const COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media', 'weakpoints', 'checkins'];
+export const COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media', 'weakpoints', 'checkins', 'trainingTemplates'];
 export const LEGACY_COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media'];
 export const STANDARD_SOURCE = 'https://www.sport.gov.cn/rlzx/n5633/c28294142/part/28294152.pdf';
 export const STANDARD_VERSION = '2025-01-01 / 2026-10-06复核';
@@ -23,7 +24,8 @@ const recorder = text('recordedBy', '记录者');
 export const FIELDS = {
   swim: [date, select('distance', '测试 / 比赛长度', SCORE_DISTANCES, { required: true }), select('stroke', '泳姿', ['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳', '打腿'], { required: true }), select('poolLength', '池长', ['25m', '50m', '其他'], { required: true }), text('time', '成绩（分:秒:百分秒，如00:56:17）', { required: true }), select('startType', '出发方式', ['跳台', '蹬壁', '水中', '未知']), select('timingMethod', '计时方式', ['自动计时', '手动计时', '未知']), select('recordType', '记录性质', ['训练', '比赛', '测试', '未知']), select('validityStatus', '有效性（仅有效成绩计入PB）', VALIDITY_STATUSES), text('validityNote', '有效性依据 / 失格说明'), select('testItem', '测试项目（固定选项）', TEST_ITEMS), text('location', '测试 / 比赛地点'), text('testedBy', '测试人员'), text('ageGroup', '比赛年龄组'), text('team', '代表队伍'), text('competitionSession', '比赛场次'), select('isFinal', '是否决赛', ['否', '是'], { boolean: true }), number('preliminaryRank', '预赛排名（决赛时填写）', 1, 100000, { integer: true }), text('eventName', '赛事 / 比赛项目名称'), text('heat', '比赛组别'), number('lane', '比赛道次', 1, 100, { integer: true }), text('previousTime', '上一次成绩（分:秒:百分秒）'), number('rank', '测试 / 比赛排名', 1, 100000, { integer: true }), text('winnerTime', '第一名成绩（分:秒:百分秒）'), text('task', '测试任务与器材'), text('certificate', '等级证书 / 凭证（如有）'), recorder, notes],
   growth: [date, number('height', '身高（cm）', 20, 250), number('armLength', '臂长（cm，测量口径须确认）', 1, 280), number('armSpan', '臂展（cm，历史字段）', 20, 280), number('weight', '体重（kg）', 1, 250), number('handLength', '手长（cm）', 1, 40), number('handWidth', '手宽（cm）', 1, 30), number('footLength', '脚长（cm）', 1, 50), number('sitAndReach', '坐位体前屈（cm）', -50, 100), method, recorder, notes],
-  trainings: [date, text('session', '课次名称'), text('plannedSessionId', '关联计划课次ID'), number('durationMinutes', '实际时长（分钟）', 0, 600), number('totalMeters', '实际总泳程（m）', 0, 50000), number('kickMeters', '其中打腿（m）', 0, 50000), text('trainingType', '训练内容'), text('intensity', '强度说明（教练原话）'), text('focusSkills', '本次技术提示'), number('rpe', '主观用力感（1–10）', 1, 10, { integer: true }), number('completionRate', '完成度（0–100%）', 0, 100), text('feeling', '课后感受'), text('discomfort', '疼痛 / 不适（没有请明确填无）'), text('coachNotes', '教练原话', { type: 'textarea' }), recorder],
+  trainings: [date, text('session', '课次名称'), select('entryMode', '录入方式', ['快速', '训练组']), select('stroke', '泳姿', TRAINING_STROKES), select('completionStatus', '实际完成情况', TRAINING_STATUSES), text('plannedSessionId', '关联计划课次ID'), number('plannedSessionVersion', '关联计划版本', 1, 1000000, { integer: true }), text('templateId', '使用的模板ID'), number('templateVersion', '使用的模板版本', 1, 1000000, { integer: true }), text('copiedFromId', '复制来源训练ID'), number('plannedMeters', '参考距离（非实际）', 0, 50000), number('plannedDurationMinutes', '参考时长（非实际）', 0, 600), number('durationMinutes', '实际时长（分钟）', 0, 600), number('totalMeters', '实际总泳程（m）', 0, 50000), number('kickMeters', '其中打腿（m）', 0, 50000), text('trainingType', '训练内容'), text('intensity', '强度说明（教练原话）'), text('focusSkills', '本次技术提示'), number('rpe', '主观用力感（1–10）', 1, 10, { integer: true }), number('completionRate', '完成度（0–100%）', 0, 100), text('feeling', '课后感受'), text('discomfort', '疼痛 / 不适（没有请明确填无）'), text('coachNotes', '教练原话', { type: 'textarea' }), recorder, notes],
+  trainingTemplates: [text('title', '模板名称', { required: true }), select('entryMode', '录入方式', ['快速', '训练组']), select('stroke', '泳姿', TRAINING_STROKES), text('trainingType', '训练内容'), number('plannedMeters', '参考距离（非实际）', 0, 50000), number('plannedDurationMinutes', '参考时长（非实际）', 0, 600), notes],
   fitness: [date, number('standingJump', '立定跳远（cm）', 0, 400), number('plankSeconds', '平板支撑（秒）', 0, 3600), number('sitAndReach', '坐位体前屈（cm）', -50, 100), text('shoulderFlex', '肩关节活动观察'), text('ankleFlex', '踝关节活动观察'), number('shuttleRun', '折返跑（秒）', 0.01, 600), method, recorder, notes],
   nutrition: [date, number('sleepHours', '总睡眠（小时）', 0, 24), text('bedtime', '入睡时间'), text('appetite', '食欲'), text('fatigue', '疲惫感'), text('discomfort', '疼痛 / 不适'), text('willingness', '训练意愿'), text('preMeal', '实际课前饮食'), text('postMeal', '实际课后饮食'), number('waterMl', '实际饮水量（ml，可不填）', 0, 15000), number('morningPulse', '晨脉（次/分，可不填）', 20, 250, { integer: true }), number('recoveryScore', '个人恢复感受（1–5，可不填）', 1, 5, { integer: true }), ...['calciumTaken', 'ironTaken', 'zincTaken'].map((key, i) => select(key, ['钙补充剂', '铁补充剂', '锌补充剂'][i], ['未服用', '按既有专业建议服用'], { boolean: true })), text('supplementAdvice', '既有专业建议、产品及实际用量'), recorder, notes],
   goals: [text('title', '目标名称', { required: true }), text('category', '类别'), text('targetMetric', '个人目标'), { key: 'deadline', label: '个人目标复核日期（不是已确认赛程）', type: 'date' }, select('status', '状态', ['待确认', '进行中', '已达成', '暂停']), number('currentProgress', '手动填写的进度（可不填）', 0, 100), text('ruleSource', '规则 / 赛事来源'), text('reviewedBy', '确认人'), notes],
@@ -57,7 +59,8 @@ export function validateRecord(collection, input, previous = null) {
       }
     }
   }
-  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy', ...(collection === 'swim' ? TIME_FIELDS.map(key => `${key}Ms`) : [])]);
+  const training = ['trainings', 'trainingTemplates'].includes(collection);
+  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy', ...(training ? ['sets', 'clientRequestId', ...(collection === 'trainings' ? ['mediaIds'] : [])] : []), ...(collection === 'swim' ? TIME_FIELDS.map(key => `${key}Ms`) : [])]);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`不支持的字段：${key}`);
   for (const field of fields) {
     if (previous && input[field.key] === undefined) continue;
@@ -89,7 +92,17 @@ export function validateRecord(collection, input, previous = null) {
     if (!/^\d{1,4}m$/.test(result.distance) || parseInt(result.distance) < 1 || parseInt(result.distance) > 5000) throw new Error('距离须填写1–5000米范围，如25m');
     normalizePerformanceRecord(result, true);
   }
-  if (collection === 'trainings' && result.kickMeters != null && (result.totalMeters == null || result.kickMeters > result.totalMeters)) throw new Error('打腿泳程不能大于实际总泳程，需同时填写总泳程');
+  if (training) {
+    result.sets = input.sets !== undefined ? input.sets : previous?.sets ?? [];
+    normalizeTraining(result, collection === 'trainingTemplates');
+    if (collection === 'trainingTemplates') result.version = (previous?.version || 0) + 1;
+    if (collection === 'trainings') {
+      const ids = input.mediaIds !== undefined ? input.mediaIds : previous?.mediaIds ?? [];
+      if (!Array.isArray(ids) || ids.length > 100 || ids.some(id => typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) || new Set(ids).size !== ids.length) throw new Error('训练关联影像ID无效或重复');
+      result.mediaIds = ids;
+      if (result.kickMeters != null && (result.totalMeters == null || result.kickMeters > result.totalMeters)) throw new Error('打腿泳程不能大于实际总泳程，需同时填写总泳程');
+    }
+  }
   if (collection === 'nutrition' && [result.calciumTaken, result.ironTaken, result.zincTaken].includes(true) && !result.supplementAdvice) throw new Error('请记录既有专业建议、产品及实际用量');
   if (collection === 'weakpoints' && result.sourceRef) {
     const refs = String(result.sourceRef).split(/[,，、\s]+/).filter(Boolean);
@@ -205,6 +218,12 @@ function validateStoredFields(collection, record) {
     } else if (typeof value !== 'string') throw new Error(`数据集合${collection}的${field.label}不是文字`);
     if (field.type === 'date' && !validDate(value)) throw new Error(`数据集合${collection}的日期无效`);
   }
+  if (['trainings', 'trainingTemplates'].includes(collection) && record.entryMode !== undefined) {
+    const normalized = normalizeTraining(structuredClone(record), collection === 'trainingTemplates');
+    if (record.entryMode === '训练组' && collection === 'trainings' && (record.totalMeters !== normalized.totalMeters || record.kickMeters !== normalized.kickMeters)) throw new Error('训练组实际距离与保存的汇总不一致，禁止覆盖');
+    if (collection === 'trainingTemplates' && (!Number.isInteger(record.version) || record.version < 1 || !record.title)) throw new Error('训练模板版本或名称无效');
+  }
+  if (collection === 'trainings' && record.mediaIds !== undefined && (!Array.isArray(record.mediaIds) || record.mediaIds.length > 100 || record.mediaIds.some(id => typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) || new Set(record.mediaIds).size !== record.mediaIds.length)) throw new Error('训练关联影像格式无效');
 }
 export const ordered = (records = []) => [...records].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.id).localeCompare(String(b.id)));
 export const latest = records => ordered(records).at(-1) || null;
@@ -314,12 +333,14 @@ export function analysis(state) {
 export function rangeSummary(state, start, end) {
   const inRange = key => ordered(state[key]).filter(r => r.date >= start && r.date <= end);
   const trainings = inRange('trainings'), nutrition = inRange('nutrition');
-  const sessions = state.plans.filter(p => p.status === '已确认').flatMap(p => (p.sessions || []).filter(s => s.type === '训练' && s.date >= start && s.date <= end).map(s => ({ ...s, linkId: `${p.id}/${s.id}` })));
-  const count = new Set(trainings.map(t => t.plannedSessionId).filter(id => sessions.some(s => s.linkId === id))).size;
+  const sessions = state.plans.filter(p => p.status === '已确认').flatMap(p => (p.sessions || []).filter(s => s.type === '训练' && s.date >= start && s.date <= end).map(s => ({ ...s, linkId: `${p.id}/${s.id}`, planVersion: p.version })));
+  const matching = (training, requireVersion = false) => sessions.some(s => s.linkId === training.plannedSessionId && (training.plannedSessionVersion != null ? training.plannedSessionVersion === s.planVersion : !requireVersion));
+  const count = new Set(trainings.filter(t => matching(t)).map(t => t.plannedSessionId)).size;
   const values = (key, field) => inRange(key).map(r => r[field]).filter(v => typeof v === 'number' && Number.isFinite(v));
   const sleep = values('nutrition', 'sleepHours');
-  const meters = values('trainings', 'totalMeters');
-  return { start, end, trainings, nutrition, swim: inRange('swim'), plannedCount: sessions.length || null, coverage: sessions.length ? Math.round(count / sessions.length * 100) : null, meters: meters.length ? meters.reduce((a, b) => a + b, 0) : null, metersCount: meters.length, sleep: sleep.length ? sleep.reduce((a, b) => a + b, 0) / sleep.length : null, sleepCount: sleep.length };
+  const actual = trainingSummary(trainings);
+  const completed = new Set(trainings.filter(t => t.completionStatus === '已完成' && matching(t, true)).map(t => t.plannedSessionId)).size;
+  return { start, end, trainings, nutrition, swim: inRange('swim'), plannedCount: sessions.length || null, coverage: sessions.length ? Math.round(count / sessions.length * 100) : null, planCompletionRate: sessions.length ? Math.round(completed / sessions.length * 100) : null, ...actual, sleep: sleep.length ? sleep.reduce((a, b) => a + b, 0) / sleep.length : null, sleepCount: sleep.length };
 }
 export function publicSnapshot(state, selection = state.publishing) {
   if (!selection.confirmedBy || !validDate(selection.confirmedAt)) return { publishedAt: null, story: '', swim: [], media: [] };

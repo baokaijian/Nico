@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { COLLECTIONS, LEGACY_COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
+import { trainingCollection, creationRequest, creationReplay, stampTraining, trainingRelations } from '../shared/training-records.mjs';
 import { commitPlanUpdate, retainPlanHistory } from '../shared/plan-engine.mjs';
 import { openStore } from './store.mjs';
 import { processMedia, inspectMedia } from './media.mjs';
@@ -101,7 +102,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   const change = (req, mutate, options) => store.change(revision(req), mutate, req.username, options);
   const reply = (res, saved, status = 200) => res.set('X-Nico-Revision', String(saved.revision)).status(status).json(saved.result);
   const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw httpError(400, error.message); } };
-  function relations(collection, record, data) {
+  function relations(collection, record, data, previous = null) {
     if (collection === 'plans') {
       const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
       if ((record.sourceIds || []).some(id => !existingIds.has(id))) throw httpError(400, '计划引用的来源记录不存在');
@@ -114,7 +115,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       if (record.status === '已审核' && !record.athleteIdentity) throw httpError(400, '请先确认运动员与泳道');
     }
     if (record.recordId && ![...data.swim, ...data.trainings].some(r => r.id === record.recordId)) throw httpError(400, '关联成绩/训练不存在');
-    if (collection === 'trainings' && record.plannedSessionId && !data.plans.some(p => p.sessions?.some(s => `${p.id}/${s.id}` === record.plannedSessionId))) throw httpError(400, '关联计划课次不存在');
+    trainingRelations(collection, record, data, previous);
     if (collection === 'weakpoints') {
       const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
       const refs = String(record.sourceRef || '').split(/[,，、\s]+/).filter(Boolean);
@@ -127,8 +128,14 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   });
   for (const key of COLLECTIONS) {
     app.get(`/api/${key}`, (req, res) => { const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json(current.data[key]); });
-    if (key !== 'media') app.post(`/api/${key}`, (req, res) => {
-      canWrite(req, key); const record = { ...validate(key, req.body), id: makeId(key) };
+    if (key !== 'media') app.post(`/api/${key}`, async (req, res) => {
+      canWrite(req, key);
+      revision(req);
+      const request = trainingCollection(key) ? await creationRequest(req.body, req.username) : null;
+      const current = store.read(), replay = creationReplay(current.data, key, request);
+      if (replay) return reply(res, { revision: current.revision, result: replay });
+      const record = { ...validate(key, req.body), id: makeId(key) };
+      if (trainingCollection(key)) stampTraining(record, null, req.username, new Date().toISOString(), request);
       reply(res, change(req, data => { relations(key, record, data); data[key].push(record); return record; }), 201);
     });
     app.put(`/api/${key}/:id`, (req, res) => {
@@ -136,7 +143,8 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       reply(res, change(req, data => {
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
-        const record = validate(key, req.body, data[key][index]); relations(key, record, data);
+        const previous = data[key][index], record = validate(key, req.body, previous); relations(key, record, data, previous);
+        if (trainingCollection(key)) stampTraining(record, previous, req.username, new Date().toISOString());
         if (key === 'plans') {
           const outcome = commitPlanUpdate(data, req.params.id, data[key][index], record);
           if (outcome.error) throw httpError(400, outcome.error);
