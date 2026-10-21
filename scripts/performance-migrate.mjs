@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { inspectPerformanceMigration, performanceMigrationSQL } from '../server/performance-migration.mjs';
+import { inspectPerformanceMigration, performanceMigrationSQL, commitPerformanceMigration } from '../server/performance-migration.mjs';
 import { openStore, atomicJSON } from '../server/store.mjs';
 
 const args = process.argv.slice(2), root = path.resolve(import.meta.dirname, '..');
@@ -28,7 +28,7 @@ let savedRevision = snapshot.revision;
 if (args.includes('--apply-local') && inspected.changed) {
   const store = openStore({ filename, seedPath: path.join(root, 'data/original-input.json'), backupDir: path.join(root, 'data/backups') });
   try {
-    const saved = store.change(snapshot.revision, data => { for (const key of Object.keys(data)) delete data[key]; Object.assign(data, inspected.data); return { migrated: true }; }, 'performance-ms-v1', { planSync: false });
+    const saved = commitPerformanceMigration(store, inspected);
     savedRevision = saved.revision;
   } finally { store.close(); }
 }
