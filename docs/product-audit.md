@@ -50,3 +50,7 @@ P0：前后端一致的公开范围、原片认证、初始改密流程、撤回
 ## 云端安全复核（第一阶段）
 
 实际检查确认 Nico 六表开启 RLS，anon/authenticated 均无 SELECT 权限，同步函数仅服务角色调用，私有 bucket 未开放。六项“RLS 已启用但无策略”提示与当前只允许服务端访问的设计一致，不能为消除提示新增公共策略，见[数据库检查说明](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)。同一 Supabase 项目的其他业务函数有两项既有 SECURITY DEFINER 提示，未擅自修改无关业务权限，需另行确认其调用设计，见[修复说明](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)。原生 Supabase Auth 未开启[泄露密码保护](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)，Nico 当前使用独立账号及会话；这不是本次新增的授权通路。
+
+## 第二阶段实施复核
+
+成绩计算已由 shared/performance.ts 统一为整数毫秒及明确有效性，typecheck 纳入 check；旧记录保留且标为未核验，不自动认定有效。旧展示字段和备份兼容，旧备份恢复保持当前毫秒版本。Vite 升级8.1.6安全补丁，当前依赖审计为零已知问题。以上为已实施结果，训练实际组、归属时间戳、幂等审计及技能目标仍按差距清单推进，不能视为整个V1.0已完成。
