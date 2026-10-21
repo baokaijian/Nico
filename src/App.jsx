@@ -191,7 +191,7 @@ export default function App() {
             {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate} readOnly={readOnly}/>}
             {fullView && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
             {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
-            {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} initialFilter={searchSeed}/>}
+            {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} manageTemplates={role === 'owner'} initialFilter={searchSeed}/>}
             {fullView && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>)}
             {fullView && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={data} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}

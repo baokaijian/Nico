@@ -1,0 +1,84 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { once } from 'node:events';
+import { emptyState, normalizeState } from '../shared/domain.mjs';
+import { createCloudHandler } from '../server/cloud-api.mjs';
+import { createApp } from '../server/server.js';
+import { openStore } from '../server/store.mjs';
+const set = completedRepeats => ({ id: 'set-a', task: '仅隔离协议样例', stroke: '自由泳', distanceMeters: 25, plannedRepeats: 4, completedRepeats, restSeconds: 20, isKick: false });
+for (const runtime of ['local', 'cloud']) test(`${runtime}：训练/模板幂等、关联快照、删除恢复及旧备份兼容`, async t => {
+  const initial = emptyState();
+  initial.trainings = [{ id: 'legacy', date: '2000-01-01', totalMeters: 100, coachNotes: '历史原话' }];
+  initial.media = [{ id: 'media-a', date: '2000-01-01', title: '隔离素材', type: 'video', url: '/uploads/protocol.mp4', recordId: 'legacy' }];
+  initial.plans = [{ id: 'plan-a', title: '隔离计划', focus: '教练反馈原文', startDate: '2000-01-01', endDate: '2000-01-07', status: '已确认', reviewedBy: '隔离审核', version: 1, sessions: [{ id: 's', date: '2000-01-02', type: '训练', title: '原课次', sets: [{ task: '隔离协议安排', repeats: 4, distance: 25, restSeconds: 20 }] }] }];
+  const legacyBackup = structuredClone(initial); delete legacyBackup.trainingTemplates;
+  const token = 'f'.repeat(64); let read, send;
+  if (runtime === 'local') {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nico-training-api-'));
+    const seedPath = path.join(dir, 'seed.json'); fs.writeFileSync(seedPath, JSON.stringify(initial));
+    const store = openStore({ filename: path.join(dir, 'state.sqlite'), seedPath, backupDir: path.join(dir, 'backups') });
+    const server = createApp({ store, uploadsDir: path.join(dir, 'uploads'), tokens: { owner: token }, processUploads: false }).listen(0, '127.0.0.1'); await once(server, 'listening');
+    t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); store.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+    read = () => store.read();
+    send = (route, method, body, revision = read().revision, guest = false) => fetch(`http://127.0.0.1:${server.address().port}${route}`, { method, headers: { ...(!guest ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json', 'If-Match': String(revision) }, ...(!['GET', 'HEAD'].includes(method) ? { body: JSON.stringify(body) } : {}) });
+  } else {
+    let current = { data: initial, revision: 1 };
+    const handler = createCloudHandler({ origins: [], backend: {
+      read: async () => structuredClone(current), session: async () => ({ username: 'protocol-only', expires_at: '2100-01-01T00:00:00Z' }), account: async () => ({ must_change_password: false }),
+      save: async (revision, data) => { if (revision !== current.revision) throw Object.assign(new Error('冲突'), { status: 409 }); current = { data: structuredClone(data), revision: revision + 1 }; return current.revision; },
+    } });
+    read = () => structuredClone(current);
+    send = (route, method, body, revision = read().revision, guest = false) => handler(new Request(`https://protocol.invalid/nico-api${route}`, { method, headers: { ...(!guest ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json', 'If-Match': String(revision) }, ...(!['GET', 'HEAD'].includes(method) ? { body: JSON.stringify(body) } : {}) }));
+  }
+  assert.equal((await send('/api/trainings', 'GET', null, undefined, true)).status, 401);
+  assert.equal((await send('/api/trainingTemplates', 'GET', null, undefined, true)).status, 401);
+  assert.equal((await send('/api/trainings', 'POST', {}, undefined, true)).status, 401);
+  const templateBody = { title: '隔离模板', entryMode: '训练组', sets: [set(null)], clientRequestId: 'template-request-01' };
+  const revision = read().revision;
+  const first = await send('/api/trainingTemplates', 'POST', templateBody); assert.equal(first.status, 201); const template = await first.json();
+  assert.equal(template.version, 1); assert.equal(template.athleteId, 'nico'); assert.ok(template.createdAt); assert.ok(template.createdBy); assert.equal(template.clientRequestId, undefined);
+  const afterTemplate = read(); const replay = await send('/api/trainingTemplates', 'POST', templateBody, revision);
+  assert.equal(replay.status, 200); assert.equal((await replay.json()).id, template.id); assert.deepEqual(read(), afterTemplate);
+  assert.equal((await send('/api/trainingTemplates', 'POST', { ...templateBody, title: '变更的请求' })).status, 409);
+  const trainingBody = { date: '2000-01-02', session: '协议训练', entryMode: '训练组', sets: [set(2)], durationMinutes: 30, completionStatus: '部分完成', templateId: template.id, templateVersion: 1, plannedSessionId: 'plan-a/s', plannedSessionVersion: 1, mediaIds: ['media-a'], copiedFromId: 'legacy', clientRequestId: 'training-request-01' };
+  const beforeTraining = read().revision, saved = await send('/api/trainings', 'POST', trainingBody); assert.equal(saved.status, 201); const training = await saved.json();
+  assert.equal(training.totalMeters, 50); assert.equal(training.plannedSessionSnapshot.session.title, '原课次'); assert.equal(training.templateVersion, 1);
+  assert.equal(read().data.media[0].recordId, 'legacy', '不覆盖素材原有主关联');
+  const afterTraining = read(); assert.equal((await send('/api/trainings', 'POST', trainingBody, beforeTraining)).status, 200); assert.deepEqual(read(), afterTraining);
+  const simultaneous = { date: '2000-01-03', totalMeters: 75, clientRequestId: 'parallel-request-01' };
+  const sameRevision = read().revision;
+  const parallel = await Promise.all([send('/api/trainings', 'POST', simultaneous, sameRevision), send('/api/trainings', 'POST', simultaneous, sameRevision)]);
+  assert.ok(parallel.some(r => r.status === 201)); assert.ok(parallel.every(r => [200, 201, 409].includes(r.status)));
+  assert.equal(read().data.trainings.filter(r => r.creationRequest?.id === simultaneous.clientRequestId).length, 1);
+  assert.equal((await send('/api/trainings', 'POST', simultaneous, sameRevision)).status, 200);
+  assert.equal((await send('/api/trainings', 'POST', null)).status, 400);
+  const currentTemplate = await send(`/api/trainingTemplates/${template.id}`, 'PUT', { title: '新版模板', sets: [{ ...set(null), plannedRepeats: 8 }] }); assert.equal(currentTemplate.status, 200); assert.equal((await currentTemplate.json()).version, 2);
+  assert.equal(read().data.trainings.find(r => r.id === training.id).sets[0].plannedRepeats, 4);
+  assert.equal((await send('/api/trainings', 'POST', { ...trainingBody, clientRequestId: 'training-request-02' })).status, 409, '不能新用过期模板');
+  const plan = await send('/api/plans/plan-a', 'PUT', { title: '新计划', sessions: [] }); assert.equal(plan.status, 200);
+  const edit = await send(`/api/trainings/${training.id}`, 'PUT', { notes: '只改备注', mediaIds: ['media-a'] }); assert.equal(edit.status, 200); const edited = await edit.json();
+  assert.equal(edited.plannedSessionSnapshot.session.title, '原课次'); assert.equal(edited.plannedSessionSnapshot.planVersion, 1); assert.equal(edited.createdAt, training.createdAt);
+  const beforeInvalid = read();
+  for (const body of [{ mediaIds: ['missing'] }, { entryMode: '训练组', sets: [set(1.5)] }, { completionStatus: '已完成' }, { createdAt: 'invented' }]) assert.equal((await send(`/api/trainings/${training.id}`, 'PUT', body)).status, 400);
+  assert.deepEqual(read(), beforeInvalid);
+  const oldEdited = await send('/api/trainings/legacy', 'PUT', { notes: '补记备注' }); assert.equal(oldEdited.status, 200); const old = await oldEdited.json(); assert.equal(old.createdAt, undefined); assert.equal(old.coachNotes, '历史原话'); assert.ok(old.updatedAt);
+  assert.equal((await send(`/api/trainingTemplates/${template.id}`, 'DELETE', {})).status, 200);
+  assert.equal((await send('/api/trainingTemplates', 'POST', templateBody)).status, 409, '不复活已删除的同请求记录');
+  assert.equal((await send(`/api/trainings/${training.id}`, 'PUT', { notes: '模板删除后仍可维护历史训练' })).status, 200);
+  assert.equal((await send(`/api/trainings/${training.id}`, 'DELETE', {})).status, 200);
+  assert.equal((await send('/api/trainings', 'POST', trainingBody)).status, 409);
+  const trashed = read().data.trash.find(r => r.record.id === training.id); assert.equal(trashed.record.totalMeters, 50);
+  assert.equal((await send(`/api/trash/${trashed.id}/restore`, 'POST', {})).status, 200);
+  const templateTrash = read().data.trash.find(r => r.record.id === template.id);
+  assert.equal((await send(`/api/trash/${templateTrash.id}/restore`, 'POST', {})).status, 200);
+  assert.equal((await send('/api/restore', 'POST', { format: 'nico-backup-v1', data: legacyBackup })).status, 200);
+  const restored = read().data; normalizeState(restored);
+  assert.equal(restored.trainings.length, 1); assert.deepEqual(restored.trainings[0], initial.trainings[0]);
+  assert.ok(restored.trash.some(r => r.collection === 'trainings' && r.record.id === training.id));
+  assert.ok(restored.trash.some(r => r.collection === 'trainingTemplates' && r.record.id === template.id));
+  assert.equal((await send('/api/trainingTemplates', 'POST', templateBody)).status, 409);
+  const publicSummary = await send('/api/public-summary', 'GET', null, undefined, true); assert.equal(publicSummary.status, 200); assert.equal((await publicSummary.json()).trainings, undefined);
+});

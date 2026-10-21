@@ -1,4 +1,5 @@
 import { performanceMilliseconds } from './performance.ts';
+import { trainingFacts } from './training.ts';
 import { analysis, best, ordered, rangeSummary, validDate, validateRecord } from './domain.mjs';
 import { practiceOverview } from './practice.mjs';
 
@@ -41,7 +42,7 @@ function dataRange(state) {
 
 function trainingVolumeWindow(state, end, days) {
   const start = addDays(end, -(days - 1));
-  const records = ordered(state.trainings).filter(r => r.date >= start && r.date <= end && typeof r.totalMeters === 'number' && Number.isFinite(r.totalMeters));
+  const records = ordered(state.trainings).filter(r => r.date >= start && r.date <= end && trainingFacts(r).meters != null && trainingFacts(r).occurred);
   const weeks = new Map();
   for (const record of records) weeks.set(weekStart(record.date), (weeks.get(weekStart(record.date)) || 0) + record.totalMeters);
   return {
