@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { FIELDS, ordered, best, validateRecord, WOMEN_50, STANDARD_SOURCE, STANDARD_VERSION } from '../../shared/domain.mjs';
 import { Field, Message, Empty } from './ui';
 import TrainingRecords from './TrainingRecords';
+import { recordFormFields, changeRecordField } from '../services/record-form';
 const names = { swim: '成绩', trainings: '水上训练', fitness: '体能', nutrition: '恢复与饮食', growth: '身体测量', goals: '个人目标', annotations: '录像批注', media: '素材说明' };
 function valueLabel(value) { return value === true ? '按既有专业建议服用' : value === false ? '未服用' : value == null || value === '' ? '未填写' : String(value); }
 export default function Records(props) {
@@ -24,7 +25,7 @@ function GenericRecords({ type, data, api, onSaved, readOnly = false, allowAdd =
   useEffect(() => { try { setDraftFound(JSON.parse(localStorage.getItem(key) || 'null')); } catch { setError('本地草稿无法读取，可继续使用服务端数据'); } }, [key]);
   const edit = r => { setBaseRevision(api.getRevision()); setConflict(false); setEditing(r.id); setValues(Object.fromEntries(fields.map(f => [f.key, type === 'swim' && TIME_FIELDS.includes(f.key) ? performanceInput(r, f.key) : r[f.key] ?? '']))); setError(''); };
   const change = (field, value) => {
-    setValues(current => { const next = { ...current, [field]: value }; try { localStorage.setItem(key, JSON.stringify({ values: next, editing, baseRevision })); } catch { setError('无法暂存草稿，请导出后继续'); } return next; });
+    setValues(current => { const next = changeRecordField(type, current, field, value); try { localStorage.setItem(key, JSON.stringify({ values: next, editing, baseRevision })); } catch { setError('无法暂存草稿，请导出后继续'); } return next; });
   };
   const reset = () => { setBaseRevision(api.getRevision()); setConflict(false); setEditing(null); setValues(blank()); setError(''); setDraftFound(null); localStorage.removeItem(key); };
   const save = async e => {
@@ -65,14 +66,7 @@ function GenericRecords({ type, data, api, onSaved, readOnly = false, allowAdd =
     if (type === 'growth' && BODY_FIELDS.includes(field.key)) return { ...field, step: 0.1 };
     return choices ? { ...field, type: 'select', options: choices.map(o => o.id), optionLabels: Object.fromEntries(choices.map(o => [o.id, o.label])) } : field;
   };
-  const SIMPLE_KEYS = {
-    trainings: ['date', 'plannedSessionId', 'durationMinutes', 'totalMeters', 'feeling', 'discomfort', 'coachNotes'],
-    nutrition: ['date', 'sleepHours', 'fatigue', 'discomfort', 'willingness'],
-    swim: ['date', 'distance', 'stroke', 'poolLength', 'time', 'startType', 'timingMethod', 'recordType', 'validityStatus'],
-    growth: ['date', 'height', 'weight', 'measurementMethod', 'recordedBy'],
-    fitness: ['date', 'standingJump', 'plankSeconds', 'sitAndReach', 'measurementMethod', 'recordedBy'],
-  };
-  const simpleKeys = SIMPLE_KEYS[type] || fields.map(f => f.key);
+  const formFields = recordFormFields(type, fields, values);
   const facetOptions = key => FIELDS.swim.find(f => f.key === key)?.options || [];
   return <div className="stack fade-in"><header><h1>{names[type]}记录</h1><p className="muted">{readOnly ? '查看实际录入的记录，未填写的字段表示未知。' : '填写实际观察；留空表示未记录，0只表示实际为零。'}</p></header><Message>{savedMessage}</Message>
     {type === 'growth' && <Message>身体测量须保留一位小数。臂长与臂展分别记录，测量方法未确认时请留空。</Message>}
@@ -82,7 +76,7 @@ function GenericRecords({ type, data, api, onSaved, readOnly = false, allowAdd =
     <Message error>{error}</Message>{conflict && <Message>请先用顶部“刷新记录”读取最新版本，对照下方记录。<button onClick={() => { setBaseRevision(api.getRevision()); setConflict(false); setError('已采用当前版本，请确认输入后再次保存'); }}>已核对最新记录，允许重试</button></Message>}
     {!readOnly && (allowAdd || editing) && <details className="glass-card" open={Boolean(editing)}><summary>{editing ? '编辑记录' : '添加记录'}</summary>
       {draftFound && <Message>发现此设备的未提交草稿。<button onClick={() => { setValues(draftFound.values); setEditing(draftFound.editing); setBaseRevision(draftFound.baseRevision ?? 0); setDraftFound(null); }}>恢复草稿</button> <button onClick={() => { localStorage.removeItem(key); setDraftFound(null); }}>舍弃草稿</button></Message>}
-      <form onSubmit={save}><div className="form-grid">{fields.filter(f => simpleKeys.includes(f.key)).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{simpleKeys.length < fields.length && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{fields.filter(f => !simpleKeys.includes(f.key)).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
+      <form onSubmit={save}><div className="form-grid">{formFields.primary.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{formFields.secondary.length > 0 && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{formFields.secondary.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
         <div className="actions"><button disabled={busy} className="apple-btn apple-btn-primary">{busy ? '正在保存…' : '保存到服务端'}</button><button type="button" onClick={reset} className="apple-btn apple-btn-secondary">清空 / 取消</button><button type="button" onClick={() => downloadJSON(`Nico-${type}-未提交草稿.json`, { collection: type, values, editing })} className="apple-btn apple-btn-secondary">导出未提交草稿</button></div><p className="muted">草稿仅在此设备，不会自动覆盖服务端。保存失败时输入保留。</p>
       </form></details>}
     {type === 'swim' && !publicMode && <><Message>成绩按整数毫秒保存，显示分:秒:百分秒；可输入56.171等三位小数，编辑会保留精度。只有核验有效、池长明确的成绩参与PB。未核验、失格和无效记录不会被删除。</Message><Message>测试年龄组按测试年份减出生年份计算；生日未知时留空。排名、上一次成绩和第一名成绩按实际来源填写，缺失时不自动推算。</Message><div className="filter-bar"><label>记录分类<select className="apple-input" value={scoreKind} onChange={e => setScoreKind(e.target.value)}>{['全部', '测试', '比赛', '训练', '未知'].map(kind => <option key={kind}>{kind}</option>)}</select></label><label>距离<select className="apple-input" value={facets.distance} onChange={e => setFacets(current => ({ ...current, distance: e.target.value }))}><option value="">全部</option>{facetOptions('distance').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>泳姿<select className="apple-input" value={facets.stroke} onChange={e => setFacets(current => ({ ...current, stroke: e.target.value }))}><option value="">全部</option>{facetOptions('stroke').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>池长<select className="apple-input" value={facets.poolLength} onChange={e => setFacets(current => ({ ...current, poolLength: e.target.value }))}><option value="">全部</option>{facetOptions('poolLength').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>有效性<select className="apple-input" value={facets.validityStatus} onChange={e => setFacets(current => ({ ...current, validityStatus: e.target.value }))}><option value="">全部</option>{facetOptions('validityStatus').map(option => <option key={option} value={option}>{option}</option>)}</select></label></div></>}
