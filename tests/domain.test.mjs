@@ -4,22 +4,26 @@ import { raw } from './fixture.mjs';
 import { analysis, best, parseTime, normalizeState, validateRecord, publicSnapshot, rangeSummary, validDate, WOMEN_50 } from '../shared/domain.mjs';
 import { reportHTML } from '../shared/reports.mjs';
 const data = normalizeState(raw);
+// Confirmation is an explicit assumption in these isolated arithmetic cases only.
+const confirmed = { ...data, swim: data.swim.map(record => ({ ...record, validityStatus: '有效' })) };
+
 test('原始输入完整保留，所有新集合为空，不生成实测数据', () => {
   for (const key of Object.keys(raw)) assert.deepEqual(data[key], raw[key]);
   assert.deepEqual(data.plans, []); assert.deepEqual(data.annotations, []);
   const before = JSON.stringify(data); analysis(data); reportHTML(data, '2026-10-01', '2026-10-07'); assert.equal(JSON.stringify(data), before);
 });
 test('同项目PB与分析只来自录入记录，25米不会污染50米', () => {
+  assert.equal(best(data.swim), null, '原始记录没有有效性确认，不自动计PB');
   const long = raw.swim.filter(r => r.distance === '50m' && r.poolLength === '50m');
   const expected = Math.min(...long.map(r => r.seconds));
-  assert.equal(best(data.swim).seconds, expected);
-  assert.equal(best(data.swim, '25m', '自由泳', '25m').seconds, Math.min(...raw.swim.filter(r => r.distance === '25m' && r.poolLength === '25m').map(r => r.seconds)));
-  const result = analysis(data); assert.ok(result.facts[1].text.includes((long[0].seconds - expected).toFixed(2)));
+  assert.equal(best(confirmed.swim).seconds, expected);
+  assert.equal(best(confirmed.swim, '25m', '自由泳', '25m').seconds, Math.min(...raw.swim.filter(r => r.distance === '25m' && r.poolLength === '25m').map(r => r.seconds)));
+  const result = analysis(confirmed); assert.ok(result.facts[1].text.includes((long[0].seconds - expected).toFixed(2)));
   assert.match(result.focus, /核对最新成绩备注/);
   assert.equal(result.focusEvidence.text, result.recent.notes);
   assert.ok(result.facts.some(f => /体能已录入0条/.test(f.text)));
   assert.ok(result.facts.some(f => /原始目标的/.test(f.text)));
-  assert.deepEqual(analysis(data), analysis(data));
+  assert.deepEqual(analysis(confirmed), analysis(confirmed));
 });
 test('日期和成绩严格解析，拒绝非数值、负数、无效日期', () => {
   assert.equal(parseTime('00:30.50'), 30.5); assert.equal(parseTime('28'), 28);
@@ -57,7 +61,7 @@ test('公开摘要默认空，白名单不包含私有字段', () => {
 });
 test('周期报告有全部8章，缺少分母不编覆盖率，安全转义原始文本', () => {
   const summary = rangeSummary(data, '2026-10-01', '2026-10-07'); assert.equal(summary.coverage, null); assert.equal(summary.meters, null); assert.equal(summary.sleep, null);
-  const html = reportHTML(data, '2026-10-01', '2026-10-07'); assert.equal((html.match(/<h2>/g) || []).length, 8); assert.ok(html.includes(best(data.swim).seconds.toFixed(2))); assert.match(html, /未记录/); assert.match(html, /未记录/);
+  const html = reportHTML(data, '2026-10-01', '2026-10-07'); assert.equal((html.match(/<h2>/g) || []).length, 8); assert.match(html, /尚未确认有效性/); assert.match(html, /未记录/); assert.match(html, /未记录/);
   const modified = structuredClone(data); modified.profile.name = '<script>alert(1)</script>';
   assert.ok(!reportHTML(modified, '2026-10-01', '2026-10-07').includes('<script>'));
   assert.equal(WOMEN_50.自由泳['50m'].三级, 36); assert.equal(WOMEN_50.自由泳['25m'].三级, 34);

@@ -9,7 +9,7 @@ import { openStore } from '../server/store.mjs';
 
 // Fixed protocol cases only; never imported by the app or written into real archives.
 const now = '2026-10-19T08:00:00.000Z';
-const score = (id, date, time, extra = {}) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m', ...extra });
+const score = (id, date, time, extra = {}) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m', validityStatus: '有效', ...extra });
 const training = (id, date, totalMeters, extra = {}) => ({ id, date, totalMeters, ...extra });
 const recovery = (id, date, extra = {}) => ({ id, date, ...extra });
 const build = overrides => { const state = emptyState(); Object.assign(state, overrides); return state; };

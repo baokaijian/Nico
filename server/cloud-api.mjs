@@ -1,4 +1,5 @@
 import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
+import { upgradePerformanceState } from '../shared/performance.ts';
 import { COLLECTIONS, LEGACY_COLLECTIONS, normalizeState, validateRecord, validDate, publicSnapshot, analysis } from '../shared/domain.mjs';
 import { syncPlanDraft, commitPlanUpdate, retainPlanHistory } from '../shared/plan-engine.mjs';
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
@@ -206,9 +207,11 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           const input = await body(); if (input.format !== 'nico-backup-v1') throw fail(400, '请选择平台导出的完整备份');
           let restored; try { restored = normalizeState(input.data); } catch (error) { throw fail(400, error.message); }
           for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
-          const dataVersion = data.schemaVersion;
+          const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion;
           const retained = retainPlanHistory(data, restored);
-          for (const key of Object.keys(data)) delete data[key]; Object.assign(data, dataVersion === 2 ? upgradePrdState(retained).data : retained); result = { success: true };
+          let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained;
+          if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data;
+          for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); result = { success: true };
         } else if (endpoint === '/api/public-export' && method === 'POST') return json({ success: true, message: '云端公开白名单已生效，访客只读取这些内容；未提交私有数据到GitHub。' });
         else throw fail(404, '接口不存在');
         if (planSync) syncPlanDraft(current.data, data, { now: new Date(now()).toISOString(), triggeredByRecordId: result?.id ?? (typeof parts[2] === 'string' ? parts[2] : null) });

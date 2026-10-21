@@ -4,7 +4,7 @@ import { emptyState, analysis, planContext } from '../shared/domain.mjs';
 import { reportHTML } from '../shared/reports.mjs';
 
 // Fixed protocol cases only; never imported by the app or written into its data.
-const score = (id, date, time, extra = {}) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m', ...extra });
+const score = (id, date, time, extra = {}) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m', validityStatus: '有效', ...extra });
 const video = { id: 'test-video', date: '2000-03-01', title: '协议视频', type: 'video', duration: 10 };
 const annotation = { id: 'test-note', mediaId: video.id, athleteIdentity: '协议运动员/泳道', startSecond: 1, endSecond: 3, observation: '协议观察', limitation: '仅此片段', status: '已审核', reviewedBy: '协议审核人' };
 const plan = (id, extra = {}) => ({ id, title: '协议计划', focus: '协议重点', startDate: '2000-01-01', endDate: '2000-01-31', status: '已确认', reviewedBy: '协议教练', version: 1, sessions: [], ...extra });

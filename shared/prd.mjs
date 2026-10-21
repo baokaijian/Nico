@@ -1,3 +1,4 @@
+import { parseMilliseconds, formatMilliseconds, normalizePerformanceRecord, performanceMilliseconds } from './performance.ts';
 // PRD dates are stored as ISO calendar dates; examples are not athlete facts.
 export const PRD_VERSION = 2;
 export const SCORE_DISTANCES = ['10m', '15m', '25m', '50m', '100m', '200m', '400m', '800m', '1500m'];
@@ -7,26 +8,13 @@ const SCORE_TEXT = ['location', 'testedBy', 'ageGroup', 'team', 'competitionSess
 const SCORE_NUMBERS = ['rank', 'lane', 'preliminaryRank'];
 const hasValue = value => value !== '' && value != null;
 const decimal = value => Math.abs(value * 10 - Math.round(value * 10)) < 1e-8;
+// Compatibility wrappers. Arithmetic and comparisons use integer milliseconds.
 export function parseScore(value, allowZero = false) {
-  if (typeof value !== 'string') return null;
-  const s = value.trim();
-  let seconds;
-  if (/^\d{2,4}:\d{2}:\d{2}$/.test(s)) {
-    const [minutes, whole, hundredths] = s.split(':').map(Number);
-    if (whole >= 60) return null;
-    seconds = (minutes * 6000 + whole * 100 + hundredths) / 100;
-  } else {
-    if (!/^(?:\d{1,3}:)?\d{1,4}(?:\.\d{1,2})?$/.test(s)) return null;
-    const parts = s.split(':');
-    if (parts.length === 2 && Number(parts[1]) >= 60) return null;
-    seconds = parts.length === 2 ? (Number(parts[0]) * 6000 + Math.round(Number(parts[1]) * 100)) / 100 : Number(parts[0]);
-  }
-  return seconds >= (allowZero ? 0 : 0.01) && seconds <= 86400 ? seconds : null;
+  const ms = parseMilliseconds(value, allowZero);
+  return ms === null ? null : ms / 1000;
 }
 export function scoreFormat(seconds) {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0 || seconds > 86400) return '';
-  const ticks = Math.round(seconds * 100);
-  return `${String(Math.floor(ticks / 6000)).padStart(2, '0')}:${String(Math.floor(ticks % 6000 / 100)).padStart(2, '0')}:${String(ticks % 100).padStart(2, '0')}`;
+  return typeof seconds === 'number' && Number.isFinite(seconds) ? formatMilliseconds(Math.round(seconds * 1000)) : '';
 }
 export function dateFormat(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? `${Number(value.slice(0, 4))}年${Number(value.slice(5, 7))}月${Number(value.slice(8, 10))}日` : value || '未填写';
@@ -45,21 +33,14 @@ export function validatePrdRecord(collection, record, { canonicalize = false } =
   if (record.stroke === '打腿' && (!record.testItem || !record.testItem.includes('打腿'))) throw new Error('打腿测试须选择具体打腿项目');
   if (hasValue(record.testItem) && (record.testItem.includes('打腿') ? record.stroke !== '打腿' : record.testItem !== record.stroke)) throw new Error('测试项目与泳姿不一致');
   if (hasValue(record.recordType) && !['训练', '比赛', '测试', '未知'].includes(record.recordType)) throw new Error('记录性质无效');
-  for (const key of ['time', 'previousTime', 'winnerTime']) {
-    if (!hasValue(record[key])) { if (key === 'time') throw new Error('请填写成绩'); continue; }
-    const seconds = parseScore(record[key]);
-    if (seconds == null) throw new Error(`${key}成绩格式无效`);
-    if (canonicalize) record[key] = scoreFormat(seconds);
-    else if (record[key] !== scoreFormat(seconds)) throw new Error(`${key}须为分:秒:百分秒格式`);
-  }
-  const seconds = parseScore(record.time);
-  if (canonicalize) record.seconds = seconds;
-  else if (record.seconds !== seconds) throw new Error('成绩与秒数不一致');
+  normalizePerformanceRecord(record, canonicalize);
+  const ownMs = performanceMilliseconds(record);
+  const winnerMs = performanceMilliseconds(record, 'winnerTime');
   for (const key of SCORE_NUMBERS) if (hasValue(record[key]) && (!Number.isInteger(record[key]) || record[key] < 1 || record[key] > (key === 'lane' ? 100 : 100000))) throw new Error(`${key}须为正整数`);
   if (record.isFinal != null && typeof record.isFinal !== 'boolean') throw new Error('是否决赛须为布尔值或未知');
   if (record.isFinal === false && hasValue(record.preliminaryRank)) throw new Error('预赛记录不能填写决赛前的预赛排名');
-  if (hasValue(record.winnerTime) && parseScore(record.winnerTime) > seconds) throw new Error('第一名成绩不能慢于本人成绩');
-  if (record.rank === 1 && hasValue(record.winnerTime) && parseScore(record.winnerTime) !== seconds) throw new Error('排名第一时第一名成绩须与本人成绩一致');
+  if (winnerMs !== null && winnerMs > ownMs) throw new Error('第一名成绩不能慢于本人成绩');
+  if (record.rank === 1 && winnerMs !== null && winnerMs !== ownMs) throw new Error('排名第一时第一名成绩须与本人成绩一致');
   return record;
 }
 // Derived fields never create a previous result when timing conditions are unknown.
@@ -70,7 +51,10 @@ export function derivePrdState(state) {
   const media = [...state.media, ...deleted.filter(t => t.collection === 'media').map(t => t.record)];
   for (const score of scores) {
     score.testAgeGroup = score.recordType === '测试' && state.profile.birthDate && score.date >= state.profile.birthDate ? Number(score.date.slice(0, 4)) - Number(state.profile.birthDate.slice(0, 4)) : null;
-    score.gapTime = hasValue(score.winnerTime) && parseScore(score.winnerTime) != null && score.seconds >= parseScore(score.winnerTime) ? scoreFormat((Math.round(score.seconds * 100) - Math.round(parseScore(score.winnerTime) * 100)) / 100) : '';
+    const ownMs = performanceMilliseconds(score), winnerMs = performanceMilliseconds(score, 'winnerTime');
+    const gapMs = ownMs !== null && winnerMs !== null && ownMs >= winnerMs ? ownMs - winnerMs : null;
+    score.gapTime = formatMilliseconds(gapMs);
+    if (score.timeMs !== undefined) score.gapTimeMs = gapMs;
     score.mediaIds = media.filter(m => m.recordId === score.id).map(m => m.id).sort();
   }
   return state;
@@ -101,7 +85,14 @@ export function upgradePrdState(raw) {
       changed(collection, record, 'recordType', /比赛/.test(evidence) ? '比赛' : /初测|考核|测试/.test(evidence) ? '测试' : '未知');
     }
     if (!record.testItem && TEST_ITEMS.includes(record.stroke)) changed(collection, record, 'testItem', record.stroke);
-    for (const key of ['time', 'previousTime', 'winnerTime']) if (hasValue(record[key]) && parseScore(record[key]) != null) changed(collection, record, key, scoreFormat(parseScore(record[key])));
+    for (const key of ['time', 'previousTime', 'winnerTime']) if (hasValue(record[key]) && parseScore(record[key]) != null) {
+      const ms = parseMilliseconds(record[key]);
+      if (ms % 10 && record[`${key}Ms`] == null) {
+        changed(collection, record, `${key}Ms`, ms);
+        changed(collection, record, `${key}Input`, record[key]);
+      }
+      changed(collection, record, key, scoreFormat(parseScore(record[key])));
+    }
     if (parseScore(record.time) != null) changed(collection, record, 'seconds', parseScore(record.time));
   }
   // An explicit matching event title in the original notes is evidence, dates alone are not.
@@ -120,6 +111,7 @@ export function validatePrdState(state) {
   for (const [index, record] of state.swim.entries()) for (const key of ['testAgeGroup', 'gapTime', 'mediaIds']) {
     if (JSON.stringify(record[key]) !== JSON.stringify(expected.swim[index][key])) throw new Error(`${key}派生数据不一致`);
   }
+  for (const [index, record] of state.swim.entries()) if (record.timeMs !== undefined && record.gapTimeMs !== expected.swim[index].gapTimeMs) throw new Error('整数毫秒差距派生数据不一致');
   if (new Set([...state.swim, ...state.trainings].map(r => r.id)).size !== state.swim.length + state.trainings.length) throw new Error('成绩与训练ID不能重复，否则素材关联不明确');
   const ids = new Set([...state.swim, ...state.trainings, ...(state.trash || []).filter(t => ['swim', 'trainings'].includes(t.collection)).map(t => t.record)].map(r => r.id));
   for (const item of [...state.media, ...(state.trash || []).filter(t => t.collection === 'media').map(t => t.record)]) if (item.recordId && !ids.has(item.recordId)) throw new Error('素材关联记录不存在');

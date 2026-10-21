@@ -123,4 +123,6 @@ npm run check
 
 ## PRD 数据结构检查
 
+成绩新增整数毫秒与有效性模型，旧字段及备份继续兼容。主显示为 `00:56:17`；输入支持 `56.171`，编辑会载入完整精度。只有家长核验“有效”且池长明确的同项目记录参与PB，旧记录默认“未核验”；失格/无效仍保留在历史。`npm run audit:performance` 默认只读，写入迁移需显式 `-- --apply-local`，云端使用单独最新导出和带冲突保护的私有SQL。详见 [数据模型与回滚](docs/data-model.md)。
+
 字段映射、数据保护和云端整改步骤见 [PRD_DATA_SCHEMA.md](./PRD_DATA_SCHEMA.md)。`npm run audit:data` 只读检查；加入 `-- --apply-local --update-release` 才整改本地事实库与同一公开白名单的成绩格式。包含私人数据的报告留在忽略的 `review`，不进入公开仓库。

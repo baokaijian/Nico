@@ -14,7 +14,7 @@ import { seedBytes, originalPath, hasPrivateInput } from './fixture.mjs';
 // Fixed protocol cases only. Every value below is either entered by hand here or
 // computed from it; nothing is invented by the engine.
 const now = '2026-10-19T08:00:00.000Z';
-const score = (id, date, time) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m' });
+const score = (id, date, time) => ({ id, date, time, distance: '50m', stroke: '自由泳', poolLength: '50m', validityStatus: '有效' });
 const point = (id, extra = {}) => ({ id, date: '2026-10-01', title: '协议薄弱点', category: '技术动作', sourceType: '家长观察', sourceRef: '', evidence: '协议文本：仅用于校验', targetPerWeek: null, drillHint: '', status: '练习中', recordedBy: '协议', notes: '', ...extra });
 const checkin = (id, weakPointId, date, times, extra = {}) => ({ id, date, weakPointId, times, durationMinutes: null, quality: '', childFeeling: '', notes: '', recordedBy: '协议', ...extra });
 const build = overrides => { const state = emptyState(); Object.assign(state, overrides); return state; };
@@ -92,7 +92,7 @@ test('候选薄弱点只引用已录入记录，确认后不再重复提示', ()
 
 test('能力成长只比较已录入的同一项目记录', () => {
   const state = build({
-    swim: [score('t-score-1', '2026-09-01', '00:40.00'), score('t-score-2', '2026-09-20', '00:38.00'), score('t-score-3', '2026-10-10', '00:39.00'), { id: 't-score-25', date: '2026-09-05', distance: '25m', stroke: '自由泳', poolLength: '25m', time: '00:25.00' }],
+    swim: [score('t-score-1', '2026-09-01', '00:40.00'), score('t-score-2', '2026-09-20', '00:38.00'), score('t-score-3', '2026-10-10', '00:39.00'), { id: 't-score-25', date: '2026-09-05', distance: '25m', stroke: '自由泳', poolLength: '25m', time: '00:25.00', validityStatus: '有效' }],
     growth: [{ id: 'g-1', date: '2026-01-01', height: 130, weight: 28 }, { id: 'g-2', date: '2026-09-01', height: 134.5, weight: 30 }],
   });
   const growth = growthTimeline(state);
