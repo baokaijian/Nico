@@ -23,16 +23,27 @@ function Sparkline({ points, label }) {
   </svg>;
 }
 
-function MediaCard({ item, api, onPlay }) {
+function MediaCard({ item, api, onPlay, heading = 'h2' }) {
   const poster = item.posterUrl ? assetUrl(api, item.posterUrl) : '';
-  return <article className="glass-card media-item">
-    <button className="poster-button" onClick={onPlay} aria-label={`播放${item.title}`}>
+  const Title = heading;
+  return <article className="showcase-media-card">
+    <button className="poster-button" onClick={onPlay} aria-label={`${item.type === 'video' ? '播放' : '查看'}${item.title}，${dayLabel(item.date)}`}>
       {poster ? <img src={poster} alt={`${item.title}封面`} loading="lazy"/> : <span>影像</span>}
-      <span className="play-label">{item.type === 'video' ? '播放' : '查看'}</span>
+      <span className="media-kind">{item.type === 'video' ? '视频' : '图片'}</span>
+      <span className="play-label" aria-hidden="true">{item.type === 'video' && <svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>}{item.type === 'video' ? '播放' : '查看'}</span>
     </button>
-    <h2>{item.title}</h2>
-    <p className="muted">{dayLabel(item.date)}{item.duration ? ` · ${item.duration.toFixed(1)}秒` : ''} · {item.type === 'video' ? '视频' : '图片'}</p>
+    <div className="showcase-media-caption"><Title>{item.title}</Title><p><time dateTime={item.date}>{dayLabel(item.date)}</time>{item.duration > 0 && <span>{item.duration.toFixed(1)}秒</span>}</p></div>
   </article>;
+}
+
+function MediaViewer({ item, api, onClose }) {
+  if (!item) return null;
+  return <Modal title={`${dayLabel(item.date)} · ${item.title}`} onClose={onClose}>
+    {item.type === 'video'
+      ? <video className="media-player" controls autoPlay playsInline preload="metadata" src={assetUrl(api, item.url)}/>
+      : <img className="media-player" src={assetUrl(api, item.url)} alt={item.title}/>}
+    {item.duration > 0 && <p className="muted">时长{item.duration.toFixed(1)}秒。</p>}
+  </Modal>;
 }
 
 function EmptyPublic({ children }) { return <div className="glass-card"><p className="empty">{children}</p></div>; }
@@ -40,6 +51,7 @@ function EmptyPublic({ children }) { return <div className="glass-card"><p class
 export default function Showcase({ data, published, story = '', view = 'home', api, onNavigate }) {
   const swim = data.swim || NO_RECORDS, media = data.media || NO_RECORDS;
   const [active, setActive] = useState(null), [event, setEvent] = useState('');
+  const orderedMedia = useMemo(() => [...media].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id)), [media]);
   const events = useMemo(() => performanceGroups(swim).map(group => ({ ...group, label: strokeLabel(group.records[0]) }))
     .sort((a, b) => b.records.length - a.records.length || a.label.localeCompare(b.label)), [swim]);
   const timeline = useMemo(() => {
@@ -53,13 +65,8 @@ export default function Showcase({ data, published, story = '', view = 'home', a
   if (nothing) return <div className="stack"><EmptyPublic>当前摘要中没有成绩或影像。内容为原始录入值，不填充示例数据。</EmptyPublic></div>;
   if (view === 'media') return <div className="stack fade-in">
     <header><h1>精选影像</h1><p className="muted">共{media.length}项影像，按日期排列。</p></header>
-    {!media.length ? <EmptyPublic>摘要中尚无影像。</EmptyPublic> : <div className="media-showcase-grid">{media.map(item => <MediaCard key={item.id} item={item} api={api} onPlay={() => setActive(item.id)}/>)}</div>}
-    {selected && <Modal title={`${dayLabel(selected.date)} · ${selected.title}`} onClose={() => setActive(null)}>
-      {selected.type === 'video'
-        ? <video className="media-player" controls playsInline preload="metadata" src={assetUrl(api, selected.url)}/>
-        : <img className="media-player" src={assetUrl(api, selected.url)} alt={selected.title}/>}
-      <p className="muted">{selected.duration ? `时长${selected.duration.toFixed(1)}秒。` : ''}素材为原始文件，未作剪辑。</p>
-    </Modal>}
+    {!media.length ? <EmptyPublic>摘要中尚无影像。</EmptyPublic> : <div className="media-showcase-grid">{orderedMedia.map(item => <MediaCard key={item.id} item={item} api={api} onPlay={() => setActive(item.id)}/>)}</div>}
+    <MediaViewer item={selected} api={api} onClose={() => setActive(null)}/>
   </div>;
   if (view === 'results') return <div className="stack fade-in">
     <div className="section-head"><div><h1>成绩记录</h1><p className="muted">共{swim.length}条成绩，按项目分别统计。</p></div></div>
@@ -103,10 +110,11 @@ export default function Showcase({ data, published, story = '', view = 'home', a
       </article>)}</div>
     </section>}
     {media.length > 0 && <section>
-      <div className="section-head"><h2>最新影像</h2>{onNavigate && <button className="apple-btn apple-btn-secondary" onClick={() => onNavigate('media')}>查看全部影像 →</button>}</div>
-      <div className="media-showcase-grid">{[...media].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map(item => <MediaCard key={item.id} item={item} api={api} onPlay={() => onNavigate ? onNavigate('media') : setActive(item.id)}/>)}</div>
+      <div className="section-head"><h2>精选影像</h2><p className="muted">{media.length > 3 ? `最近3项 / 共${media.length}项` : `共${media.length}项`} · 点击封面即可查看</p></div>
+      <div className="media-showcase-grid">{orderedMedia.slice(0, 3).map(item => <MediaCard key={item.id} item={item} api={api} heading="h3" onPlay={() => setActive(item.id)}/>)}</div>
     </section>}
     {swim.length > 0 && <div className="actions">{onNavigate && <button className="apple-btn apple-btn-primary" onClick={() => onNavigate('results')}>查看全部成绩记录 →</button>}</div>}
     <p className="showcase-note">成绩为原始录入值，未经换算或预测。</p>
+    <MediaViewer item={selected} api={api} onClose={() => setActive(null)}/>
   </div>;
 }
