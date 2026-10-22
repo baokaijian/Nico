@@ -139,12 +139,12 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (key !== 'media') app.post(`/api/${key}`, async (req, res) => {
       canWrite(req, key);
       revision(req);
-      const request = (trainingCollection(key) || growthCollection(key) || key === 'swim') ? await creationRequest(req.body, req.username) : null;
+      const request = (trainingCollection(key) || growthCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) ? await creationRequest(req.body, req.username) : null;
       const current = store.read(), replay = creationReplay(current.data, key, request);
       if (replay) return reply(res, { revision: current.revision, result: replay });
       if (growthCollection(key)) return reply(res, change(req, data => saveGrowth(data, key, req.body, { id: makeId(key), actor: req.username, now: new Date().toISOString(), request })), 201);
       const record = { ...validate(key, req.body), id: makeId(key) };
-      if (trainingCollection(key) || key === 'swim') stampTraining(record, null, req.username, new Date().toISOString(), request);
+      if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, null, req.username, new Date().toISOString(), request);
       reply(res, change(req, data => { relations(key, record, data); data[key].push(record); return record; }), 201);
     });
     app.put(`/api/${key}/:id`, (req, res) => {
@@ -155,7 +155,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
         const previous = data[key][index];
         if (growthCollection(key, previous) || key === 'goals' && req.body.modelVersion === 1) return saveGrowth(data, key, req.body, { id: previous.id, actor: req.username, now: new Date().toISOString() });
         const record = validate(key, req.body, previous); relations(key, record, data, previous);
-        if (trainingCollection(key) || key === 'swim') stampTraining(record, previous, req.username, new Date().toISOString());
+        if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, previous, req.username, new Date().toISOString());
         if (key === 'plans') {
           const outcome = commitPlanUpdate(data, req.params.id, data[key][index], record);
           if (outcome.error) throw httpError(400, outcome.error);

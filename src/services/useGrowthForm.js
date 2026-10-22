@@ -9,8 +9,9 @@ export default function useGrowthForm({ collection, defaults, data, api, onSaved
   const dirty = useRef(false), draft = useRecordDraft(api, draftCollection || collection, validGrowthDraft), { persist } = draft;
   useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   useEffect(() => { if (dirty.current && !readOnly) persist(form); }, [form, readOnly, persist]);
-  const change = (key, value) => { const firstInput = !dirty.current; dirty.current = true; setForm(current => ({ ...current, ...(firstInput ? { baseRevision: api.getRevision() } : {}), values: { ...current.values, [key]: value } })); };
+  const change = (key, value) => { if (draft.blocked || busy) { setError('请先恢复或处理草稿，再更换关联。'); return; } const firstInput = !dirty.current; dirty.current = true; setForm(current => ({ ...current, ...(firstInput ? { baseRevision: api.getRevision() } : {}), values: { ...current.values, [key]: value } })); };
   const replace = (values, editing = null) => {
+    if (busy) return false;
     if (draft.blocked) { setError('请先处理本账号未提交草稿，再填写其他记录。'); return false; }
     if (dirty.current && !window.confirm('替换当前未保存表单？继续前可先导出草稿。')) return false;
     dirty.current = true; setForm({ ...fresh(values), editing }); setOpen(true); setError(''); setConflict(false); return true;

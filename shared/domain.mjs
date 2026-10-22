@@ -65,7 +65,7 @@ export function validateRecord(collection, input, previous = null) {
     }
   }
   const training = ['trainings', 'trainingTemplates'].includes(collection);
-  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy', ...(training ? ['sets', 'clientRequestId', ...(collection === 'trainings' ? ['mediaIds'] : [])] : []), ...(['swim', 'media'].includes(collection) ? ['clientRequestId'] : []), ...(collection === 'swim' ? TIME_FIELDS.map(key => `${key}Ms`) : [])]);
+  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy', ...(training ? ['sets', 'clientRequestId', ...(collection === 'trainings' ? ['mediaIds'] : [])] : []), ...(['swim', 'media', 'weakpoints', 'checkins'].includes(collection) ? ['clientRequestId'] : []), ...(collection === 'swim' ? TIME_FIELDS.map(key => `${key}Ms`) : [])]);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`不支持的字段：${key}`);
   for (const field of fields) {
     if (previous && input[field.key] === undefined) continue;

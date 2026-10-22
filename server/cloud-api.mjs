@@ -140,7 +140,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       const expected = request.headers.get('if-match');
       if (!/^\d+$/.test(expected || '')) throw fail(428, '请先加载最新记录，再提交修改');
       let trainingInput, receipt, mediaInput;
-      if (method === 'POST' && parts.length === 2 && parts[0] === 'api' && (trainingCollection(parts[1]) || growthCollection(parts[1]) || parts[1] === 'swim')) {
+      if (method === 'POST' && parts.length === 2 && parts[0] === 'api' && (trainingCollection(parts[1]) || growthCollection(parts[1]) || ['swim', 'weakpoints', 'checkins'].includes(parts[1]))) {
         trainingInput = await body(); receipt = await creationRequest(trainingInput, session.username);
         const replay = creationReplay(data, parts[1], receipt);
         if (replay) return json(replay);
@@ -211,7 +211,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
             const input = trainingInput ?? await body();
             if (growthCollection(key)) { result = saveGrowth(data, key, input, { id: `${key}-${randomHex(16)}`, actor: session.username, now: new Date(now()).toISOString(), request: receipt }); } else {
             const record = { ...validate(key, input), id: `${key}-${randomHex(16)}` };
-            if (trainingCollection(key) || key === 'swim') stampTraining(record, null, session.username, new Date(now()).toISOString(), receipt);
+            if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, null, session.username, new Date(now()).toISOString(), receipt);
             relations(key, record, data); data[key].push(record); result = record; }
           }
           else if (['PUT', 'DELETE'].includes(method) && parts.length === 3) {
@@ -220,7 +220,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
               const previous = data[key][index], input = await body();
               if (growthCollection(key, previous) || key === 'goals' && input.modelVersion === 1) { result = saveGrowth(data, key, input, { id: previous.id, actor: session.username, now: new Date(now()).toISOString() }); } else {
               const record = validate(key, input, previous); relations(key, record, data, previous);
-              if (trainingCollection(key) || key === 'swim') stampTraining(record, previous, session.username, new Date(now()).toISOString());
+              if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, previous, session.username, new Date(now()).toISOString());
               if (key === 'plans') { const outcome = commitPlanUpdate(data, parts[2], data[key][index], record); if (outcome.error) throw fail(400, outcome.error); }
               data[key][index] = record; result = record; }
             }
