@@ -6,32 +6,28 @@ import { loadAppView } from './services/app-view';
 import { Message, Modal } from './components/ui';
 import LoginPanel from './components/LoginPanel';
 import LogoutDialog from './components/LogoutDialog';
-import { createDraftStore } from './services/drafts';
-const Dashboard = lazy(() => import('./components/Dashboard'));
-const Plans = lazy(() => import('./components/PlanViewer'));
-const Records = lazy(() => import('./components/Records'));
-const Reports = lazy(() => import('./components/Reports'));
-const Practice = lazy(() => import('./components/Practice'));
-const Gallery = lazy(() => import('./components/MediaGallery'));
+import { createDraftStore, draftScopeKey } from './services/drafts';
+import { MANAGEMENT_NAV, resolveManagementLocation, createManagementPosition } from './services/management';
+import ManagementView from './components/ManagementView';
 const Showcase = lazy(() => import('./components/Showcase'));
-const Profile = lazy(() => import('./components/Profile'));
 const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'private' || !!import.meta.env.VITE_API_URL;
 const ChangePassword = lazy(() => import('./components/ChangePassword'));
-const privateTabs = [['today', '今日'], ['week', '本周'], ['practice', '打卡'], ['records', '记录'], ['review', '复盘'], ['profile', '档案']];
+const privateTabs = MANAGEMENT_NAV.map(item => [item.key, item.label]);
 const publicTabs = [['home', '概览'], ['results', '成绩'], ['media', '影像']];
-const recordTypes = [['trainings', '水上训练'], ['swim', '成绩'], ['fitness', '体能'], ['nutrition', '恢复与饮食'], ['growth', '身体测量']];
 const roleLabels = { owner: '家长管理', coach: '协作录入', viewer: '只读访问' };
 export default function App() {
-  const [data, setData] = useState(emptyState), [tab, setTab] = useState('home'), [recordType, setRecordType] = useState('trainings'), [reviewTab, setReviewTab] = useState('report'), [role, setRole] = useState('viewer'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [auth, setAuth] = useState(false), [session, setSession] = useState(null), [published, setPublished] = useState(null), [story, setStory] = useState('');
+  const [data, setData] = useState(emptyState), [tab, setTab] = useState('home'), [role, setRole] = useState('viewer'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [auth, setAuth] = useState(false), [session, setSession] = useState(null), [published, setPublished] = useState(null), [story, setStory] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false), [passwordOpen, setPasswordOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false), [logoutBusy, setLogoutBusy] = useState(false), [logoutError, setLogoutError] = useState('');
+  const [location, setLocation] = useState({ section: 'workbench', view: 'home' });
+  const positionStore = useRef(null), positionIdentity = useRef(null);
   const [mediaTarget, setMediaTarget] = useState(null), [quickEntry, setQuickEntry] = useState(false);
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
   const [mode, setMode] = useState(() => api.getMode());
   const modeRef = useRef(mode);
   const [publicSnapshot, setPublicSnapshot] = useState(null);
-  const lastTabs = useRef({ view: 'home', manage: 'today' });
+  const lastTabs = useRef({ view: 'home', manage: 'workbench' });
   const authenticated = !!session?.authenticated && !session?.mustChangePassword;
   const [loaded, setLoaded] = useState(false);
   const fullView = adminCapable && authenticated && mode === 'manage';
@@ -48,7 +44,7 @@ export default function App() {
       const result = await loadAppView(api, { mode: modeRef.current, adminCapable, base: import.meta.env.BASE_URL, signal: controller.signal, onSession: current => {
         if (controller.signal.aborted) return;
         setSession(current); setRole(current?.role || 'viewer');
-        if (!current?.authenticated || current.mustChangePassword || previousAccount.current !== current.username) { setData(emptyState()); setLoaded(false); }
+        if (!current?.authenticated || current.mustChangePassword || previousAccount.current !== current.username) { setData(emptyState()); setLoaded(false); positionIdentity.current = null; }
         previousAccount.current = current?.authenticated ? current.username : null;
         if (hadSession.current && !current?.authenticated) { setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); setAuth(modeRef.current === 'manage'); }
         hadSession.current = !!current?.authenticated;
@@ -59,6 +55,9 @@ export default function App() {
         const current = result.privateSnapshot;
         if (current.revision < api.getRevision()) return;
         setData(normalizeState(current.data)); setLoaded(true); setAuth(false);
+        const scope = api.getDraftScope(), identity = draftScopeKey(scope);
+        positionStore.current = createManagementPosition({ scope, isCurrent: value => api.getDraftScope() === value });
+        if (positionIdentity.current !== identity) { setLocation(positionStore.current.read()); positionIdentity.current = identity; }
         setTab(currentTab => privateTabs.some(([key]) => key === currentTab) ? currentTab : lastTabs.current.manage);
       } else {
         setPublicSnapshot(result.publicSnapshot);
@@ -91,7 +90,16 @@ export default function App() {
     modeRef.current = next; api.setMode(next); setMode(next); setUserMenuOpen(false); setNotice('');
     setTab(lastTabs.current[next]); void reload();
   };
-  const navigate = (next, type) => { setQuickEntry(next === 'records' && type === 'trainings'); setTab(next); if (type) setRecordType(type); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  const navigate = (next, type) => {
+    if (modeRef.current === 'manage') { const target = resolveManagementLocation(next, type); setLocation(target); positionStore.current?.write(target); setQuickEntry(next === 'records' && type === 'trainings'); }
+    else setTab(next);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+  const openQuickEntry = (type, context = {}) => {
+    if (type === 'skill') navigate('growth', 'skills');
+    else { navigate('training', type === 'training' ? 'trainings' : type === 'score' ? 'swim' : 'media'); setQuickEntry(true); }
+    if (type === 'media') { const training = data.trainings.find(row => row.id === context.trainingId); setMediaTarget({ recordId: training?.id || '', date: training?.date || '' }); }
+  };
   const onSaved = (collection, record, removedId) => {
     setData(current => {
       if (!Array.isArray(current[collection])) return { ...current, [collection]: record };
@@ -107,8 +115,7 @@ export default function App() {
     setNotice('上次提交已获服务端确认。');
   };
   const readOnly = !authenticated || role === 'viewer';
-  const canEditRecords = !readOnly && (role === 'owner' || ['swim', 'trainings'].includes(recordType));
-  const logout = async (deleteDrafts = false) => {
+    const logout = async (deleteDrafts = false) => {
     const drafts = createDraftStore({ scope: api.getDraftScope() });
     setLogoutBusy(true); setLogoutError('');
     setUserMenuOpen(false);
@@ -128,21 +135,15 @@ export default function App() {
     event.preventDefault();
     const query = searchValue.trim();
     setSearchSeed(query);
-    if (query || tab !== 'records') navigate('records');
+    if (query || location.section !== 'training') navigate('training', 'swim');
   };
   const tabs = fullView ? privateTabs : publicTabs;
-  const tabName = (fullView ? privateTabs : publicTabs).find(([key]) => key === tab)?.[1] || '';
-  const recordTypeName = recordTypes.find(([key]) => key === recordType)?.[1] || '';
-  const statusText = !fullView
-    ? published ? `摘要发布：${published}` : ''
-    : !loaded ? '尚未读取事实库'
-      : error ? '上次成功读取的记录 · 连接状态待确认'
-        : authenticated ? '事实库：本次读取的服务端记录' : '只读浏览 · 登录后可录入与修改';
+  const tabName = location.section === 'settings' ? '管理设置' : privateTabs.find(([key]) => key === location.section)?.[1] || '';
   return <div className="app">
     <a href="#main" className="skip-link">跳到正文</a>
     <header className="topbar"><div className="topbar-inner">
       <div className="brand"><span className="brand-mark" aria-hidden="true">≈</span><div><b>Nico 游泳成长记录</b><small>{!fullView ? (authenticated ? '查看模式 · 已登录' : '精选摘要') : authenticated ? `${roleLabels[role] || '访问'}` : '只读浏览'}</small></div></div>
-      <nav className="main-tabs" aria-label="主要导航">{tabs.map(([key, label]) => <button key={key} className={`tab-btn ${tab === key ? 'active' : ''}`} aria-current={tab === key ? 'page' : undefined} onClick={() => navigate(key)}>{label}</button>)}</nav>
+      <nav className="main-tabs" aria-label="主要导航">{tabs.map(([key, label]) => <button key={key} className={`tab-btn ${(fullView ? location.section : tab) === key ? 'active' : ''}`} aria-current={(fullView ? location.section : tab) === key ? 'page' : undefined} onClick={() => navigate(key)}>{label}</button>)}</nav>
       <div className="topbar-right">
         <button type="button" className="refresh-trigger" onClick={reload} disabled={loading}>刷新记录</button>
         {adminCapable && (session?.authenticated
@@ -150,6 +151,7 @@ export default function App() {
               {userMenuOpen && <div className="pop-backdrop" onClick={() => setUserMenuOpen(false)} aria-hidden="true"/>}
               <button type="button" className="user-chip" onClick={() => setUserMenuOpen(value => !value)} aria-expanded={userMenuOpen} aria-haspopup="menu" aria-label={`${session.username || '管理员'}，已登录，${fullView ? '管理模式' : '查看模式'}`}><span className="user-avatar" aria-hidden="true">{(roleLabels[role] || '访')[0]}</span>{fullView ? '管理模式' : '查看模式'} ▾</button>
               {userMenuOpen && <div className="user-menu" role="menu">
+                {authenticated && role === 'owner' && <button type="button" role="menuitem" onClick={() => { modeRef.current = 'manage'; api.setMode('manage'); setMode('manage'); setUserMenuOpen(false); const target = resolveManagementLocation('settings'); setLocation(target); positionStore.current?.write(target); void reload(); }}>管理设置</button>}
                 {authenticated && <button type="button" role="menuitem" onClick={() => switchMode(fullView ? 'view' : 'manage')}>{fullView ? '切换到查看模式' : '返回管理模式'}</button>}
                 <button type="button" role="menuitem" onClick={() => { setUserMenuOpen(false); setPasswordOpen(true); }}>修改密码</button>
                 <button type="button" role="menuitem" className="danger" onClick={() => { setUserMenuOpen(false); setLogoutError(''); setLogoutOpen(true); }}>退出登录</button>
@@ -160,13 +162,8 @@ export default function App() {
       </div>
     </div></header>
     {fullView && <div className="ctxbar"><div className="ctxbar-inner">
-      <nav className="crumb" aria-label="当前位置"><b>{tabName}</b>{fullView && tab === 'records' && <> / {recordTypeName}</>}{fullView && tab === 'review' && <> / {reviewTab === 'report' ? '周期报告' : '录像复盘'}</>}<span className="crumb-sub">{statusText}</span></nav>
-      {fullView && tab === 'records' && <div className="ctx-tabs" role="group" aria-label="记录类型">{recordTypes.map(([key, label]) => <button key={key} aria-pressed={recordType === key} onClick={() => setRecordType(key)}>{label}</button>)}</div>}
-      {fullView && tab === 'review' && <div className="ctx-tabs" role="group" aria-label="复盘内容"><button aria-pressed={reviewTab === 'report'} onClick={() => setReviewTab('report')}>周期报告</button><button aria-pressed={reviewTab === 'media'} onClick={() => setReviewTab('media')}>录像复盘</button></div>}
-      <div className="ctx-actions">
-        {fullView && !readOnly && tab === 'today' && <button className="apple-btn apple-btn-primary" onClick={() => navigate('records', 'trainings')}>记录本次训练</button>}
-        <form className="record-search" onSubmit={runSearch} role="search"><input className="apple-input" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder="日期 / 项目 / 备注" aria-label="查找记录"/><button type="submit">查找</button></form>
-      </div>
+      <nav className="crumb" aria-label="当前位置"><b>{tabName}</b><span className="crumb-sub">完整档案 · 公开展示需单独选择</span></nav>
+      <form className="record-search" onSubmit={runSearch} role="search"><input className="apple-input" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder="日期 / 项目 / 备注" aria-label="查找记录"/><button type="submit">查找</button></form>
     </div></div>}
     <div className="shell">
       <main id="main" className="pane">
@@ -174,12 +171,7 @@ export default function App() {
         {session?.authenticated && session.mustChangePassword
           ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
           : loading && !selectedLoaded ? <Message>正在读取记录…</Message> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense key={session?.authenticated ? session.username : 'guest'} fallback={<Message>正在打开页面…</Message>}>
-            {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate} readOnly={readOnly}/>}
-            {fullView && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
-            {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate} manageSkills={role === 'owner'}/>}
-            {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} manageTemplates={role === 'owner'} initialFilter={searchSeed} initialOpen={quickEntry} onLinkMedia={record => { setMediaTarget({ recordId: record.id, date: record.date }); setReviewTab('media'); navigate('review'); }}/>}
-            {fullView && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'} initialRecord={mediaTarget}/>)}
-            {fullView && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
+            {fullView && <ManagementView location={location} navigate={navigate} data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
         {passwordOpen && session?.authenticated && <Suspense fallback={<Message>正在打开账号设置…</Message>}><Modal title="修改管理员密码" onClose={() => setPasswordOpen(false)}><ChangePassword api={api} onChanged={async () => { setPasswordOpen(false); await reload(); }}/></Modal></Suspense>}

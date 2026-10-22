@@ -630,3 +630,32 @@ dialog::backdrop { background: var(--overlay); }
 /* Touch targets include the practice/skills section switch. */
 .ctx-tabs button { min-height:44px; }
 .growth-records .training-check { min-height:44px; }
+
+/* V1.2 management: actions first, details on demand. */
+.management-view { min-width:0; }
+.management-sections { display:flex; gap:.4rem; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:.7rem; }
+.management-sections button { min-height:44px; padding:.5rem .85rem; background:transparent; border:1px solid transparent; border-radius:var(--r-sm); color:var(--text-muted); }
+.management-sections button[aria-current="page"] { background:var(--brand-soft); color:var(--brand); border-color:var(--line-strong); font-weight:650; }
+.quick-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.75rem; }
+.quick-action { min-height:98px; padding:1.1rem; background:var(--surface); text-align:left; border:1px solid var(--line-strong); border-radius:var(--r-md); color:var(--text); }
+.quick-action:first-child { background:var(--brand); color:white; border-color:var(--brand); }
+.quick-action strong { display:block; font-size:1.15rem; margin-bottom:.45rem; }
+.quick-action span { display:block; font-size:.85rem; opacity:.8; }
+.workbench-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.5rem; }
+.workbench-section { min-width:0; padding:1.25rem 0; border-top:1px solid var(--line); }
+.workbench-section h2 { font-size:1.2rem; margin:0 0 .8rem; }
+.workbench-section button { min-height:44px; }
+.workbench-list { list-style:none; margin:0; padding:0; }
+.workbench-list li { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.65rem 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.workbench-list p { margin:.25rem 0; }
+.workbench-focus { font-size:1.2rem; max-width:60ch; margin-block:1rem; }
+.workbench-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+.workbench-stats strong { display:block; font-size:1.8rem; color:var(--brand); font-weight:650; }
+@media(max-width:650px) {
+  .quick-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .quick-action { min-height:88px; padding:.9rem; }
+  .quick-action span { font-size:.8rem; }
+  .workbench-columns { grid-template-columns:1fr; gap:0; }
+  .workbench-stats { gap:.5rem; font-size:.85rem; }
+  .workbench-stats strong { font-size:1.45rem; }
+}
