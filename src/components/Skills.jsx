@@ -7,8 +7,8 @@ import { Field, Message, Empty } from './ui';
 import { EvidencePicker, GrowthForm, GrowthHistory, GrowthActionDialog } from './GrowthUI';
 const standardDefaults = () => ({ modelVersion: 1, name: '', dimension: '水中安全', levels: Object.fromEntries(SKILL_LEVELS.map(level => [level, ''])), status: '停用', reviewedBy: '', notes: '' });
 const assessmentDefaults = () => ({ modelVersion: 1, skillId: '', definitionVersion: 0, date: today(), assessor: '', level: '', status: '待确认', evidenceNote: '', evidenceRefs: [], improvementNote: '', previousAssessmentId: '', weakPointId: '', checkinIds: [] });
-export default function Skills({ data, api, onSaved, readOnly, onCreatePoint, retestSeed }) {
-  const [section, setSection] = useState('assessments'), [skillId, setSkillId] = useState(retestSeed?.skillId || ''), [dimension, setDimension] = useState(''), [action, setAction] = useState(null);
+export default function Skills({ data, api, onSaved, readOnly, onCreatePoint, retestSeed, initialSection = 'assessments' }) {
+  const [section, setSection] = useState(initialSection), [skillId, setSkillId] = useState(retestSeed?.skillId || ''), [dimension, setDimension] = useState(''), [action, setAction] = useState(null);
   const assessment = useGrowthForm({ collection: 'skillAssessments', defaults: assessmentDefaults, data, api, onSaved, readOnly });
   const standard = useGrowthForm({ collection: 'skillDefinitions', defaults: standardDefaults, data, api, onSaved, readOnly });
   const timeline = useMemo(() => skillTimeline(data), [data]);

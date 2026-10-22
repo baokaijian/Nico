@@ -10,8 +10,8 @@ const Skills = lazy(() => import('./Skills'));
 const splitRefs = value => String(value || '').split(/[,，、\s]+/).filter(Boolean);
 const statusHint = { 待确认: '待家长依据教练反馈核对', 练习中: '当前打卡目标', 已改善: '保留记录，不再计入周目标', 暂停: '暂不打卡，保留历史' };
 
-export default function Practice({ data, api, onSaved, readOnly = false, navigate, manageSkills = true }) {
-  const [section, setSection] = useState('practice'), [retestSeed, setRetestSeed] = useState(null);
+export default function Practice({ data, api, onSaved, readOnly = false, navigate, manageSkills = true, initialSection = 'practice' }) {
+  const [section, setSection] = useState(initialSection), [retestSeed, setRetestSeed] = useState(null);
   const overview = useMemo(() => practiceOverview(data), [data]);
   const growth = useMemo(() => growthTimeline(data), [data]);
   const dimensions = useMemo(() => planDimensions(data), [data]);
