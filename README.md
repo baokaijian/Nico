@@ -6,7 +6,7 @@
 
 ## V1.2 管理体验开发
 
-开发分支为`codex/v1-2-management`，尚未合并上线。详细[导航方案、旧新映射、原操作路径和原型](docs/superpowers/specs/2026-10-22-v1-2-management-design.md)、[分阶段计划](docs/superpowers/plans/2026-10-22-v1-2-management.md)、[实际验收与回滚记录](docs/v1-2-acceptance.md)。前端和兼容API需配套发布，无破坏性数据库迁移。真人45秒录入目标尚未测量。
+开发分支`codex/v1-2-management`已推送，尚未合并上线。详细[导航方案、旧新映射、原操作路径和原型](docs/superpowers/specs/2026-10-22-v1-2-management-design.md)、[分阶段计划](docs/superpowers/plans/2026-10-22-v1-2-management.md)、[实际验收与回滚记录](docs/v1-2-acceptance.md)。前端和兼容API需配套发布，无破坏性数据库迁移。真人45秒录入目标尚未测量。
 
 ## 数据与运行方式
 
