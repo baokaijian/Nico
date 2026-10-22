@@ -4,8 +4,8 @@ export class ApiError extends Error {
 }
 export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = () => '', options = {}) {
   const persistence = createSessionPersistence(base, options);
-  let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {};
-  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; persistence.clear(); };
+  let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {}, draftIdentity = null;
+  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; persistence.clear(); };
   const unauthorized = () => { resetAuth(); onUnauthorized(); };
   const credential = () => accessToken || getToken();
   const credentials = base ? 'omit' : 'same-origin';
@@ -83,8 +83,11 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     if (result.accessToken) { generation++; revision = null; accessToken = result.accessToken; }
     if (result.csrf) csrf = result.csrf;
     if (accessToken && result.expiresAt) persistence.save(accessToken, result.expiresAt);
+    if (result.authenticated && !result.mustChangePassword && result.username && ['owner', 'coach'].includes(result.role)) {
+      if (draftIdentity?.account !== result.username || draftIdentity.epoch !== generation) draftIdentity = { backend: base || globalThis.location?.origin || 'local', account: result.username, athlete: 'nico', epoch: generation };
+    } else if (action === 'session' || action === 'login') draftIdentity = null;
     return result;
   }
-  return { cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
+  return { cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getDraftScope: () => draftIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };
 }
