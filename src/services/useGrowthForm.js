@@ -3,10 +3,11 @@ import { validateRecord } from '../../shared/domain.mjs';
 import { editableGrowth } from '../../shared/growth-model.ts';
 import useRecordDraft from './useRecordDraft';
 import { validGrowthDraft } from './drafts';
-export default function useGrowthForm({ collection, defaults, data, api, onSaved, readOnly }) {
-  const fresh = useCallback(values => ({ values: { ...defaults(), ...values }, editing: null, baseRevision: api.getRevision(), clientRequestId: crypto.randomUUID() }), [defaults, api]);
+export default function useGrowthForm({ collection, defaults, data, api, onSaved, readOnly, initialValues = {}, requestId, draftCollection, onRecordSaved, onBusyChange }) {
+  const fresh = useCallback(values => ({ values: { ...defaults(), ...initialValues, ...values }, editing: null, baseRevision: api.getRevision(), clientRequestId: requestId || crypto.randomUUID() }), [defaults, api, initialValues, requestId]);
   const [form, setForm] = useState(() => fresh()), [open, setOpen] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false);
-  const dirty = useRef(false), draft = useRecordDraft(api, collection, validGrowthDraft), { persist } = draft;
+  const dirty = useRef(false), draft = useRecordDraft(api, draftCollection || collection, validGrowthDraft), { persist } = draft;
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   useEffect(() => { if (dirty.current && !readOnly) persist(form); }, [form, readOnly, persist]);
   const change = (key, value) => { const firstInput = !dirty.current; dirty.current = true; setForm(current => ({ ...current, ...(firstInput ? { baseRevision: api.getRevision() } : {}), values: { ...current.values, [key]: value } })); };
   const replace = (values, editing = null) => {
@@ -22,7 +23,7 @@ export default function useGrowthForm({ collection, defaults, data, api, onSaved
       const previous = form.editing ? data[collection].find(record => record.id === form.editing) : null;
       validateRecord(collection, form.values, previous);
       const record = await api.request(`/api/${collection}${form.editing ? `/${form.editing}` : ''}`, { method: form.editing ? 'PUT' : 'POST', body: { ...form.values, ...(!form.editing ? { clientRequestId: form.clientRequestId } : {}) }, expectedRevision: form.baseRevision });
-      onSaved(collection, record); reset(); setOpen(false); setNotice('已保存到服务端；确认与达成状态须另行人工核对。');
+      onSaved(collection, record); reset(); setOpen(false); setNotice('已保存到服务端；确认与达成状态须另行人工核对。'); onRecordSaved?.(record, collection);
     } catch (problem) { setError(problem.message); setConflict(problem.status === 409); } finally { setBusy(false); }
   };
   const remove = async record => {

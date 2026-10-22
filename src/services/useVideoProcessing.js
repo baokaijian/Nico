@@ -22,6 +22,7 @@ export default function useVideoProcessing(api, onSaved) {
       body.append('sourceUrl', record.url); body.append('playback', variants.playback, 'playback.mp4'); body.append('poster', variants.poster, 'poster.jpg'); body.append('metadata', JSON.stringify(variants.metadata));
       const saved = await api.request(`/api/media/${encodeURIComponent(record.id)}/variants`, { method: 'POST', body, expectedRevision, signal: controller.signal });
       if (mounted.current) { onSaved('media', saved); cached.current = null; setStatus('兼容播放副本与封面已保存；原片保留。'); }
+      return { success: true };
     } catch (problem) {
       if (!mounted.current) return;
       const message = controller.signal.aborted ? cached.current ? '已停止等待保存结果，原片保留；请先刷新核对是否已保存，再重试。' : '已取消兼容处理，原片仍保留，可在列表重试。' : `原片已保存；${problem.message} ${cached.current ? '生成结果暂存于本页，可重试保存；遇到版本冲突请先刷新核对。' : '可在列表重新处理，不必重复上传原片。'}`;
@@ -31,6 +32,7 @@ export default function useVideoProcessing(api, onSaved) {
       if (!cached.current && !problem.status) {
         try { const saved = await api.request(`/api/media/${encodeURIComponent(record.id)}/processing-failure`, { method: 'POST', expectedRevision, body: { sourceUrl: record.url, message: message.slice(0, 300) } }); if (mounted.current) onSaved('media', saved); } catch { /* Original save remains authoritative; failure status was not confirmed. */ }
       }
+      return { success: false, message };
     } finally { operation.current = null; if (mounted.current) setBusy(false); }
   };
   return { busy, status, error, process, cancel: () => operation.current?.abort() };

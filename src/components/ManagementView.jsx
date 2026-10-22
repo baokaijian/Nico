@@ -11,7 +11,7 @@ const Goals = lazy(() => import('./GrowthGoals'));
 const Reports = lazy(() => import('./Reports'));
 const Gallery = lazy(() => import('./MediaGallery'));
 const Profile = lazy(() => import('./Profile'));
-export default function ManagementView({ location, navigate, data, api, onSaved, reload, readOnly, role, openQuickEntry, initialOpen, initialFilter, mediaTarget }) {
+export default function ManagementView({ location, navigate, data, api, onSaved, reload, readOnly, role, openQuickEntry, initialOpen, initialFilter, mediaTarget, resumeVersion }) {
   const { section, view } = location, owner = role === 'owner';
   const shared = { data, api, onSaved, reload, readOnly, navigate };
   const views = section === 'settings' ? SETTINGS_VIEWS : MANAGEMENT_NAV.find(item => item.key === section)?.views || [];
@@ -20,7 +20,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
   return <div className="management-view stack">{section !== 'workbench' && <nav className="management-sections" aria-label={`${section === 'settings' ? '管理设置' : MANAGEMENT_NAV.find(item => item.key === section)?.label}分类`}>{views.map(([key, label]) => <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{label}</button>)}</nav>}
     {archive && <div className="ctx-tabs" role="group" aria-label="成长档案内容">{[['archive', '基础档案'], ['growth', '身体测量'], ['fitness', '体能测量'], ['nutrition', '恢复与饮食']].map(([key, label]) => <button key={key} aria-pressed={view === key} onClick={() => navigate('review', key)}>{label}</button>)}</div>}
     <Suspense fallback={<Message>正在打开记录…</Message>}>
-      {section === 'workbench' && <Workbench {...shared} openQuickEntry={openQuickEntry}/>}
+      {section === 'workbench' && <Workbench {...shared} role={role} resumeVersion={resumeVersion} openQuickEntry={openQuickEntry}/>}
       {section === 'training' && ['trainings', 'swim'].includes(view) && <Records key={view} {...shared} type={view} readOnly={readOnly || !['owner', 'coach'].includes(role)} manageTemplates={owner} initialFilter={initialFilter} initialOpen={initialOpen} onLinkMedia={record => openQuickEntry('media', { trainingId: record.id })}/>}
       {section === 'training' && view === 'plans' && <Plans {...shared}/>}
       {(section === 'training' || section === 'review') && view === 'media' && <Gallery {...shared} key={`${section}/${mediaTarget?.recordId || ''}`} allowUpload={owner} initialRecord={mediaTarget}/>}

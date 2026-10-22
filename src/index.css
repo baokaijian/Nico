@@ -659,3 +659,30 @@ dialog::backdrop { background: var(--overlay); }
   .workbench-stats { gap:.5rem; font-size:.85rem; }
   .workbench-stats strong { font-size:1.45rem; }
 }
+.quick-entry { display:grid; gap:1rem; min-width:0; }
+.quick-entry .stack { gap:.75rem; }
+.quick-entry .glass-card { box-shadow:none; padding:.8rem; }
+.quick-entry .entry-context { margin:0; padding:.7rem; background:var(--brand-soft); border-radius:var(--r-sm); overflow-wrap:anywhere; }
+.entry-context span { display:inline-block; margin-left:.5rem; color:var(--brand); font-size:.85rem; }
+.quick-entry details { min-width:0; }
+.quick-entry input[type="file"] { max-width:100%; min-width:0; }
+.entry-summary h3 { color:var(--brand); }
+.entry-summary li { margin-block:.5rem; }
+.entry-next-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+.entry-next-actions button { min-height:48px; white-space:normal; }
+.entry-tools { display:flex; flex-wrap:wrap; gap:.5rem; border-top:1px solid var(--line); padding-top:1rem; }
+.quick-entry button { min-height:44px; }
+.quick-entry > .entry-back { justify-self:start; }
+dialog:has(.quick-entry) { width:min(760px,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); }
+.mobile-quick-entry { display:none; }
+@media(max-width:650px) {
+  dialog:has(.quick-entry) { width:100%; max-width:100%; height:100dvh; max-height:100dvh; margin:0; border-radius:0; padding:1rem; box-sizing:border-box; }
+  dialog:has(.quick-entry) > .flex-between { position:sticky; top:-1rem; background:var(--surface); z-index:2; padding-block:.6rem; }
+  .quick-entry .actions { position:sticky; bottom:-1rem; background:var(--surface); padding:.75rem 0 calc(.75rem + env(safe-area-inset-bottom)); z-index:1; }
+  .entry-next-actions { grid-template-columns:1fr; }
+  .mobile-quick-entry { display:block; position:fixed; right:16px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:30; }
+  .mobile-quick-entry > button { min-height:48px; box-shadow:var(--shadow); }
+  .mobile-quick-options { display:grid; gap:.4rem; margin-bottom:.5rem; padding:.6rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow); }
+  .mobile-quick-options button { min-height:44px; padding:.6rem 1rem; }
+  .app:has(.mobile-quick-entry) .shell { padding-bottom:96px; }
+}

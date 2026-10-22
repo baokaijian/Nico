@@ -12,6 +12,7 @@ export const validGrowthDraft = value => plain(value) && plain(value.values) &&
     if (['definitionVersion', 'modelVersion', 'currentProgress'].includes(key)) return typeof item === 'number' && Number.isFinite(item);
     return typeof item === 'string';
   });
+export const validUploadDraft = value => plain(value) && plain(value.values) && Object.entries(value.values).every(([key, item]) => ['date', 'title', 'description', 'category', 'recordId'].includes(key) && typeof item === 'string') && typeof value.clientRequestId === 'string' && Number.isSafeInteger(value.baseRevision) && typeof value.fileLabel === 'string';
 export const draftScopeKey = scope => scope?.backend && scope?.account && scope?.athlete ? [scope.backend, scope.account, scope.athlete].map(encodeURIComponent).join(':') : '';
 const legacyKey = collection => collection === 'training' ? 'nico_training_draft_v1' : `nico_form_draft_${collection}`;
 export function createDraftStore({ scope, isCurrent = () => true, storage, now = Date.now, validate = plain } = {}) {
