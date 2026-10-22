@@ -42,4 +42,10 @@ for (const runtime of ['local', 'cloud']) test(`${runtime}连续活动：成绩/
   assert.equal((await send(`/api/swim/${saved.id}`, 'DELETE')).status, 200); assert.equal((await send('/api/swim', 'POST', input)).status, 409);
   assert.equal((await send(`/api/media/${media.id}`, 'DELETE')).status, 200); assert.equal((await send('/api/media', 'POST', uploadForm(training.id))).status, 409); assert.equal(uploads(), 1, '已保存原片保留，重试临时文件清理');
   assert.equal(read().data.trainings.length, 1); assert.equal(read().data.trainings[0].totalMeters, 100);
+  for (const [key, values] of [['weakpoints', {date:'2000-01-01', title:'协议改进点', category:'技术动作',sourceType:'家长观察', evidence:'隔离测试观察',status:'练习中'}], ['checkins', {date:'2000-01-01', weakPointId:read().data.weakpoints[0]?.id, times:2}]]) {
+    const input={...values, ...(key === 'checkins' ? {weakPointId:read().data.weakpoints[0].id} : {}), clientRequestId:`protocol-${key}-request`}, base=read().revision;
+    const first=await send(`/api/${key}`,'POST',input); const row=await first.json(); assert.equal(first.status,201,row.error);
+    const replay=await send(`/api/${key}`,'POST',input,base); assert.equal(replay.status,200); assert.equal((await replay.json()).id,row.id); assert.equal(read().data[key].length,1);
+    assert.equal((await send(`/api/${key}`,'POST',{...input,notes:'changed'})).status,409);
+  }
 });

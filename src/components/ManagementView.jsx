@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { MANAGEMENT_NAV, SETTINGS_VIEWS } from '../services/management';
 import { Message } from './ui';
+const GrowthWorkspace = lazy(() => import('./GrowthWorkspace'));
 const Workbench = lazy(() => import('./Workbench'));
 const Dashboard = lazy(() => import('./Dashboard'));
 const Records = lazy(() => import('./Records'));
@@ -25,7 +26,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'training' && view === 'plans' && <Plans {...shared}/>}
       {(section === 'training' || section === 'review') && view === 'media' && <Gallery {...shared} key={`${section}/${mediaTarget?.recordId || ''}`} allowUpload={owner} initialRecord={mediaTarget}/>}
       {section === 'growth' && view === 'practice' && <Practice {...shared} manageSkills={owner}/>}
-      {section === 'growth' && view === 'skills' && <Practice {...shared} initialSection="skills" manageSkills={owner}/>}
+      {section === 'growth' && view === 'skills' && <GrowthWorkspace {...shared} manageSkills={owner}/>}
       {section === 'growth' && view === 'goals' && <Goals {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'trends' && <Dashboard {...shared}/>}
       {section === 'review' && view === 'reports' && <Reports data={data}/>}
