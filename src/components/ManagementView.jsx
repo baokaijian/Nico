@@ -28,7 +28,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'growth' && view === 'practice' && <Practice {...shared} manageSkills={owner}/>}
       {section === 'growth' && view === 'skills' && <GrowthWorkspace {...shared} manageSkills={owner}/>}
       {section === 'growth' && view === 'goals' && <Goals {...shared} readOnly={readOnly || !owner}/>}
-      {section === 'review' && view === 'trends' && <Dashboard {...shared}/>}
+      {section === 'review' && view === 'trends' && <Dashboard {...shared} detailOnly/>}
       {section === 'review' && view === 'reports' && <Reports data={data}/>}
       {archive && (view === 'archive' ? <Profile {...shared} role="viewer" view="archive" readOnly/> : <Records key={view} {...shared} type={view} readOnly={readOnly || !owner} initialFilter={initialFilter}/>)}
       {section === 'settings' && (view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view}/>)}

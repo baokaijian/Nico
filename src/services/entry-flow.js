@@ -46,3 +46,7 @@ export function entryDefaults(type, context, data) {
   }
   return { date, recordId: record?.id || '' };
 }
+// Keep the root receipt discoverable while any optional form remains unsubmitted.
+export function canFinishEntryFlow(list, flowId) {
+  return list?.status === 'ready' && !list.items.some(item => item.collection.startsWith(`quick.${flowId}.`) && ['ready','expired','corrupt','unavailable'].includes(item.status));
+}

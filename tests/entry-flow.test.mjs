@@ -33,3 +33,10 @@ test('流程草稿拒绝损坏步骤/请求ID/附带文件或私有表单快照'
   const flow = newEntryFlow('score'); assert.equal(validEntryFlow(flow), true);
   for (const patch of [{ step: 'unknown' }, { requests: {} }, { scoreIds: [null] }, { file: 'raw bytes' }]) assert.equal(validEntryFlow({ ...flow, ...patch }), false);
 });
+
+test('结束时未提交的补充草稿仍有恢复入口，未知存储状态不当作已清空', async () => {
+  const { canFinishEntryFlow } = await import('../src/services/entry-flow.js');
+  assert.equal(canFinishEntryFlow({status:'ready',items:[{collection:'quick.flow-a.swim',status:'ready'}]},'flow-a'),false);
+  assert.equal(canFinishEntryFlow({status:'ready',items:[{collection:'quick.flow-b.swim',status:'ready'}]},'flow-a'),true);
+  assert.equal(canFinishEntryFlow({status:'unavailable',items:[]},'flow-a'),false);
+});

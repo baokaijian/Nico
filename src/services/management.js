@@ -1,3 +1,4 @@
+import { eligiblePerformance, performanceMilliseconds } from '../../shared/performance.ts';
 import { analysis, planContext, ordered } from '../../shared/domain.mjs';
 import { practiceOverview } from '../../shared/practice.mjs';
 import { trainingFacts, trainingSummary } from '../../shared/training.ts';
@@ -36,5 +37,8 @@ export function workbenchModel(data, day) {
   const pending = [['skillAssessments', '技能测评', 'skills'], ['weakpoints', '技术短板', 'practice'], ['goals', '阶段目标', 'goals'], ['milestones', '成长里程碑', 'goals']].flatMap(([key, label, view]) => (data[key] || []).filter(row => row.status === '待确认').map(row => ({ id: row.id, key, label, title: row.title || row.standardSnapshot?.name || '待核对记录', location: { section: 'growth', view } })));
   const week = practiceOverview(data, day).week, result = analysis(data), context = planContext(data, day, result.version);
   const actual = ordered(data.trainings).filter(row => row.date <= day && trainingFacts(row).occurred);
-  return { pending, week, summary: trainingSummary(data.trainings.filter(row => row.date >= week.start && row.date <= day)), goals: (data.goals || []).filter(row => row.status === '进行中'), latestTraining: actual.at(-1) || null, recentScores: ordered(data.swim).filter(row => row.date <= day).reverse().slice(0, 3), focus: context.current?.focus || result.focus, confirmedFocus: !!context.current };
+  const latestScore = ordered(data.swim).filter(row => row.date <= day).at(-1);
+  const peers = latestScore && eligiblePerformance(latestScore) ? ordered(data.swim).filter(row => row.date <= day && eligiblePerformance(row) && ['distance','stroke','poolLength'].every(key => row[key] === latestScore[key])) : [];
+  const scoreChange = peers.length >= 2 ? { current: peers.at(-1), previous: peers.at(-2), deltaMs: performanceMilliseconds(peers.at(-1)) - performanceMilliseconds(peers.at(-2)) } : null;
+  return { pending, week, scoreChange, summary: trainingSummary(data.trainings.filter(row => row.date >= week.start && row.date <= day)), goals: (data.goals || []).filter(row => row.status === '进行中'), latestTraining: actual.at(-1) || null, recentScores: ordered(data.swim).filter(row => row.date <= day).reverse().slice(0, 3), focus: context.current?.focus || result.focus, confirmedFocus: !!context.current };
 }

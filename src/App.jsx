@@ -22,6 +22,7 @@ export default function App() {
   const [logoutOpen, setLogoutOpen] = useState(false), [logoutBusy, setLogoutBusy] = useState(false), [logoutError, setLogoutError] = useState('');
   const [entry, setEntry] = useState(null), [resumeVersion, setResumeVersion] = useState(0), [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [location, setLocation] = useState({ section: 'workbench', view: 'home' });
+  const entryOpener = useRef(null);
   const positionStore = useRef(null), positionIdentity = useRef(null);
   const [mediaTarget, setMediaTarget] = useState(null), [quickEntry, setQuickEntry] = useState(false);
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
@@ -97,7 +98,7 @@ export default function App() {
     else setTab(next);
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
-  const openQuickEntry = (type, context = {}) => { if (role !== 'owner' && (type === 'skill' || type === 'media' && !context.trainingId)) { setNotice('此录入操作仅限家长管理者。'); return; } setQuickMenuOpen(false); setEntry({ type, context }); };
+  const openQuickEntry = (type, context = {}) => { if (role !== 'owner' && (type === 'skill' || type === 'media' && !context.trainingId)) { setNotice('此录入操作仅限家长管理者。'); return; } entryOpener.current = document.activeElement; setQuickMenuOpen(false); setEntry({ type, context }); };
   const closeEntry = () => { setEntry(null); setResumeVersion(value => value + 1); };
   const onSaved = (collection, record, removedId) => {
     setData(current => {
@@ -173,7 +174,7 @@ export default function App() {
             {fullView && <ManagementView location={location} navigate={navigate} data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget} resumeVersion={resumeVersion}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
-        {fullView && entry && !readOnly && <Suspense fallback={<Message>正在打开快捷录入…</Message>}><QuickEntry key={entry.type} {...entry} data={data} api={api} onSaved={onSaved} reload={reload} onClose={closeEntry} navigate={navigate} role={role}/></Suspense>}
+        {fullView && entry && !readOnly && <Suspense fallback={<Message>正在打开快捷录入…</Message>}><QuickEntry key={entry.type} {...entry} data={data} api={api} onSaved={onSaved} reload={reload} onClose={closeEntry} navigate={navigate} role={role} restoreFocus={() => { const target = entryOpener.current?.isConnected ? entryOpener.current : document.querySelector('.mobile-quick-entry > button'); target?.focus(); }}/></Suspense>}
         {passwordOpen && session?.authenticated && <Suspense fallback={<Message>正在打开账号设置…</Message>}><Modal title="修改管理员密码" onClose={() => setPasswordOpen(false)}><ChangePassword api={api} onChanged={async () => { setPasswordOpen(false); await reload(); }}/></Modal></Suspense>}
         {logoutOpen && <LogoutDialog api={api} busy={logoutBusy} error={logoutError} onLogout={logout} onClose={() => { if (!logoutBusy) setLogoutOpen(false); }}/>}
       </main>
