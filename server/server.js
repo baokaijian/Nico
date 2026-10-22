@@ -1,3 +1,4 @@
+import { activityRelations } from '../shared/activity-records.mjs';
 import { growthCollection, growthId } from '../shared/growth-model.ts';
 import { saveGrowth, actGrowth, deleteGrowth, restoreGrowth, retainGrowthHistory, goalCandidates, skillTimeline } from '../shared/growth-records.mjs';
 import { upgradePrdState } from '../shared/prd.mjs';
@@ -105,6 +106,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   const reply = (res, saved, status = 200) => res.set('X-Nico-Revision', String(saved.revision)).status(status).json(saved.result);
   const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw httpError(400, error.message); } };
   function relations(collection, record, data, previous = null) {
+    activityRelations(collection, record, data, previous);
     if (collection === 'plans') {
       const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
       if ((record.sourceIds || []).some(id => !existingIds.has(id))) throw httpError(400, '计划引用的来源记录不存在');
@@ -137,12 +139,12 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (key !== 'media') app.post(`/api/${key}`, async (req, res) => {
       canWrite(req, key);
       revision(req);
-      const request = (trainingCollection(key) || growthCollection(key)) ? await creationRequest(req.body, req.username) : null;
+      const request = (trainingCollection(key) || growthCollection(key) || key === 'swim') ? await creationRequest(req.body, req.username) : null;
       const current = store.read(), replay = creationReplay(current.data, key, request);
       if (replay) return reply(res, { revision: current.revision, result: replay });
       if (growthCollection(key)) return reply(res, change(req, data => saveGrowth(data, key, req.body, { id: makeId(key), actor: req.username, now: new Date().toISOString(), request })), 201);
       const record = { ...validate(key, req.body), id: makeId(key) };
-      if (trainingCollection(key)) stampTraining(record, null, req.username, new Date().toISOString(), request);
+      if (trainingCollection(key) || key === 'swim') stampTraining(record, null, req.username, new Date().toISOString(), request);
       reply(res, change(req, data => { relations(key, record, data); data[key].push(record); return record; }), 201);
     });
     app.put(`/api/${key}/:id`, (req, res) => {
@@ -153,7 +155,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
         const previous = data[key][index];
         if (growthCollection(key, previous) || key === 'goals' && req.body.modelVersion === 1) return saveGrowth(data, key, req.body, { id: previous.id, actor: req.username, now: new Date().toISOString() });
         const record = validate(key, req.body, previous); relations(key, record, data, previous);
-        if (trainingCollection(key)) stampTraining(record, previous, req.username, new Date().toISOString());
+        if (trainingCollection(key) || key === 'swim') stampTraining(record, previous, req.username, new Date().toISOString());
         if (key === 'plans') {
           const outcome = commitPlanUpdate(data, req.params.id, data[key][index], record);
           if (outcome.error) throw httpError(400, outcome.error);
@@ -222,7 +224,12 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   app.post('/api/media', (req, _res, next) => { try { canWrite(req, 'media'); revision(req); next(); } catch (error) { next(error); } }, upload.single('file'), async (req, res) => {
     if (!req.file) throw httpError(400, '请选择文件');
     try {
-      const record = { ...validate('media', req.body), id: makeId('media'), type: req.file.mimetype.startsWith('video/') ? 'video' : 'photo', url: `/uploads/${req.file.filename}`, processingStatus: '待处理' };
+      const sourceSha256 = createHash('sha256').update(fs.readFileSync(req.file.path)).digest('hex');
+      const receipt = await creationRequest({ ...req.body, sourceSha256, sourceType: req.file.mimetype }, req.username);
+      const current = store.read(), replay = creationReplay(current.data, 'media', receipt);
+      if (replay) { fs.unlinkSync(req.file.path); return reply(res, { revision: current.revision, result: replay }); }
+      const record = { ...validate('media', req.body), id: makeId('media'), type: req.file.mimetype.startsWith('video/') ? 'video' : 'photo', url: `/uploads/${req.file.filename}`, sourceSha256, processingStatus: '待处理' };
+      stampTraining(record, null, req.username, new Date().toISOString(), receipt);
       if (processUploads) {
         let info;
         try { info = await inspectMedia(req.file.path, record.type); } catch { throw httpError(400, '无法识别真实素材格式，请检查文件或FFmpeg配置'); }

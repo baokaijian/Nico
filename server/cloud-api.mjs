@@ -1,3 +1,4 @@
+import { activityRelations } from '../shared/activity-records.mjs';
 import { growthCollection, growthId } from '../shared/growth-model.ts';
 import { saveGrowth, actGrowth, deleteGrowth, restoreGrowth, retainGrowthHistory, goalCandidates, skillTimeline } from '../shared/growth-records.mjs';
 import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
@@ -16,6 +17,7 @@ const fileFor = url => typeof url === 'string' && /^\/uploads\/[A-Za-z0-9_-][A-Z
 const publicFiles = data => publicSnapshot(data).media.flatMap(item => [fileFor(item.url), fileFor(item.posterUrl)].filter(Boolean));
 const privateFiles = data => data.media.flatMap(item => [fileFor(item.url), fileFor(item.playbackUrl), fileFor(item.posterUrl)].filter(Boolean));
 function relations(collection, record, data, previous = null) {
+  activityRelations(collection, record, data, previous);
   if (collection === 'plans') {
     const ids = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
     if ((record.sourceIds || []).some(id => !ids.has(id))) throw fail(400, '计划引用的来源记录不存在');
@@ -137,11 +139,21 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       if (!['POST', 'PUT', 'DELETE'].includes(method)) throw fail(404, '接口不存在');
       const expected = request.headers.get('if-match');
       if (!/^\d+$/.test(expected || '')) throw fail(428, '请先加载最新记录，再提交修改');
-      let trainingInput, receipt;
-      if (method === 'POST' && parts.length === 2 && parts[0] === 'api' && (trainingCollection(parts[1]) || growthCollection(parts[1]))) {
+      let trainingInput, receipt, mediaInput;
+      if (method === 'POST' && parts.length === 2 && parts[0] === 'api' && (trainingCollection(parts[1]) || growthCollection(parts[1]) || parts[1] === 'swim')) {
         trainingInput = await body(); receipt = await creationRequest(trainingInput, session.username);
         const replay = creationReplay(data, parts[1], receipt);
         if (replay) return json(replay);
+      }
+      if (method === 'POST' && endpoint === '/api/media') {
+        const form = await request.formData(), file = form.get('file');
+        if (!(file instanceof Blob) || !file.size || file.size > 50 * 1024 * 1024) throw fail(400, '请选择50MB以内的素材');
+        const input = Object.fromEntries([...form.entries()].filter(([key]) => key !== 'file'));
+        validate('media', input);
+        const source = await file.arrayBuffer(), sourceSha256 = await digestBytes(source);
+        receipt = await creationRequest({ ...input, sourceSha256, sourceType: file.type }, session.username);
+        const replay = creationReplay(data, 'media', receipt); if (replay) return json(replay);
+        mediaInput = { input, file, source, sourceSha256 };
       }
       if (Number(expected) !== current.revision) throw fail(409, '记录已被更新，请刷新后核对并重试；当前输入已保留');
       let result, uploadedFile;
@@ -149,15 +161,15 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       let planSync = true;
       try {
         if (parts[1] === 'media' && parts.length === 2 && method === 'POST') {
-          const form = await request.formData(), file = form.get('file');
+          const { input, file, source, sourceSha256 } = mediaInput;
           if (!(file instanceof Blob) || !file.size || file.size > 50 * 1024 * 1024) throw fail(400, '请选择50MB以内的素材');
           const types = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' };
           if (!types[file.type]) throw fail(400, '不支持此素材类型');
-          const record = validate('media', Object.fromEntries([...form.entries()].filter(([key]) => key !== 'file')));
+          const record = validate('media', input);
+          stampTraining(record, null, session.username, new Date(now()).toISOString(), receipt);
           uploadedFile = `file-${randomHex(16)}.${types[file.type]}`;
           Object.assign(record, { id: `media-${randomHex(16)}`, type: file.type.startsWith('video/') ? 'video' : 'photo', url: `/uploads/${uploadedFile}`, processingStatus: file.type.startsWith('video/') ? '已保存原片，兼容副本待处理' : '原图已保存' });
-          const source = await file.arrayBuffer();
-          record.sourceSha256 = await digestBytes(source);
+          record.sourceSha256 = sourceSha256;
           relations('media', record, data); await backend.upload(uploadedFile, source, file.type); data.media.push(record); result = record;
         } else if (parts[1] === 'media' && parts.length === 4 && method === 'POST' && ['variants', 'processing-failure'].includes(parts[3])) {
           const item = data.media.find(m => m.id === parts[2]);
@@ -199,7 +211,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
             const input = trainingInput ?? await body();
             if (growthCollection(key)) { result = saveGrowth(data, key, input, { id: `${key}-${randomHex(16)}`, actor: session.username, now: new Date(now()).toISOString(), request: receipt }); } else {
             const record = { ...validate(key, input), id: `${key}-${randomHex(16)}` };
-            if (trainingCollection(key)) stampTraining(record, null, session.username, new Date(now()).toISOString(), receipt);
+            if (trainingCollection(key) || key === 'swim') stampTraining(record, null, session.username, new Date(now()).toISOString(), receipt);
             relations(key, record, data); data[key].push(record); result = record; }
           }
           else if (['PUT', 'DELETE'].includes(method) && parts.length === 3) {
@@ -208,7 +220,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
               const previous = data[key][index], input = await body();
               if (growthCollection(key, previous) || key === 'goals' && input.modelVersion === 1) { result = saveGrowth(data, key, input, { id: previous.id, actor: session.username, now: new Date(now()).toISOString() }); } else {
               const record = validate(key, input, previous); relations(key, record, data, previous);
-              if (trainingCollection(key)) stampTraining(record, previous, session.username, new Date(now()).toISOString());
+              if (trainingCollection(key) || key === 'swim') stampTraining(record, previous, session.username, new Date(now()).toISOString());
               if (key === 'plans') { const outcome = commitPlanUpdate(data, parts[2], data[key][index], record); if (outcome.error) throw fail(400, outcome.error); }
               data[key][index] = record; result = record; }
             }
