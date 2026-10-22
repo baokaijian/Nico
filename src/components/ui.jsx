@@ -7,13 +7,13 @@ export function Field({ field, value, onChange }) {
 }
 export function Message({ children, error = false }) { return children ? <div className={`notice ${error ? 'error' : ''}`} role={error ? 'alert' : 'status'}>{children}</div> : null; }
 export function Empty({ children = '尚未录入记录。' }) { return <p className="empty">{children}</p>; }
-export function Modal({ title, children, onClose }) {
-  const ref = useRef(null), titleId = useId();
+export function Modal({ title, children, onClose, restoreFocus }) {
+  const ref = useRef(null), titleId = useId(), restoreRef = useRef(restoreFocus);
   useEffect(() => {
     const previous = document.activeElement;
     const dialog = ref.current;
     dialog.showModal();
-    return () => { dialog.close(); previous?.focus(); };
+    return () => { dialog.close(); if (restoreRef.current) restoreRef.current(); else previous?.focus(); };
   }, []);
   return <dialog ref={ref} aria-labelledby={titleId} onCancel={e => { e.preventDefault(); onClose(); }}><div className="flex-between"><h2 id={titleId}>{title}</h2><button type="button" className="apple-btn apple-btn-secondary" onClick={onClose} aria-label="关闭弹窗">关闭</button></div>{children}</dialog>;
 }

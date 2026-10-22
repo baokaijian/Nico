@@ -17,6 +17,6 @@ export default function GrowthWorkspace({ data, api, onSaved, readOnly, navigate
     <div hidden={panel !== 'assessments'}><Skills {...shared} readOnly={readOnly || !manageSkills} workspace focusedSkillId={selectedId} onSkillChange={setSkillId} assessmentSeed={assessmentSeed} onCreatePoint={row => { setPointSeed({ ...row, token: crypto.randomUUID() }); setPanel('practice'); }}/></div>
     <div hidden={panel !== 'practice'}><Practice {...shared} embedded focusedSkillId={selectedId} initialAssessment={pointSeed} manageSkills={manageSkills} onRetest={seedAssessment}/></div>
     <div hidden={panel !== 'goals'}><GrowthGoals {...shared} readOnly={readOnly || !manageSkills} focusedSkillId={selectedId}/></div>
-    <p className="muted">未关联到此技能的记录仍在“全部练习”和“全部目标”中；切换此工作区不会删除输入。</p>
+    <p className="muted">未关联到此技能的记录仍在“技术短板与打卡”和“目标与里程碑”中；切换此工作区不会删除输入。</p>
   </div>;
 }

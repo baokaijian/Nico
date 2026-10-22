@@ -4,6 +4,10 @@
 
 访客无需登录即可查看公开成长概览、家长选定的成绩和授权影像；完整档案、训练计划、分析及原片需登录。管理员账号用于录入、修改、导出与恢复记录。网站仍由GitHub Pages提供，账号、记录与素材由Supabase承接。详见[管理员登录说明](ADMIN_LOGIN.md)。
 
+## V1.2 管理体验开发
+
+开发分支为`codex/v1-2-management`，尚未合并上线。详细[导航方案、旧新映射、原操作路径和原型](docs/superpowers/specs/2026-10-22-v1-2-management-design.md)、[分阶段计划](docs/superpowers/plans/2026-10-22-v1-2-management.md)、[实际验收与回滚记录](docs/v1-2-acceptance.md)。前端和兼容API需配套发布，无破坏性数据库迁移。真人45秒录入目标尚未测量。
+
 ## 数据与运行方式
 
 - `data/original-input.json` 是原始录入档案。首次启动完整导入 SQLite，之后不改写该文件（本次迁移前为server/db.json，原字节保留）；旧成绩、身体测量、目标和素材原字段保留。

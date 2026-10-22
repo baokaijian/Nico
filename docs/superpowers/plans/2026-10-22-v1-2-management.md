@@ -1,6 +1,6 @@
 # Nico Growth V1.2 Management Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 用四入口管理界面及连续工作区降低家长日常录入复杂度，保留原有数据、安全、证据与保存可靠性。
 
@@ -38,11 +38,11 @@
 - workbenchModel(data, day) -> {pending,summary,goals,latestTraining,recentScores,focus}，复用既有事实规则。
 - ManagementView({location,setLocation,data,api,onSaved,reload,readOnly,role,openQuickEntry,navigate})适配既有组件。
 
-- [ ] 写tests/management.test.mjs：old week映射训练计划、profile映射管理设置；非法路径回工作台；A/B/API位置隔离，旧身份引用无效；空库无待办，待确认只来自真实状态，取消训练不算实际量。
-- [ ] 运行node --test tests/management.test.mjs，预期缺少新模块失败。
-- [ ] 实现导航服务、Workbench和适配视图，拆Profile的settings/archive区域，App接四入口和角色边界。
-- [ ] 运行专项测试、npm run check及隔离浏览器验证导航/详情/查看模式；记录结果。
-- [ ] 提交阶段1及验收台账。回滚为导航/布局提交回退，数据/API保持兼容。
+- [x] 写tests/management.test.mjs：old week映射训练计划、profile映射管理设置；非法路径回工作台；A/B/API位置隔离，旧身份引用无效；空库无待办，待确认只来自真实状态，取消训练不算实际量。
+- [x] 运行node --test tests/management.test.mjs，预期缺少新模块失败。
+- [x] 实现导航服务、Workbench和适配视图，拆Profile的settings/archive区域，App接四入口和角色边界。
+- [x] 运行专项测试、npm run check及隔离浏览器验证导航/详情/查看模式；记录结果。
+- [x] 提交阶段1及验收台账。回滚为导航/布局提交回退，数据/API保持兼容。
 
 ### Task 2: QuickEntry与可恢复流程状态（阶段2基础）
 
@@ -54,9 +54,9 @@
 - entryContext(flow,data)验证主记录存在且可继续；无视频字节写本地。
 - QuickEntry({type,context,data,api,onSaved,onClose})组合训练/成绩/技能/媒体；流程草稿使用现有身份/TTL机制。
 
-- [ ] 写entry-flow.test：后续失败保留trainingId、刷新重新定位有效主记录、主记录删除阻止继续、各类型上下文不复制成绩/等级/实际量、未知步骤/损坏草稿拒绝。
-- [ ] 跑专项红测试，再实现纯状态机及QuickEntry骨架；已有业务表单用props嵌入，不新建第二套业务校验。
-- [ ] 跑专项绿测试，确认账户/档案/API草稿测试仍绿；阶段2最终提交随Task4。
+- [x] 写entry-flow.test：后续失败保留trainingId、刷新重新定位有效主记录、主记录删除阻止继续、各类型上下文不复制成绩/等级/实际量、未知步骤/损坏草稿拒绝。
+- [x] 跑专项红测试，再实现纯状态机及QuickEntry骨架；已有业务表单用props嵌入，不新建第二套业务校验。
+- [x] 跑专项绿测试，确认账户/档案/API草稿测试仍绿；阶段2最终提交随Task4。
 
 ### Task 3: 成绩/上传的收据及最小关联（阶段2可靠性）
 
@@ -67,10 +67,10 @@
 - 复用creationRequest/creationReplay，成绩POST和媒体multipart接受clientRequestId；原片收据哈希包含服务端文件SHA256及白名单元数据。
 - 同请求重试返回原记录；不同内容/已删除409，未经认证401，协作者上传权限不扩大。
 
-- [ ] 写两后端协议测试：同训练保存成绩/关联媒体、无效关联拒绝、收据重试只创建一次、变内容409、已删除不复活、陈旧CAS不写、原片失败不影响训练、匿名写拒绝。
-- [ ] 跑红测试证明现有端缺创建保护，再增量接入两个后端；只清理失败请求临时产生的文件，不删除已有素材。
-- [ ] 跑两后端绿测试及既有训练/成绩/媒体/恢复测试；校验performance.ts/training.ts未修改。
-- [ ] 提交可靠性子提交；不做业务数据迁移。回滚保留可选字段/收据，前端可退回旧入口。
+- [x] 写两后端协议测试：同训练保存成绩/关联媒体、无效关联拒绝、收据重试只创建一次、变内容409、已删除不复活、陈旧CAS不写、原片失败不影响训练、匿名写拒绝。
+- [x] 跑红测试证明现有端缺创建保护，再增量接入两个后端；只清理失败请求临时产生的文件，不删除已有素材。
+- [x] 跑两后端绿测试及既有训练/成绩/媒体/恢复测试；校验performance.ts/training.ts未修改。
+- [x] 提交可靠性子提交；不做业务数据迁移。回滚保留可选字段/收据，前端可退回旧入口。
 
 ### Task 4: 训练→成绩/影像/反馈→摘要（阶段2完成）
 
@@ -81,10 +81,10 @@
 - QuickEntry成功摘要actions进入swim/media/feedback/结束；swim.trainingId/media.recordId使用已保存训练，反馈PUT保留开始输入CAS。
 - 上传原片成功回调与处理结束回调分别报告，摘要能区分原片保存/副本处理失败。
 
-- [ ] 先加上下文/表单字段/请求ID稳定性专项断言，红后修改。
-- [ ] 接入复用表单、收据、上下文选择器、成功摘要和可跳过分支；嵌入表单不展示整个历史列表。
-- [ ] 隔离浏览器跑训练→成绩→上传/已有影像→反馈→结束；模拟断网/响应丢失、409、刷新、退出/账号切换、草稿恢复，验证总记录数与关联ID。
-- [ ] 完整check，记录阶段2文件/风险/回滚及实测交互次数，提交。
+- [x] 先加上下文/表单字段/请求ID稳定性专项断言，红后修改。
+- [x] 接入复用表单、收据、上下文选择器、成功摘要和可跳过分支；嵌入表单不展示整个历史列表。
+- [x] 隔离浏览器跑训练→成绩→上传/已有影像→反馈→结束；模拟断网/响应丢失、409、刷新、退出/账号切换、草稿恢复，验证总记录数与关联ID。
+- [x] 完整check，记录阶段2文件/风险/回滚及实测交互次数，提交。
 
 ### Task 5: 技能工作区与连续目标审核（阶段3）
 
@@ -95,16 +95,16 @@
 - Skills支持focusedSkillId/entryOnly/initialContext/onCreatePoint；Practice支持上下文来源和onRetest；保留完整模式默认。
 - GrowthGoals支持focusedSkillId及确认后的待审核里程碑入口，同页两个独立确认动作。
 
-- [ ] 红测试：不同技能互不混用、撤销评估不作为当前等级、无关联项保留全部视图、候选不达成、目标确认不确认里程碑。
-- [ ] 实现同屏选择器和上下文面板，保留未保存表单/草稿处理；折叠来源/版本但不删除。
-- [ ] 两后端增长测试及隔离浏览器闭环；确认打卡后等级不变、复测等级为空、两次确认分别操作。
-- [ ] 完整check，记录并提交阶段3。
+- [x] 红测试：不同技能互不混用、撤销评估不作为当前等级、无关联项保留全部视图、候选不达成、目标确认不确认里程碑。
+- [x] 实现同屏选择器和上下文面板，保留未保存表单/草稿处理；折叠来源/版本但不删除。
+- [x] 两后端增长测试及隔离浏览器闭环；确认打卡后等级不变、复测等级为空、两次确认分别操作。
+- [x] 完整check，记录并提交阶段3。
 
 ### Task 6: 四尺寸、可靠性复验与交付（阶段4）
 
 **Files:** Modify src/index.css and targeted UI; Create docs/v1-2-acceptance.md; Update docs/changelog.md, requirements-gap.md, test-plan.md, data-model.md, README.md。
 
-- [ ] 检查320/390/768/1440视口、44px触控、固定入口不遮挡、弹窗Tab/Esc焦点和返回位置；记录可复现缺陷后修复。
-- [ ] 完整lint/typecheck/test/build/verify:public；API与静态产物分开校验，所有新写操作在隔离后端测试。
-- [ ] 汇总四阶段实际文件、测试、风险、提交及回滚；真人45秒、真机、完整无障碍仍待真人/专门验收。
+- [x] 检查320/390/768/1440视口、44px触控、固定入口不遮挡、弹窗Tab/Esc焦点和返回位置；记录可复现缺陷后修复。
+- [x] 完整lint/typecheck/test/build/verify:public；API与静态产物分开校验，所有新写操作在隔离后端测试。
+- [x] 汇总四阶段实际文件、测试、风险、提交及回滚；真人45秒、真机、完整无障碍仍待真人/专门验收。
 - [ ] 新上下文整分支审查并修复重要问题；最终提交/推送开发分支，记录实际交付状态，现网发布单独记证据。

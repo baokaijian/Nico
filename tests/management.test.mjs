@@ -32,3 +32,9 @@ test('工作台空库没有虚构待办，真实待确认事项才出现，计�
   assert.equal(result.summary.count, 1); assert.equal(result.summary.knownMeters, 50); assert.equal(result.latestTraining.id, 'actual');
   assert.deepEqual(result.goals.map(row => row.id), ['active']);
 });
+test('工作台最近成绩变化只比较同项目同池长已核验记录', () => {
+  const data=emptyState(); const row={distance:'50m',stroke:'自由泳',poolLength:'25m',validityStatus:'有效'};
+  data.swim=[{...row,id:'a',date:'2000-01-01',timeMs:60000},{...row,id:'other',date:'2000-01-02',poolLength:'50m',timeMs:55000},{...row,id:'b',date:'2000-01-03',timeMs:59000}];
+  assert.equal(workbenchModel(data,'2000-01-04').scoreChange.deltaMs,-1000);
+  data.swim[2].validityStatus='未核验'; assert.equal(workbenchModel(data,'2000-01-04').scoreChange,null);
+});
