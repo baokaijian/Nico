@@ -94,7 +94,7 @@ export default function App() {
     setTab(lastTabs.current[next]); void reload();
   };
   const navigate = (next, type) => {
-    if (modeRef.current === 'manage') { const target = resolveManagementLocation(next, type); setLocation(target); positionStore.current?.write(target); setQuickEntry(next === 'records' && type === 'trainings'); }
+    if (fullView) { const target = resolveManagementLocation(next, type); setLocation(target); positionStore.current?.write(target); setQuickEntry(next === 'records' && type === 'trainings'); }
     else setTab(next);
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
