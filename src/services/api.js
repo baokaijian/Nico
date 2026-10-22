@@ -33,7 +33,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     if (!anonymous && next && (revision == null || Number(next) >= revision)) revision = Number(next);
     return result;
   }
-  function upload(body, onProgress) {
+  function upload(body, onProgress, { expectedRevision } = {}) {
     const started = generation;
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -42,7 +42,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       const token = credential(); if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
       if (revision == null) return reject(new ApiError('请先加载数据', 428));
-      xhr.setRequestHeader('If-Match', String(revision));
+      xhr.setRequestHeader('If-Match', String(expectedRevision ?? revision));
       xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
       xhr.onerror = () => reject(new ApiError('上传结果未确认，文件选择与说明已保留；请先刷新核对再重试', 0));
       xhr.onload = () => {

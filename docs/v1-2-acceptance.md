@@ -12,7 +12,11 @@
 
 ## 阶段2：连续录入
 
-待开发/验收。
+- 文件：QuickEntry、EntryResume、TrainingFeedback；TrainingRecords、Records、Skills、MediaGallery适配；entry-flow、activity-records、drafts、api、useGrowthForm、useVideoProcessing及双运行时API。
+- 实现：四类快捷表单；训练保存后同一摘要内补成绩/影像/反馈；自动关联本次训练；独立失败保留主记录；账号隔离草稿、请求标识和CAS冲突重试。成绩默认未核验，实际量、等级和成绩不复制。
+- 验证：完整116项测试与lint/typecheck/build通过。隔离浏览器完成训练→成绩→PNG素材→反馈；模拟响应丢失、写入503、CAS冲突、刷新恢复后，最终仅1条训练/1条新成绩/1个素材且关联正确。视频转码的真人上传体验尚未验收，不能用图片测试代替。
+- 风险：跨接口中断、旧客户端兼容、素材重试；双运行时契约测试覆盖幂等冲突与删除后禁止复活。没有数据库迁移或公开范围变化。
+- 回滚：按逆序撤销阶段2前端和后端提交；新增关联为可选字段，既有JSON和素材可保留；原始业务记录不删除。
 
 ## 阶段3：成长同屏
 

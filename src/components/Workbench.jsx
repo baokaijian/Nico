@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import { workbenchModel } from '../services/management';
 import { today } from '../services/files';
 import { performanceLabel, validityLabel } from '../../shared/performance.ts';
+import EntryResume from './EntryResume';
 import { Empty } from './ui';
-export default function Workbench({ data, navigate, openQuickEntry, readOnly }) {
+export default function Workbench({ data, navigate, openQuickEntry, readOnly, api, role, resumeVersion }) {
   const model = useMemo(() => workbenchModel(data, today()), [data]);
   return <div className="management-workbench stack"><header><h1>工作台</h1><p className="muted">记录本次训练，接着补充成绩、影像或教练反馈。</p></header>
-    {!readOnly && <div className="quick-actions" aria-label="快捷操作">{[['training', '记录训练'], ['score', '记录成绩'], ['skill', '技能测评'], ['media', '添加影像']].map(([type, name]) => <button className="quick-action" key={type} onClick={() => openQuickEntry(type)}><strong>{name}</strong><span>{type === 'training' ? '先保存，再按需补充' : type === 'score' ? '保留真实计时与条件' : type === 'skill' ? '明确测评，另行确认' : '保存到私有档案'}</span></button>)}</div>}
+    {!readOnly && <div className="quick-actions" aria-label="快捷操作">{[['training', '记录训练'], ['score', '记录成绩'], ['skill', '技能测评'], ['media', '添加影像']].map(([type, name]) => <button className="quick-action" key={type} disabled={role !== 'owner' && ['skill', 'media'].includes(type)} onClick={() => openQuickEntry(type)}><strong>{name}</strong><span>{type === 'training' ? '先保存，再按需补充' : type === 'score' ? '保留真实计时与条件' : type === 'skill' ? '明确测评，另行确认' : '保存到私有档案'}</span></button>)}</div>}
+    {!readOnly && <EntryResume key={resumeVersion} api={api} openQuickEntry={openQuickEntry}/>}
     <div className="workbench-columns"><section className="workbench-section"><div className="section-head"><h2>待确认事项 <small>{model.pending.length}</small></h2><button onClick={() => navigate('growth')}>查看全部</button></div>{!model.pending.length ? <Empty>暂时没有待确认事项。</Empty> : <ul className="workbench-list">{model.pending.slice(0, 4).map(item => <li key={`${item.key}/${item.id}`}><div><small>{item.label}</small><p>{item.title}</p></div><button onClick={() => navigate(item.location.section, item.location.view)}>处理</button></li>)}</ul>}</section>
     <section className="workbench-section"><h2>当前训练重点</h2><span className="badge">{model.confirmedFocus ? '已确认的周期重点' : '待家长核对的建议'}</span><p className="workbench-focus">{model.focus}</p><button onClick={() => navigate('training', 'plans')}>查看详情</button></section></div>
     <section className="workbench-section"><div className="section-head"><h2>本周训练摘要</h2><button onClick={() => navigate('training', 'trainings')}>查看记录</button></div><div className="workbench-stats"><p><strong>{model.summary.count}</strong> 次实际训练</p><p><strong>{model.summary.minutes ?? '未记录'}</strong> {model.summary.minutes == null ? '时长' : '已知分钟'}</p><p><strong>{model.summary.metersCount || model.summary.knownMeters ? model.summary.knownMeters : '未记录'}</strong> {model.summary.metersCount || model.summary.knownMeters ? '已知米' : '距离'}</p></div><small className="muted">{model.week.start}—{model.week.end}；只统计已记录的实际量，计划和缺失量不补齐。</small></section>

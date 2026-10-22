@@ -11,6 +11,7 @@ import { MANAGEMENT_NAV, resolveManagementLocation, createManagementPosition } f
 import ManagementView from './components/ManagementView';
 const Showcase = lazy(() => import('./components/Showcase'));
 const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'private' || !!import.meta.env.VITE_API_URL;
+const QuickEntry = lazy(() => import('./components/QuickEntry'));
 const ChangePassword = lazy(() => import('./components/ChangePassword'));
 const privateTabs = MANAGEMENT_NAV.map(item => [item.key, item.label]);
 const publicTabs = [['home', '概览'], ['results', '成绩'], ['media', '影像']];
@@ -19,6 +20,7 @@ export default function App() {
   const [data, setData] = useState(emptyState), [tab, setTab] = useState('home'), [role, setRole] = useState('viewer'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [auth, setAuth] = useState(false), [session, setSession] = useState(null), [published, setPublished] = useState(null), [story, setStory] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false), [passwordOpen, setPasswordOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false), [logoutBusy, setLogoutBusy] = useState(false), [logoutError, setLogoutError] = useState('');
+  const [entry, setEntry] = useState(null), [resumeVersion, setResumeVersion] = useState(0), [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [location, setLocation] = useState({ section: 'workbench', view: 'home' });
   const positionStore = useRef(null), positionIdentity = useRef(null);
   const [mediaTarget, setMediaTarget] = useState(null), [quickEntry, setQuickEntry] = useState(false);
@@ -44,7 +46,7 @@ export default function App() {
       const result = await loadAppView(api, { mode: modeRef.current, adminCapable, base: import.meta.env.BASE_URL, signal: controller.signal, onSession: current => {
         if (controller.signal.aborted) return;
         setSession(current); setRole(current?.role || 'viewer');
-        if (!current?.authenticated || current.mustChangePassword || previousAccount.current !== current.username) { setData(emptyState()); setLoaded(false); positionIdentity.current = null; }
+        if (!current?.authenticated || current.mustChangePassword || previousAccount.current !== current.username) { setData(emptyState()); setLoaded(false); positionIdentity.current = null; setEntry(null); setQuickMenuOpen(false); }
         previousAccount.current = current?.authenticated ? current.username : null;
         if (hadSession.current && !current?.authenticated) { setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); setAuth(modeRef.current === 'manage'); }
         hadSession.current = !!current?.authenticated;
@@ -70,7 +72,7 @@ export default function App() {
   }, [api]);
   useEffect(() => {
     api.setOnUnauthorized(() => {
-      reloadController.current?.abort(); setSession(null); setData(emptyState()); setLoaded(false); setRole('viewer');
+      reloadController.current?.abort(); setSession(null); setData(emptyState()); setLoaded(false); setEntry(null); setQuickMenuOpen(false); setRole('viewer');
       setAuth(modeRef.current === 'manage'); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。');
       void reload();
     });
@@ -79,7 +81,7 @@ export default function App() {
   useEffect(() => {
     if (!session?.expiresAt) return;
     const timer = setTimeout(() => {
-      api.resetAuth(); setSession(null); setData(emptyState()); setLoaded(false);
+      api.resetAuth(); setSession(null); setData(emptyState()); setLoaded(false); setEntry(null); setQuickMenuOpen(false);
       setNotice('登录已到期，请重新登录。'); setAuth(modeRef.current === 'manage'); void reload();
     }, Math.max(0, session.expiresAt - Date.now()));
     return () => clearTimeout(timer);
@@ -95,11 +97,8 @@ export default function App() {
     else setTab(next);
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
-  const openQuickEntry = (type, context = {}) => {
-    if (type === 'skill') navigate('growth', 'skills');
-    else { navigate('training', type === 'training' ? 'trainings' : type === 'score' ? 'swim' : 'media'); setQuickEntry(true); }
-    if (type === 'media') { const training = data.trainings.find(row => row.id === context.trainingId); setMediaTarget({ recordId: training?.id || '', date: training?.date || '' }); }
-  };
+  const openQuickEntry = (type, context = {}) => { if (role !== 'owner' && (type === 'skill' || type === 'media' && !context.trainingId)) { setNotice('此录入操作仅限家长管理者。'); return; } setQuickMenuOpen(false); setEntry({ type, context }); };
+  const closeEntry = () => { setEntry(null); setResumeVersion(value => value + 1); };
   const onSaved = (collection, record, removedId) => {
     setData(current => {
       if (!Array.isArray(current[collection])) return { ...current, [collection]: record };
@@ -108,7 +107,7 @@ export default function App() {
     });
     if (removedId || ['plans', 'skillDefinitions', 'skillAssessments', 'milestones'].includes(collection)) { setNotice('上次提交已获服务端确认。'); reload(); return; }
     if (EVIDENCE_COLLECTIONS.includes(collection)) {
-      setNotice(<>上次提交已获服务端确认，计划草稿已依据本次记录同步更新。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('week')}>查看本周计划草稿</button></>);
+      setNotice('已保存到私有档案。');
       reload();
       return;
     }
@@ -126,7 +125,7 @@ export default function App() {
     }
     reloadController.current?.abort(); api.resetAuth(); setSession(null); setLoaded(false); setData(emptyState());
     const cleared = deleteDrafts ? drafts.clear() : null;
-    setLogoutOpen(false); setLogoutBusy(false); setMediaTarget(null);
+    setLogoutOpen(false); setLogoutBusy(false); setMediaTarget(null); setEntry(null); setQuickMenuOpen(false);
     modeRef.current = 'view'; api.setMode('view'); setMode('view'); setPasswordOpen(false); setAuth(false);
     const draftMessage = deleteDrafts ? cleared.status === 'cleared' ? '已删除本账号的新版草稿。' : '未能确认草稿已清除，请在下次登录后检查。' : '草稿按原账号保留，重新登录后可恢复。';
     setNotice(`${failed ? '已清除本机登录；服务端会话将在有效期结束后失效。' : '已退出账号。'}${draftMessage}`); await reload();
@@ -171,13 +170,15 @@ export default function App() {
         {session?.authenticated && session.mustChangePassword
           ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
           : loading && !selectedLoaded ? <Message>正在读取记录…</Message> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense key={session?.authenticated ? session.username : 'guest'} fallback={<Message>正在打开页面…</Message>}>
-            {fullView && <ManagementView location={location} navigate={navigate} data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget}/>}
+            {fullView && <ManagementView location={location} navigate={navigate} data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget} resumeVersion={resumeVersion}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
+        {fullView && entry && !readOnly && <Suspense fallback={<Message>正在打开快捷录入…</Message>}><QuickEntry key={entry.type} {...entry} data={data} api={api} onSaved={onSaved} reload={reload} onClose={closeEntry} navigate={navigate} role={role}/></Suspense>}
         {passwordOpen && session?.authenticated && <Suspense fallback={<Message>正在打开账号设置…</Message>}><Modal title="修改管理员密码" onClose={() => setPasswordOpen(false)}><ChangePassword api={api} onChanged={async () => { setPasswordOpen(false); await reload(); }}/></Modal></Suspense>}
         {logoutOpen && <LogoutDialog api={api} busy={logoutBusy} error={logoutError} onLogout={logout} onClose={() => { if (!logoutBusy) setLogoutOpen(false); }}/>}
       </main>
     </div>
+    {fullView && !readOnly && !entry && <div className="mobile-quick-entry">{quickMenuOpen && <div className="mobile-quick-options">{[['training','记录训练'],['score','记录成绩'],['skill','技能测评'],['media','添加影像']].map(([type,name]) => <button key={type} disabled={role !== 'owner' && ['skill','media'].includes(type)} onClick={() => openQuickEntry(type)}>{name}</button>)}</div>}<button className="apple-btn apple-btn-primary" aria-expanded={quickMenuOpen} onClick={() => setQuickMenuOpen(value => !value)}>快捷录入</button></div>}
     <footer className="app-footer">公开内容经家长授权 · 完整档案需登录 · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer>
   </div>;
 }
