@@ -10,10 +10,10 @@ export function Empty({ children = '尚未录入记录。' }) { return <p classN
 export function Modal({ title, children, onClose, restoreFocus }) {
   const ref = useRef(null), titleId = useId(), restoreRef = useRef(restoreFocus);
   useEffect(() => {
-    const previous = document.activeElement;
+    const previous = document.activeElement, restore = restoreRef.current;
     const dialog = ref.current;
     dialog.showModal();
-    return () => { dialog.close(); if (restoreRef.current) restoreRef.current(); else previous?.focus(); };
+    return () => { dialog.close(); if (restore) restore(); else previous?.focus(); };
   }, []);
   return <dialog ref={ref} aria-labelledby={titleId} onCancel={e => { e.preventDefault(); onClose(); }}><div className="flex-between"><h2 id={titleId}>{title}</h2><button type="button" className="apple-btn apple-btn-secondary" onClick={onClose} aria-label="关闭弹窗">关闭</button></div>{children}</dialog>;
 }

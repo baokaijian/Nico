@@ -6,3 +6,9 @@ export function skillWorkspace(data, skillId) {
   const pointIds = new Set(points.map(row => row.id));
   return { current: assessments.filter(row => row.status === '已确认').at(-1) || null, assessments, points, checkins: (data.checkins || []).filter(row => pointIds.has(row.weakPointId)), goals: (data.goals || []).filter(row => (row.relatedSkillIds || []).includes(skillId)) };
 }
+
+export function practiceDraftContext(data, skillId, checkin, point) {
+  const model = skillWorkspace(data, skillId), checkinPoint = (data.weakpoints || []).find(row => row.id === checkin.weakPointId) || null;
+  const scopedAssessments = new Set(model.assessments.map(row => row.id));
+  return { checkinPoint, checkinOutside: !!checkin.weakPointId && !model.points.some(row => row.id === checkin.weakPointId), pointOutside: point.sourceType === '技能评估' && refs(point.sourceRef).some(id => !scopedAssessments.has(id)) };
+}
