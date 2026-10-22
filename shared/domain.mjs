@@ -1,10 +1,12 @@
+import { validateGrowthInput, validateStoredGrowth, growthCollection } from './growth-model.ts';
+import { validateGrowthHistory } from './growth-records.mjs';
 import { PERFORMANCE_VERSION, TIME_FIELDS, VALIDITY_STATUSES, validTimeMs, formatMilliseconds, parseMilliseconds, normalizePerformanceRecord, performanceMilliseconds, performanceSeconds, validityLabel, eligiblePerformance } from './performance.ts';
 import { TRAINING_STROKES, TRAINING_STATUSES, normalizeTraining, trainingSummary } from './training.ts';
 import { parseScore, validatePrdRecord, validatePrdState, SCORE_DISTANCES, TEST_ITEMS } from './prd.mjs';
 // Shared by the UI, API, reports and tests. Empty measurements stay empty.
 // weakpoints / checkins are the parent-run practice loop: the parent decides what
 // to work on (from coach feedback), then records each completed practice session.
-export const COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media', 'weakpoints', 'checkins', 'trainingTemplates'];
+export const COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media', 'weakpoints', 'checkins', 'trainingTemplates', 'skillDefinitions', 'skillAssessments', 'milestones'];
 export const LEGACY_COLLECTIONS = ['growth', 'swim', 'trainings', 'fitness', 'nutrition', 'goals', 'plans', 'annotations', 'media'];
 export const STANDARD_SOURCE = 'https://www.sport.gov.cn/rlzx/n5633/c28294142/part/28294152.pdf';
 export const STANDARD_VERSION = '2025-01-01 / 2026-10-06复核';
@@ -22,6 +24,8 @@ const notes = text('notes', '备注 / 原始观察', { type: 'textarea' });
 const method = text('measurementMethod', '测量方法 / 器材');
 const recorder = text('recordedBy', '记录者');
 export const FIELDS = {
+  // Structured growth fields are validated by the shared typed contract.
+  skillDefinitions: [], skillAssessments: [], milestones: [],
   swim: [date, select('distance', '测试 / 比赛长度', SCORE_DISTANCES, { required: true }), select('stroke', '泳姿', ['自由泳', '仰泳', '蛙泳', '蝶泳', '混合泳', '打腿'], { required: true }), select('poolLength', '池长', ['25m', '50m', '其他'], { required: true }), text('time', '成绩（分:秒:百分秒，如00:56:17）', { required: true }), select('startType', '出发方式', ['跳台', '蹬壁', '水中', '未知']), select('timingMethod', '计时方式', ['自动计时', '手动计时', '未知']), select('recordType', '记录性质', ['训练', '比赛', '测试', '未知']), select('validityStatus', '有效性（仅有效成绩计入PB）', VALIDITY_STATUSES), text('validityNote', '有效性依据 / 失格说明'), select('testItem', '测试项目（固定选项）', TEST_ITEMS), text('location', '测试 / 比赛地点'), text('testedBy', '测试人员'), text('ageGroup', '比赛年龄组'), text('team', '代表队伍'), text('competitionSession', '比赛场次'), select('isFinal', '是否决赛', ['否', '是'], { boolean: true }), number('preliminaryRank', '预赛排名（决赛时填写）', 1, 100000, { integer: true }), text('eventName', '赛事 / 比赛项目名称'), text('heat', '比赛组别'), number('lane', '比赛道次', 1, 100, { integer: true }), text('previousTime', '上一次成绩（分:秒:百分秒）'), number('rank', '测试 / 比赛排名', 1, 100000, { integer: true }), text('winnerTime', '第一名成绩（分:秒:百分秒）'), text('task', '测试任务与器材'), text('certificate', '等级证书 / 凭证（如有）'), recorder, notes],
   growth: [date, number('height', '身高（cm）', 20, 250), number('armLength', '臂长（cm，测量口径须确认）', 1, 280), number('armSpan', '臂展（cm，历史字段）', 20, 280), number('weight', '体重（kg）', 1, 250), number('handLength', '手长（cm）', 1, 40), number('handWidth', '手宽（cm）', 1, 30), number('footLength', '脚长（cm）', 1, 50), number('sitAndReach', '坐位体前屈（cm）', -50, 100), method, recorder, notes],
   trainings: [date, text('session', '课次名称'), select('entryMode', '录入方式', ['快速', '训练组']), select('stroke', '泳姿', TRAINING_STROKES), select('completionStatus', '实际完成情况', TRAINING_STATUSES), text('plannedSessionId', '关联计划课次ID'), number('plannedSessionVersion', '关联计划版本', 1, 1000000, { integer: true }), text('templateId', '使用的模板ID'), number('templateVersion', '使用的模板版本', 1, 1000000, { integer: true }), text('copiedFromId', '复制来源训练ID'), number('plannedMeters', '参考距离（非实际）', 0, 50000), number('plannedDurationMinutes', '参考时长（非实际）', 0, 600), number('durationMinutes', '实际时长（分钟）', 0, 600), number('totalMeters', '实际总泳程（m）', 0, 50000), number('kickMeters', '其中打腿（m）', 0, 50000), text('trainingType', '训练内容'), text('intensity', '强度说明（教练原话）'), text('focusSkills', '本次技术提示'), number('rpe', '主观用力感（1–10）', 1, 10, { integer: true }), number('completionRate', '完成度（0–100%）', 0, 100), text('feeling', '课后感受'), text('discomfort', '疼痛 / 不适（没有请明确填无）'), text('coachNotes', '教练原话', { type: 'textarea' }), recorder, notes],
@@ -33,7 +37,7 @@ export const FIELDS = {
   annotations: [text('mediaId', '素材ID', { required: true }), text('athleteIdentity', '运动员 / 泳道确认'), number('startSecond', '片段开始（秒）', 0, 86400, { required: true }), number('endSecond', '片段结束（秒）', 0, 86400, { required: true }), text('observation', '可见事实', { required: true, type: 'textarea' }), text('limitation', '证据限制'), text('suggestion', '下一次练习方向（待审核）', { type: 'textarea' }), text('recordId', '关联成绩 / 训练ID'), text('reviewedBy', '审核人'), select('status', '审核状态', ['草稿', '已审核'], { required: true })],
   media: [date, text('title', '标题', { required: true }), text('description', '原始说明（与录像批注分开）', { type: 'textarea' }), text('category', '分类'), text('recordId', '关联成绩 / 训练ID')],
   // Practised by the parent at home or before/after training; never invented by the platform.
-  weakpoints: [date, text('title', '薄弱点（一句话，如“转身后蹬壁不充分”）', { required: true }), select('category', '类别', ['技术动作', '出发与转身', '打腿与腿法', '体能', '节奏与配合', '心理与习惯', '其他'], { required: true }), select('sourceType', '来源', ['教练反馈原话', '已审核录像观察', '成绩对比', '家长观察', '平台建议待确认'], { required: true }), text('sourceRef', '来源记录ID（多个用逗号分隔，可留空）'), text('evidence', '依据原文 / 观察（照录，不改写）', { type: 'textarea' }), number('targetPerWeek', '每周练习目标次数（家长填写，可不填）', 1, 21, { integer: true }), text('drillHint', '练习方式提示（照录教练建议或家长安排，可留空）', { type: 'textarea' }), select('status', '状态', ['待确认', '练习中', '已改善', '暂停'], { required: true }), recorder, notes],
+  weakpoints: [date, text('title', '薄弱点（一句话，如“转身后蹬壁不充分”）', { required: true }), select('category', '类别', ['技术动作', '出发与转身', '打腿与腿法', '体能', '节奏与配合', '心理与习惯', '其他'], { required: true }), select('sourceType', '来源', ['教练反馈原话', '已审核录像观察', '成绩对比', '家长观察', '平台建议待确认', '技能评估'], { required: true }), text('sourceRef', '来源记录ID（多个用逗号分隔，可留空）'), text('evidence', '依据原文 / 观察（照录，不改写）', { type: 'textarea' }), number('targetPerWeek', '每周练习目标次数（家长填写，可不填）', 1, 21, { integer: true }), text('drillHint', '练习方式提示（照录教练建议或家长安排，可留空）', { type: 'textarea' }), select('status', '状态', ['待确认', '练习中', '已改善', '暂停'], { required: true }), recorder, notes],
   checkins: [date, text('weakPointId', '薄弱点ID', { required: true }), number('times', '本次完成次数 / 组数（实际填写，未完成可填0）', 0, 200, { integer: true }), number('durationMinutes', '练习时长（分钟，可不填）', 0, 600), select('quality', '完成质量（家长观察）', ['未完成', '部分完成', '按要求完成', '超出要求']), text('childFeeling', '孩子主观感受（原话，可不填）'), notes, recorder],
 };
 export function validDate(value) {
@@ -44,6 +48,7 @@ export function validDate(value) {
 export const parseTime = parseScore;
 export const timeLabel = seconds => seconds == null ? '未记录' : formatMilliseconds(Math.round(seconds * 1000));
 export function validateRecord(collection, input, previous = null) {
+  if (['skillDefinitions', 'skillAssessments', 'milestones'].includes(collection) || collection === 'goals' && (input?.modelVersion === 1 || previous?.modelVersion === 1)) return validateGrowthInput(collection, input, previous);
   const fields = FIELDS[collection];
   if (!fields || !input || typeof input !== 'object' || Array.isArray(input)) throw new Error('记录格式无效');
   const result = { ...previous };
@@ -204,10 +209,12 @@ export function normalizeState(raw) {
     if (state.performanceSchemaVersion === PERFORMANCE_VERSION && (!validTimeMs(record.timeMs) || !VALIDITY_STATUSES.includes(record.validityStatus))) throw new Error('毫秒成绩迁移不完整');
     if (record.timeMs !== undefined) normalizePerformanceRecord(record);
   }
+  validateGrowthHistory(state);
   if (state.schemaVersion === 2) validatePrdState(state);
   return state;
 }
 function validateStoredFields(collection, record) {
+  if (growthCollection(collection, record)) { validateStoredGrowth(collection, record); return; }
   for (const field of FIELDS[collection]) {
     const value = record[field.key];
     if (value == null || value === '') continue;

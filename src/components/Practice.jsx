@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { FIELDS, validateRecord } from '../../shared/domain.mjs';
 import { practiceOverview, growthTimeline, PRACTICE_ENGINE_VERSION } from '../../shared/practice.mjs';
 import { planDimensions } from '../../shared/plan-engine.mjs';
@@ -6,10 +6,12 @@ import { today } from '../services/files';
 import { Empty, Message } from './ui';
 import RecordSources from './RecordSources';
 
+const Skills = lazy(() => import('./Skills'));
 const splitRefs = value => String(value || '').split(/[,，、\s]+/).filter(Boolean);
 const statusHint = { 待确认: '待家长依据教练反馈核对', 练习中: '当前打卡目标', 已改善: '保留记录，不再计入周目标', 暂停: '暂不打卡，保留历史' };
 
-export default function Practice({ data, api, onSaved, readOnly = false, navigate }) {
+export default function Practice({ data, api, onSaved, readOnly = false, navigate, manageSkills = true }) {
+  const [section, setSection] = useState('practice'), [retestSeed, setRetestSeed] = useState(null);
   const overview = useMemo(() => practiceOverview(data), [data]);
   const growth = useMemo(() => growthTimeline(data), [data]);
   const dimensions = useMemo(() => planDimensions(data), [data]);
@@ -35,7 +37,7 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
     validateRecord('weakpoints', values, previous);
     const saved = await api.request(`/api/weakpoints${editingId ? `/${editingId}` : ''}`, { method: editingId ? 'PUT' : 'POST', body: values, expectedRevision: api.getRevision() });
     onSaved('weakpoints', saved);
-    setEditingPoint(null); setShowForm(false);
+    setEditingPoint(null); setShowForm(false); setCheckinField('weakPointId', saved.id);
     setPointForm({ date: today(), title: '', category: '技术动作', sourceType: '教练反馈原话', sourceRef: '', evidence: '', targetPerWeek: '', drillHint: '', status: '练习中', recordedBy: '', notes: '' });
     setNotice(editingId ? '薄弱点已更新。' : '薄弱点已录入，可开始打卡。');
   });
@@ -58,7 +60,14 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
     onSaved('weakpoints', saved);
   });
   const checkinDates = overview.heatmap.filter(day => day.count).length;
-  return <div className="stack fade-in">
+  const startFromAssessment = row => {
+    setSection('practice'); setEditingPoint(null); setShowForm(true);
+    setPointForm({ date: today(), title: `${row.standardSnapshot.name}：待核对的改进点`, category: '技术动作', sourceType: '技能评估', sourceRef: row.id, evidence: row.evidenceNote, targetPerWeek: '', drillHint: row.improvementNote || '', status: '待确认', recordedBy: '', notes: '' });
+    setNotice('已预填评估来源，请人工核对短板描述及练习安排后保存。');
+  };
+  const tabs = <div className="ctx-tabs" role="group" aria-label="打卡与技能"><button aria-pressed={section === 'practice'} onClick={() => setSection('practice')}>练习打卡</button><button aria-pressed={section === 'skills'} onClick={() => setSection('skills')}>技能测评与标准</button></div>;
+  if (section === 'skills') return <div className="stack">{tabs}<Suspense fallback={<Message>正在打开技能记录…</Message>}><Skills data={data} api={api} onSaved={onSaved} readOnly={readOnly || !manageSkills} onCreatePoint={startFromAssessment} retestSeed={retestSeed}/></Suspense></div>;
+  return <div className="stack fade-in">{tabs}
     <header className="page-header"><div><p className="eyebrow">家长录入 · 依据教练反馈与已录入记录</p><h1>薄弱点打卡练习</h1><p className="muted">平台只把你已经录入的教练反馈、录像观察和成绩变成候选薄弱点；薄弱点与每次打卡都由家长确认后写入，不自动生成、不填充示例。</p></div><button className="apple-btn apple-btn-primary" onClick={() => { setEditingPoint(null); setPointForm({ date: today(), title: '', category: '技术动作', sourceType: '教练反馈原话', sourceRef: '', evidence: '', targetPerWeek: '', drillHint: '', status: '练习中', recordedBy: '', notes: '' }); setShowForm(true); }} disabled={readOnly}>新增薄弱点</button></header>
     <section className="stat-grid">
       <Stat label="本周打卡次数" value={overview.weekTimes} hint={overview.weekTarget ? `周目标 ${overview.weekTarget} 次 · ${overview.week.start}—${overview.week.end}` : `未设定周目标 · ${overview.week.start}—${overview.week.end}`}/>
@@ -70,7 +79,7 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
     {!overview.points.length ? <section className="glass-card"><h2>还没有薄弱点</h2><Empty>尚未录入薄弱点。薄弱点只能由家长依据教练反馈原话、已审核录像观察或已录入成绩确认；平台不自动生成，也不用推测填充。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('records', 'trainings')}>先录入教练反馈</button></Empty></section> : <>
       <section className="glass-card"><div className="section-head"><h2>记录一次打卡</h2><p className="muted">只记录已经发生的练习；未完成可填 0 次，留空表示未记录。</p></div>
         {readOnly ? <Empty>当前为只读访问，不能写入打卡。</Empty> : <div className="form-grid">
-          <label>薄弱点<select className="apple-input" value={checkin.weakPointId} onChange={e => setCheckinField('weakPointId', e.target.value)}>{overview.points.map(point => <option key={point.id} value={point.id}>{point.title}（{point.status}）</option>)}</select></label>
+          <label>薄弱点<select className="apple-input" value={checkin.weakPointId} onChange={e => setCheckinField('weakPointId', e.target.value)}><option value="">请选择已录入薄弱点</option>{overview.points.map(point => <option key={point.id} value={point.id}>{point.title}（{point.status}）</option>)}</select></label>
           <label>日期<input className="apple-input" type="date" value={checkin.date} onChange={e => setCheckinField('date', e.target.value)}/></label>
           <label>完成次数 / 组数<input className="apple-input" type="number" min="0" max="200" step="1" value={checkin.times} onChange={e => setCheckinField('times', e.target.value)}/></label>
           <label>练习时长（分钟，可不填）<input className="apple-input" type="number" min="0" max="600" value={checkin.durationMinutes} onChange={e => setCheckinField('durationMinutes', e.target.value)}/></label>
@@ -87,6 +96,7 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
         {point.drillHint && <p>练习方式：{point.drillHint}</p>}
         <p className="muted">本周 {point.weekTimes} 次{point.targetPerWeek ? ` / 目标 ${point.targetPerWeek} 次` : '（未设周目标）'} · 累计 {point.times} 次 · 共打卡 {point.total} 条{point.total ? `（按要求完成 ${point.done} 条）` : ''} · 连续 {point.streak.days} 天 · 最近 {point.lastDate || '未打卡'}</p>
         <RecordSources data={data} ids={splitRefs(point.sourceRef)}/>
+        {!readOnly && manageSkills && point.sourceType === '技能评估' && <button onClick={() => { const prior = data.skillAssessments.find(row => splitRefs(point.sourceRef).includes(row.id) && row.status === '已确认'); if (!prior) { setError('来源测评已撤销或删除，请先核对原评估。'); return; } setRetestSeed({ skillId: prior.skillId, previousAssessmentId: prior.id, weakPointId: point.id, checkinIds: data.checkins.filter(row => row.weakPointId === point.id).map(row => row.id) }); setSection('skills'); }}>关联本阶段打卡，记录复测</button>}
         {!readOnly && <div className="actions">
           <button onClick={() => { setCheckinField('weakPointId', point.id); setCheckinField('date', today()); }}>选它为本次打卡</button>
           <button onClick={() => editPoint(point)}>编辑</button>

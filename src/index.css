@@ -395,7 +395,8 @@ details[open] > summary { margin-bottom: var(--s-3); }
 
 .check-row { display: flex; align-items: flex-start; gap: var(--s-2); margin: var(--s-3) 0; }
 .check-row input { margin-top: 5px; accent-color: var(--brand); width: 16px; height: 16px; }
-.restore-label input { display: block; margin-top: var(--s-2); }
+.restore-label { max-width: 100%; min-width: 0; }
+.restore-label input { display: block; margin-top: var(--s-2); max-width: 100%; min-width: 0; }
 
 .history-table-container { overflow-x: auto; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface); }
 .history-table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -616,3 +617,16 @@ dialog::backdrop { background: var(--overlay); }
   .training-quick-fields > .form-group:first-child,
   .training-quick-fields > .form-group:nth-child(4) { grid-column: 1 / -1; }
 }
+
+.growth-records button, .growth-records input:not([type="checkbox"]), .growth-records select { min-height: 44px; }
+.growth-records summary { min-height: 44px; padding-block: .65rem; }
+.growth-records .actions button { max-width: 100%; overflow-wrap: anywhere; }
+.growth-dimensions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--s-3); }
+.growth-dimensions article, .standard-preview, .history-entry { border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s-3); margin-block: var(--s-2); overflow-wrap: anywhere; }
+.skill-chart { width: 100%; height: auto; color: var(--brand); font-size: 16px; }
+.evidence-picker fieldset { max-height: 360px; overflow-y: auto; }
+.evidence-picker input[type="checkbox"] { flex: 0 0 22px; width: 22px; height: 22px; }
+
+/* Touch targets include the practice/skills section switch. */
+.ctx-tabs button { min-height:44px; }
+.growth-records .training-check { min-height:44px; }
