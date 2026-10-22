@@ -1,3 +1,5 @@
+import { FIELDS } from '../../shared/domain.mjs';
+import { editableGrowth } from '../../shared/growth-model.ts';
 const SIMPLE_KEYS = {
   trainings: ['date', 'plannedSessionId', 'durationMinutes', 'totalMeters', 'feeling', 'discomfort', 'coachNotes'],
   nutrition: ['date', 'sleepHours', 'fatigue', 'discomfort', 'willingness'],
@@ -25,3 +27,8 @@ export function changeRecordField(type, values, key, value) {
   return next;
 }
 import { TEST_ITEMS } from '../../shared/prd.mjs';
+
+export function editableManagementRecord(collection, record) {
+  if (['weakpoints', 'checkins'].includes(collection)) return Object.fromEntries(FIELDS[collection].filter(field => record[field.key] !== undefined).map(field => [field.key, record[field.key] ?? '']));
+  return editableGrowth(collection, record);
+}

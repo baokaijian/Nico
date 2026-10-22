@@ -7,7 +7,7 @@ import { Empty, Message } from './ui';
 import RecordSources from './RecordSources';
 import useGrowthForm from '../services/useGrowthForm';
 import { GrowthForm } from './GrowthUI';
-import { skillWorkspace } from '../services/growth-workspace';
+import { skillWorkspace, practiceDraftContext } from '../services/growth-workspace';
 const pointDefaults = () => ({ date: today(), title: '', category: '技术动作', sourceType: '教练反馈原话', sourceRef: '', evidence: '', targetPerWeek: '', drillHint: '', status: '待确认', recordedBy: '', notes: '' });
 const checkinDefaults = () => ({ date: today(), weakPointId: '', times: '', durationMinutes: '', quality: '', childFeeling: '', notes: '', recordedBy: '' });
 
@@ -24,6 +24,8 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
   const pointFormState = useGrowthForm({ collection: 'weakpoints', defaults: pointDefaults, data, api, onSaved: (...args) => { onSaved(...args); if (args[1]) practice.replace({weakPointId: args[1].id}); }, readOnly });
   const practice = useGrowthForm({ collection: 'checkins', defaults: checkinDefaults, data, api, onSaved, readOnly });
   const checkin = practice.values, pointForm = pointFormState.values, editingPoint = pointFormState.editing;
+  const draftContext = practiceDraftContext(data, focusedSkillId, checkin, pointForm);
+  const retainedCheckin = !!checkin.weakPointId && !overview.points.some(row => row.id === checkin.weakPointId);
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
   const setCheckinField = practice.change, setPointField = pointFormState.change;
   const run = async (task) => {
@@ -65,10 +67,10 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
       <Stat label="累计打卡" value={`${overview.total}条`} hint={overview.lastDate ? `最近 ${overview.lastDate}` : '尚无打卡记录'}/>
     </section>}
     <Message error>{error}</Message><Message>{notice}</Message>
-    {!overview.points.length ? <section className="glass-card"><h2>还没有薄弱点</h2><Empty>尚未录入薄弱点。薄弱点只能由家长依据教练反馈原话、已审核录像观察或已录入成绩确认；平台不自动生成，也不用推测填充。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('records', 'trainings')}>先录入教练反馈</button></Empty></section> : <>
+    {!overview.points.length && !checkin.weakPointId ? <section className="glass-card"><h2>还没有薄弱点</h2><Empty>尚未录入薄弱点。薄弱点只能由家长依据教练反馈原话、已审核录像观察或已录入成绩确认；平台不自动生成，也不用推测填充。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('records', 'trainings')}>先录入教练反馈</button></Empty></section> : <>
       <section className="glass-card"><div className="section-head"><h2>记录一次打卡</h2><p className="muted">只记录已经发生的练习；未完成可填 0 次，留空表示未记录。</p></div>
-        {readOnly ? <Empty>当前为只读访问，不能写入打卡。</Empty> : <GrowthForm form={{ ...practice, open: true }} title="本次练习打卡"><div className="form-grid">
-          <label>薄弱点<select className="apple-input" value={checkin.weakPointId} onChange={e => setCheckinField('weakPointId', e.target.value)}><option value="">请选择已录入薄弱点</option>{overview.points.map(point => <option key={point.id} value={point.id}>{point.title}（{point.status}）</option>)}</select></label>
+        {readOnly ? <Empty>当前为只读访问，不能写入打卡。</Empty> : <GrowthForm form={{ ...practice, open: true }} title="本次练习打卡">{embedded && draftContext.checkinOutside && <Message>当前未保存打卡属于其他技能或当前范围外，已保留原关联和实际填写量。请核对下方原短板，先保存或清空，再记录当前技能。</Message>}<div className="form-grid">
+          <label>薄弱点<select className="apple-input" value={checkin.weakPointId} onChange={e => setCheckinField('weakPointId', e.target.value)}><option value="">请选择已录入薄弱点</option>{retainedCheckin && <option value={checkin.weakPointId}>原输入：{draftContext.checkinPoint?.title || '原短板已移入回收站，请核对'}（当前范围外）</option>}{overview.points.map(point => <option key={point.id} value={point.id}>{point.title}（{point.status}）</option>)}</select></label>
           <label>日期<input className="apple-input" type="date" value={checkin.date} onChange={e => setCheckinField('date', e.target.value)}/></label>
           <label>完成次数 / 组数<input className="apple-input" type="number" min="0" max="200" step="1" value={checkin.times} onChange={e => setCheckinField('times', e.target.value)}/></label>
           <label>练习时长（分钟，可不填）<input className="apple-input" type="number" min="0" max="600" value={checkin.durationMinutes} onChange={e => setCheckinField('durationMinutes', e.target.value)}/></label>
@@ -105,7 +107,7 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
         {!readOnly && <div className="actions"><button className="apple-btn apple-btn-primary" onClick={() => pointFormState.replace({ date: today(), title: candidate.title, category: candidate.category, sourceType: candidate.sourceType, sourceRef: candidate.sourceRef, evidence: candidate.evidence, targetPerWeek: '', drillHint: '', status: '练习中', recordedBy: '', notes: '' })}>核对并录入薄弱点</button><span className="muted">确认后可修改名称、类别与每周目标次数。</span></div>}
       </article>)}</div>}
     </section>}
-    {!readOnly && <GrowthForm form={pointFormState} title={editingPoint ? '编辑技术短板' : '新增技术短板'}><div><div className="section-head"><h2>{editingPoint ? '编辑薄弱点' : '新增薄弱点'}</h2><p className="muted">名称与依据照录教练原话或观察，不改写、不推测。</p></div>
+    {!readOnly && <GrowthForm form={pointFormState} title={editingPoint ? '编辑技术短板' : '新增技术短板'}>{embedded && draftContext.pointOutside && <Message>当前未保存短板依据其他技能的测评，原来源和输入已保留；请先保存或清空，再开始此技能的短板。</Message>}<div><div className="section-head"><h2>{editingPoint ? '编辑薄弱点' : '新增薄弱点'}</h2><p className="muted">名称与依据照录教练原话或观察，不改写、不推测。</p></div>
       <div className="form-grid">
         <label>录入日期<input className="apple-input" type="date" value={pointForm.date} onChange={e => setPointField('date', e.target.value)}/></label>
         <label>薄弱点名称<input className="apple-input" value={pointForm.title} onChange={e => setPointField('title', e.target.value)} placeholder="如：转身后蹬壁不充分"/></label>

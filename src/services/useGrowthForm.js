@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { validateRecord } from '../../shared/domain.mjs';
-import { editableGrowth } from '../../shared/growth-model.ts';
+import { editableManagementRecord } from './record-form';
 import useRecordDraft from './useRecordDraft';
 import { validGrowthDraft } from './drafts';
 export default function useGrowthForm({ collection, defaults, data, api, onSaved, readOnly, initialValues = {}, requestId, draftCollection, onRecordSaved, onBusyChange }) {
@@ -16,7 +16,7 @@ export default function useGrowthForm({ collection, defaults, data, api, onSaved
     if (dirty.current && !window.confirm('替换当前未保存表单？继续前可先导出草稿。')) return false;
     dirty.current = true; setForm({ ...fresh(values), editing }); setOpen(true); setError(''); setConflict(false); return true;
   };
-  const edit = record => replace(editableGrowth(collection, record), record.id);
+  const edit = record => replace(editableManagementRecord(collection, record), record.id);
   const reset = () => { dirty.current = false; setForm(fresh()); draft.clear(); setConflict(false); setError(''); };
   const save = async event => {
     event.preventDefault(); setBusy(true); setError('');

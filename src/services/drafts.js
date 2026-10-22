@@ -10,8 +10,10 @@ export const validGrowthDraft = value => plain(value) && plain(value.values) &&
     if (['checkinIds', 'relatedSkillIds', 'relatedTrainingIds'].includes(key)) return Array.isArray(item) && item.every(id => typeof id === 'string');
     if (key === 'levels') return plain(item) && ['L1', 'L2', 'L3', 'L4', 'L5'].every(level => typeof item[level] === 'string');
     if (['definitionVersion', 'modelVersion', 'currentProgress'].includes(key)) return typeof item === 'number' && Number.isFinite(item);
+    if (['targetPerWeek', 'times', 'durationMinutes'].includes(key)) return typeof item === 'string' || typeof item === 'number' && Number.isFinite(item);
     return typeof item === 'string';
   });
+export const validFeedbackDraft = value => plain(value) && plain(value.values) && Object.keys(value.values).length === 1 && typeof value.values.coachNotes === 'string' && Number.isSafeInteger(value.baseRevision) && value.baseRevision >= 0;
 export const validUploadDraft = value => plain(value) && plain(value.values) && Object.entries(value.values).every(([key, item]) => ['date', 'title', 'description', 'category', 'recordId'].includes(key) && typeof item === 'string') && typeof value.clientRequestId === 'string' && Number.isSafeInteger(value.baseRevision) && typeof value.fileLabel === 'string';
 export const draftScopeKey = scope => scope?.backend && scope?.account && scope?.athlete ? [scope.backend, scope.account, scope.athlete].map(encodeURIComponent).join(':') : '';
 const legacyKey = collection => collection === 'training' ? 'nico_training_draft_v1' : `nico_form_draft_${collection}`;
