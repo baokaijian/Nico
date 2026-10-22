@@ -2,6 +2,16 @@
 export const DRAFT_TTL_MS = 7 * 86400000;
 const prefix = 'nico.draft.v2:';
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+// Partial inputs are valid drafts; malformed nested controls must never be restored.
+export const validGrowthDraft = value => plain(value) && plain(value.values) &&
+  (value.editing == null || typeof value.editing === 'string') && (value.baseRevision == null || Number.isSafeInteger(value.baseRevision)) && typeof value.clientRequestId === 'string' &&
+  Object.entries(value.values).every(([key, item]) => {
+    if (['evidenceRefs', 'baselineRefs'].includes(key)) return Array.isArray(item) && item.every(ref => plain(ref) && typeof ref.collection === 'string' && typeof ref.id === 'string');
+    if (['checkinIds', 'relatedSkillIds', 'relatedTrainingIds'].includes(key)) return Array.isArray(item) && item.every(id => typeof id === 'string');
+    if (key === 'levels') return plain(item) && ['L1', 'L2', 'L3', 'L4', 'L5'].every(level => typeof item[level] === 'string');
+    if (['definitionVersion', 'modelVersion', 'currentProgress'].includes(key)) return typeof item === 'number' && Number.isFinite(item);
+    return typeof item === 'string';
+  });
 export const draftScopeKey = scope => scope?.backend && scope?.account && scope?.athlete ? [scope.backend, scope.account, scope.athlete].map(encodeURIComponent).join(':') : '';
 const legacyKey = collection => collection === 'training' ? 'nico_training_draft_v1' : `nico_form_draft_${collection}`;
 export function createDraftStore({ scope, isCurrent = () => true, storage, now = Date.now, validate = plain } = {}) {

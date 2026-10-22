@@ -1,3 +1,5 @@
+import { growthCollection, growthId } from '../shared/growth-model.ts';
+import { saveGrowth, actGrowth, deleteGrowth, restoreGrowth, retainGrowthHistory, goalCandidates, skillTimeline } from '../shared/growth-records.mjs';
 import { derivePrdState, upgradePrdState } from '../shared/prd.mjs';
 import { upgradePerformanceState } from '../shared/performance.ts';
 import { trainingCollection, creationRequest, creationReplay, stampTraining, trainingRelations } from '../shared/training-records.mjs';
@@ -30,6 +32,7 @@ function relations(collection, record, data, previous = null) {
     const ids = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
     const refs = String(record.sourceRef || '').split(/[,，、\s]+/).filter(Boolean);
     if (refs.some(id => !ids.has(id))) throw fail(400, '薄弱点引用的来源记录不存在');
+    if (record.sourceType === '技能评估' && (!refs.length || refs.some(id => !data.skillAssessments.some(row => row.id === id && row.status === '已确认')))) throw fail(400, '技能来源须关联已确认评估');
   }
   if (collection === 'checkins' && !data.weakpoints.some(point => point.id === record.weakPointId)) throw fail(400, '打卡关联的薄弱点不存在');
   trainingRelations(collection, record, data, previous);
@@ -111,11 +114,13 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       if (session?.mustChangePassword) throw fail(403, '请先替换临时密码，再录入信息');
       if (endpoint === '/api/storage-setup' && method === 'POST') { await backend.ensureBucket(); return json({ success: true }); }
       const current = await backend.read(), data = normalizeState(structuredClone(current.data));
+      if (method === 'GET' && endpoint === '/api/skills-overview') return json(skillTimeline(data, url.searchParams.get('skillId') ? growthId(url.searchParams.get('skillId')) : ''));
+      if (method === 'GET' && parts[1] === 'goals' && parts[3] === 'candidates' && parts.length === 4) { const goal = data.goals.find(row => row.id === parts[2]); if (!goal) throw fail(404, '目标不存在'); return json(goalCandidates(data, goal)); }
       headers['X-Nico-Revision'] = String(current.revision);
       if (endpoint === '/api/snapshot' && method === 'GET') return json({ ...current, data, role: session ? 'owner' : 'viewer', athleteId: 'nico' });
       if (endpoint === '/api/backup' && method === 'GET') { if (!session) throw fail(401, '请先登录管理员账号'); return json({ format: 'nico-backup-v1', ...current }); }
       if (endpoint === '/api/public-preview' && method === 'GET') return json(publicSnapshot(data));
-      if (method === 'GET' && parts[0] === 'api' && COLLECTIONS.includes(parts[1]) && parts.length === 2) return json(data[parts[1]]);
+      if (method === 'GET' && parts[0] === 'api' && COLLECTIONS.includes(parts[1]) && parts.length === 2) return json(parts[1] === 'skillAssessments' && url.searchParams.get('skillId') ? data.skillAssessments.filter(row => row.skillId === growthId(url.searchParams.get('skillId'))) : data[parts[1]]);
       if (['GET', 'HEAD'].includes(method) && parts[1] === 'media' && parts[3] === 'content' && parts.length === 5) {
         const item = data.media.find(m => m.id === parts[2]);
         if (!item || !['original', 'playback', 'poster'].includes(parts[4])) throw fail(404, '素材不存在');
@@ -133,7 +138,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       const expected = request.headers.get('if-match');
       if (!/^\d+$/.test(expected || '')) throw fail(428, '请先加载最新记录，再提交修改');
       let trainingInput, receipt;
-      if (method === 'POST' && parts.length === 2 && parts[0] === 'api' && trainingCollection(parts[1])) {
+      if (method === 'POST' && parts.length === 2 && parts[0] === 'api' && (trainingCollection(parts[1]) || growthCollection(parts[1]))) {
         trainingInput = await body(); receipt = await creationRequest(trainingInput, session.username);
         const replay = creationReplay(data, parts[1], receipt);
         if (replay) return json(replay);
@@ -186,26 +191,32 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
             await backend.upload(posterName, posterBytes.buffer, 'image/jpeg'); uploadedVariants.push(posterName);
             Object.assign(item, info, { playbackUrl: `/uploads/${playbackName}`, posterUrl: `/uploads/${posterName}` }); result = item;
           }
+        } else if (growthCollection(parts[1]) && parts[0] === 'api' && parts.length === 4 && method === 'POST') {
+          result = actGrowth(data, parts[1], parts[2], parts[3], await body(), { actor: session.username, now: new Date(now()).toISOString() });
         } else if (COLLECTIONS.includes(parts[1]) && parts[0] === 'api') {
           const key = parts[1];
           if (method === 'POST' && parts.length === 2 && key !== 'media') {
-            const record = { ...validate(key, trainingInput ?? await body()), id: `${key}-${randomHex(16)}` };
+            const input = trainingInput ?? await body();
+            if (growthCollection(key)) { result = saveGrowth(data, key, input, { id: `${key}-${randomHex(16)}`, actor: session.username, now: new Date(now()).toISOString(), request: receipt }); } else {
+            const record = { ...validate(key, input), id: `${key}-${randomHex(16)}` };
             if (trainingCollection(key)) stampTraining(record, null, session.username, new Date(now()).toISOString(), receipt);
-            relations(key, record, data); data[key].push(record); result = record;
+            relations(key, record, data); data[key].push(record); result = record; }
           }
           else if (['PUT', 'DELETE'].includes(method) && parts.length === 3) {
             const index = data[key].findIndex(record => record.id === parts[2]); if (index < 0) throw fail(404, '记录不存在');
             if (method === 'PUT') {
-              const previous = data[key][index], record = validate(key, await body(), previous); relations(key, record, data, previous);
+              const previous = data[key][index], input = await body();
+              if (growthCollection(key, previous) || key === 'goals' && input.modelVersion === 1) { result = saveGrowth(data, key, input, { id: previous.id, actor: session.username, now: new Date(now()).toISOString() }); } else {
+              const record = validate(key, input, previous); relations(key, record, data, previous);
               if (trainingCollection(key)) stampTraining(record, previous, session.username, new Date(now()).toISOString());
               if (key === 'plans') { const outcome = commitPlanUpdate(data, parts[2], data[key][index], record); if (outcome.error) throw fail(400, outcome.error); }
-              data[key][index] = record; result = record;
+              data[key][index] = record; result = record; }
             }
-            else { if (key === 'weakpoints' && data.checkins.some(c => c.weakPointId === parts[2])) throw fail(409, '该薄弱点已有打卡记录；请先处理打卡记录，或把状态改为“暂停 / 已改善”'); const [record] = data[key].splice(index, 1); data.trash.push({ id: `trash-${randomHex(16)}`, collection: key, record, deletedAt: new Date(now()).toISOString(), deletedBy: session.username }); result = { success: true, message: '已移至回收站，原素材保留' }; }
+            else { if (key === 'weakpoints' && data.checkins.some(c => c.weakPointId === parts[2])) throw fail(409, '该薄弱点已有打卡记录；请先处理打卡记录，或把状态改为“暂停 / 已改善”'); let record = data[key][index]; if (growthCollection(key, record)) record = deleteGrowth(data, key, record, { actor: session.username, now: new Date(now()).toISOString() }); data[key].splice(index, 1); data.trash.push({ id: `trash-${randomHex(16)}`, collection: key, record, deletedAt: new Date(now()).toISOString(), deletedBy: session.username }); result = { success: true, message: '已移至回收站，原素材保留' }; }
           } else throw fail(404, '接口不存在');
         } else if (parts[1] === 'trash' && parts[3] === 'restore' && method === 'POST') {
           const index = data.trash.findIndex(item => item.id === parts[2]); if (index < 0) throw fail(404, '回收记录不存在');
-          const [item] = data.trash.splice(index, 1); if (data[item.collection].some(record => record.id === item.record.id)) throw fail(409, '相同ID已存在'); data[item.collection].push(item.record); result = item.record;
+          const [item] = data.trash.splice(index, 1); if (data[item.collection].some(record => record.id === item.record.id)) throw fail(409, '相同ID已存在'); const record = growthCollection(item.collection, item.record) ? restoreGrowth(data, item.collection, item.record, { actor: session.username, now: new Date(now()).toISOString() }) : item.record; data[item.collection].push(record); result = record;
         } else if (endpoint === '/api/profile' && method === 'PUT') {
           const { name, sex, birthDate } = await body();
           if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男', '其他'].includes(sex) || birthDate && !validDate(birthDate)) throw fail(400, '档案字段无效');
@@ -220,7 +231,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           let restored; try { restored = normalizeState(input.data); } catch (error) { throw fail(400, error.message); }
           for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
           const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion;
-          const retained = retainPlanHistory(data, restored);
+          const retained = retainGrowthHistory(data, retainPlanHistory(data, restored), { actor: session.username, now: new Date(now()).toISOString() });
           let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained;
           if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data;
           for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); result = { success: true };

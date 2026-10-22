@@ -1,3 +1,5 @@
+import { growthCollection, growthId } from '../shared/growth-model.ts';
+import { saveGrowth, actGrowth, deleteGrowth, restoreGrowth, retainGrowthHistory, goalCandidates, skillTimeline } from '../shared/growth-records.mjs';
 import { upgradePrdState } from '../shared/prd.mjs';
 import { upgradePerformanceState } from '../shared/performance.ts';
 import express from 'express';
@@ -120,20 +122,25 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
       const refs = String(record.sourceRef || '').split(/[,，、\s]+/).filter(Boolean);
       if (refs.some(id => !existingIds.has(id))) throw httpError(400, '薄弱点引用的来源记录不存在');
+      if (record.sourceType === '技能评估' && (!refs.length || refs.some(id => !data.skillAssessments.some(row => row.id === id && row.status === '已确认')))) throw httpError(400, '技能来源须关联已确认评估');
     }
     if (collection === 'checkins' && !data.weakpoints.some(point => point.id === record.weakPointId)) throw httpError(400, '打卡关联的薄弱点不存在');
   }
   app.get('/api/snapshot', (req, res) => {
     const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json({ ...current, role: req.role, athleteId: 'nico' });
   });
+  app.get('/api/skills-overview', (req, res) => res.json(skillTimeline(store.read().data, req.query.skillId ? growthId(req.query.skillId) : '')));
+  app.get('/api/goals/:id/candidates', (req, res) => { const data = store.read().data, goal = data.goals.find(row => row.id === req.params.id); if (!goal) throw httpError(404, '目标不存在'); res.json(goalCandidates(data, goal)); });
+  app.post('/api/:collection/:id/:action', (req, res, next) => { if (!growthCollection(req.params.collection)) return next(); requireOwner(req); reply(res, change(req, data => actGrowth(data, req.params.collection, req.params.id, req.params.action, req.body, { actor: req.username, now: new Date().toISOString() }))); });
   for (const key of COLLECTIONS) {
-    app.get(`/api/${key}`, (req, res) => { const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json(current.data[key]); });
+    app.get(`/api/${key}`, (req, res) => { const current = store.read(); const skillId = key === 'skillAssessments' && req.query.skillId ? growthId(req.query.skillId) : ''; res.set('X-Nico-Revision', String(current.revision)).json(skillId ? current.data[key].filter(row => row.skillId === skillId) : current.data[key]); });
     if (key !== 'media') app.post(`/api/${key}`, async (req, res) => {
       canWrite(req, key);
       revision(req);
-      const request = trainingCollection(key) ? await creationRequest(req.body, req.username) : null;
+      const request = (trainingCollection(key) || growthCollection(key)) ? await creationRequest(req.body, req.username) : null;
       const current = store.read(), replay = creationReplay(current.data, key, request);
       if (replay) return reply(res, { revision: current.revision, result: replay });
+      if (growthCollection(key)) return reply(res, change(req, data => saveGrowth(data, key, req.body, { id: makeId(key), actor: req.username, now: new Date().toISOString(), request })), 201);
       const record = { ...validate(key, req.body), id: makeId(key) };
       if (trainingCollection(key)) stampTraining(record, null, req.username, new Date().toISOString(), request);
       reply(res, change(req, data => { relations(key, record, data); data[key].push(record); return record; }), 201);
@@ -143,7 +150,9 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       reply(res, change(req, data => {
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
-        const previous = data[key][index], record = validate(key, req.body, previous); relations(key, record, data, previous);
+        const previous = data[key][index];
+        if (growthCollection(key, previous) || key === 'goals' && req.body.modelVersion === 1) return saveGrowth(data, key, req.body, { id: previous.id, actor: req.username, now: new Date().toISOString() });
+        const record = validate(key, req.body, previous); relations(key, record, data, previous);
         if (trainingCollection(key)) stampTraining(record, previous, req.username, new Date().toISOString());
         if (key === 'plans') {
           const outcome = commitPlanUpdate(data, req.params.id, data[key][index], record);
@@ -158,7 +167,8 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
         if (key === 'weakpoints' && data.checkins.some(c => c.weakPointId === req.params.id)) throw httpError(409, '该薄弱点已有打卡记录；请先处理打卡记录，或把状态改为“暂停 / 已改善”');
-        const [record] = data[key].splice(index, 1); data.trash ||= [];
+        let record = data[key][index]; if (growthCollection(key, record)) record = deleteGrowth(data, key, record, { actor: req.username, now: new Date().toISOString() });
+        data[key].splice(index, 1); data.trash ||= [];
         data.trash.push({ id: makeId('trash'), collection: key, record, deletedAt: new Date().toISOString(), deletedBy: req.username });
         return { success: true, message: '已移至回收站，原素材保留，可恢复' };
       }));
@@ -171,7 +181,8 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       if (index < 0) throw httpError(404, '回收记录不存在');
       const [item] = data.trash.splice(index, 1);
       if (data[item.collection].some(r => r.id === item.record.id)) throw httpError(409, '相同ID已存在');
-      data[item.collection].push(item.record); return item.record;
+      const record = growthCollection(item.collection, item.record) ? restoreGrowth(data, item.collection, item.record, { actor: req.username, now: new Date().toISOString() }) : item.record;
+      data[item.collection].push(record); return record;
     }));
   });
   app.put('/api/profile', (req, res) => {
@@ -201,7 +212,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
     // Backups exported before the practice loop existed simply have no weakpoints/checkins.
     for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
-    reply(res, change(req, data => { const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion; const retained = retainPlanHistory(data, restored); let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained; if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); return { success: true }; }, { planSync: false }));
+    reply(res, change(req, data => { const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion; const retained = retainGrowthHistory(data, retainPlanHistory(data, restored), { actor: req.username, now: new Date().toISOString() }); let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained; if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); return { success: true }; }, { planSync: false }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
     const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };

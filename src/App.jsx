@@ -98,7 +98,7 @@ export default function App() {
       const updated = current[collection].filter(r => r.id !== removedId && r.id !== record?.id);
       return { ...current, [collection]: record ? [...updated, record] : updated };
     });
-    if (removedId || collection === 'plans') { setNotice('上次提交已获服务端确认。'); reload(); return; }
+    if (removedId || ['plans', 'skillDefinitions', 'skillAssessments', 'milestones'].includes(collection)) { setNotice('上次提交已获服务端确认。'); reload(); return; }
     if (EVIDENCE_COLLECTIONS.includes(collection)) {
       setNotice(<>上次提交已获服务端确认，计划草稿已依据本次记录同步更新。<button type="button" className="apple-btn apple-btn-secondary" onClick={() => navigate('week')}>查看本周计划草稿</button></>);
       reload();
@@ -173,10 +173,10 @@ export default function App() {
         <Message error>{error}</Message><Message>{notice}</Message>
         {session?.authenticated && session.mustChangePassword
           ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
-          : loading && !selectedLoaded ? <Message>正在读取记录…</Message> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense fallback={<Message>正在打开页面…</Message>}>
+          : loading && !selectedLoaded ? <Message>正在读取记录…</Message> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense key={session?.authenticated ? session.username : 'guest'} fallback={<Message>正在打开页面…</Message>}>
             {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate} readOnly={readOnly}/>}
             {fullView && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
-            {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
+            {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate} manageSkills={role === 'owner'}/>}
             {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} manageTemplates={role === 'owner'} initialFilter={searchSeed} initialOpen={quickEntry} onLinkMedia={record => { setMediaTarget({ recordId: record.id, date: record.date }); setReviewTab('media'); navigate('review'); }}/>}
             {fullView && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'} initialRecord={mediaTarget}/>)}
             {fullView && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
