@@ -610,3 +610,9 @@ dialog::backdrop { background: var(--overlay); }
   .glass-card, .focus-card, .hero { box-shadow: none !important; border: 1px solid #ccc !important; background: #fff !important; }
   .report-preview { border: 0; height: auto; }
 }
+
+@media (max-width: 600px) {
+  .form-grid.training-quick-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .training-quick-fields > .form-group:first-child,
+  .training-quick-fields > .form-group:nth-child(4) { grid-column: 1 / -1; }
+}

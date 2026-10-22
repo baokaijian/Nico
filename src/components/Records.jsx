@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { FIELDS, ordered, best, validateRecord, WOMEN_50, STANDARD_SOURCE, STANDARD_VERSION } from '../../shared/domain.mjs';
 import { Field, Message, Empty } from './ui';
 import TrainingRecords from './TrainingRecords';
+import useRecordDraft from '../services/useRecordDraft';
+import DraftNotice, { draftHint } from './DraftNotice';
 import { recordFormFields, changeRecordField } from '../services/record-form';
 const names = { swim: '成绩', trainings: '水上训练', fitness: '体能', nutrition: '恢复与饮食', growth: '身体测量', goals: '个人目标', annotations: '录像批注', media: '素材说明' };
 function valueLabel(value) { return value === true ? '按既有专业建议服用' : value === false ? '未服用' : value == null || value === '' ? '未填写' : String(value); }
@@ -17,17 +19,16 @@ function GenericRecords({ type, data, api, onSaved, readOnly = false, allowAdd =
   const blank = () => Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : '']));
   const [values, setValues] = useState(blank), [editing, setEditing] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [filter, setFilter] = useState('');
   const [scoreKind, setScoreKind] = useState('全部'), [from, setFrom] = useState(''), [to, setTo] = useState(''), [facets, setFacets] = useState({ distance: '', stroke: '', poolLength: '', validityStatus: '' });
-  const [draftFound, setDraftFound] = useState(null);
+  const localDraft = useRecordDraft(api, type);
   const [savedMessage, setSavedMessage] = useState('');
   useEffect(() => { if (initialFilter !== undefined) setFilter(initialFilter); }, [initialFilter]);
   const [baseRevision, setBaseRevision] = useState(() => api?.getRevision()), [conflict, setConflict] = useState(false);
-  const key = `nico_form_draft_${type}`;
-  useEffect(() => { try { setDraftFound(JSON.parse(localStorage.getItem(key) || 'null')); } catch { setError('本地草稿无法读取，可继续使用服务端数据'); } }, [key]);
-  const edit = r => { setBaseRevision(api.getRevision()); setConflict(false); setEditing(r.id); setValues(Object.fromEntries(fields.map(f => [f.key, type === 'swim' && TIME_FIELDS.includes(f.key) ? performanceInput(r, f.key) : r[f.key] ?? '']))); setError(''); };
+  const edit = r => { if (localDraft.blocked) { setError('请先处理本账号未提交草稿，再编辑其他记录。'); return; } setBaseRevision(api.getRevision()); setConflict(false); setEditing(r.id); setValues(Object.fromEntries(fields.map(f => [f.key, type === 'swim' && TIME_FIELDS.includes(f.key) ? performanceInput(r, f.key) : r[f.key] ?? '']))); setError(''); };
   const change = (field, value) => {
-    setValues(current => { const next = changeRecordField(type, current, field, value); try { localStorage.setItem(key, JSON.stringify({ values: next, editing, baseRevision })); } catch { setError('无法暂存草稿，请导出后继续'); } return next; });
+    const next = changeRecordField(type, values, field, value);
+    setValues(next); localDraft.persist({ values: next, editing, baseRevision });
   };
-  const reset = () => { setBaseRevision(api.getRevision()); setConflict(false); setEditing(null); setValues(blank()); setError(''); setDraftFound(null); localStorage.removeItem(key); };
+  const reset = () => { setBaseRevision(api.getRevision()); setConflict(false); setEditing(null); setValues(blank()); setError(''); localDraft.clear(); };
   const save = async e => {
     e.preventDefault(); setBusy(true); setError('');
     try {
@@ -75,9 +76,10 @@ function GenericRecords({ type, data, api, onSaved, readOnly = false, allowAdd =
     {type === 'goals' && <Message>历史目标原文完整保留，包含未核实的规则或旧标准。手动进度不代表预测概率；未经确认的原文不作为训练指令。</Message>}
     <Message error>{error}</Message>{conflict && <Message>请先用顶部“刷新记录”读取最新版本，对照下方记录。<button onClick={() => { setBaseRevision(api.getRevision()); setConflict(false); setError('已采用当前版本，请确认输入后再次保存'); }}>已核对最新记录，允许重试</button></Message>}
     {!readOnly && (allowAdd || editing) && <details className="glass-card" open={Boolean(editing)}><summary>{editing ? '编辑记录' : '添加记录'}</summary>
-      {draftFound && <Message>发现此设备的未提交草稿。<button onClick={() => { setValues(draftFound.values); setEditing(draftFound.editing); setBaseRevision(draftFound.baseRevision ?? 0); setDraftFound(null); }}>恢复草稿</button> <button onClick={() => { localStorage.removeItem(key); setDraftFound(null); }}>舍弃草稿</button></Message>}
-      <form onSubmit={save}><div className="form-grid">{formFields.primary.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{formFields.secondary.length > 0 && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{formFields.secondary.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
-        <div className="actions"><button disabled={busy} className="apple-btn apple-btn-primary">{busy ? '正在保存…' : '保存到服务端'}</button><button type="button" onClick={reset} className="apple-btn apple-btn-secondary">清空 / 取消</button><button type="button" onClick={() => downloadJSON(`Nico-${type}-未提交草稿.json`, { collection: type, values, editing })} className="apple-btn apple-btn-secondary">导出未提交草稿</button></div><p className="muted">草稿仅在此设备，不会自动覆盖服务端。保存失败时输入保留。</p>
+      <DraftNotice draft={localDraft} onRestore={draft => { setValues({ ...blank(), ...draft.values }); setEditing(draft.editing); setBaseRevision(draft.baseRevision ?? 0); }}/>
+
+      <form onSubmit={save}><fieldset disabled={busy || localDraft.blocked}><legend className="sr-only">填写记录</legend><div className="form-grid">{formFields.primary.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{formFields.secondary.length > 0 && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{formFields.secondary.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
+        <div className="actions"><button disabled={busy} className="apple-btn apple-btn-primary">{busy ? '正在保存…' : '保存到服务端'}</button><button type="button" onClick={reset} className="apple-btn apple-btn-secondary">清空 / 取消</button><button type="button" onClick={() => downloadJSON(`Nico-${type}-未提交草稿.json`, { collection: type, values, editing })} className="apple-btn apple-btn-secondary">导出未提交草稿</button></div><p className="muted">{draftHint} 保存失败时输入保留。</p></fieldset>
       </form></details>}
     {type === 'swim' && !publicMode && <><Message>成绩按整数毫秒保存，显示分:秒:百分秒；可输入56.171等三位小数，编辑会保留精度。只有核验有效、池长明确的成绩参与PB。未核验、失格和无效记录不会被删除。</Message><Message>测试年龄组按测试年份减出生年份计算；生日未知时留空。排名、上一次成绩和第一名成绩按实际来源填写，缺失时不自动推算。</Message><div className="filter-bar"><label>记录分类<select className="apple-input" value={scoreKind} onChange={e => setScoreKind(e.target.value)}>{['全部', '测试', '比赛', '训练', '未知'].map(kind => <option key={kind}>{kind}</option>)}</select></label><label>距离<select className="apple-input" value={facets.distance} onChange={e => setFacets(current => ({ ...current, distance: e.target.value }))}><option value="">全部</option>{facetOptions('distance').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>泳姿<select className="apple-input" value={facets.stroke} onChange={e => setFacets(current => ({ ...current, stroke: e.target.value }))}><option value="">全部</option>{facetOptions('stroke').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>池长<select className="apple-input" value={facets.poolLength} onChange={e => setFacets(current => ({ ...current, poolLength: e.target.value }))}><option value="">全部</option>{facetOptions('poolLength').map(option => <option key={option} value={option}>{option}</option>)}</select></label><label>有效性<select className="apple-input" value={facets.validityStatus} onChange={e => setFacets(current => ({ ...current, validityStatus: e.target.value }))}><option value="">全部</option>{facetOptions('validityStatus').map(option => <option key={option} value={option}>{option}</option>)}</select></label></div></>}
     <div className="filter-bar"><label className="search">查找记录<input className="apple-input" value={filter} onChange={e => setFilter(e.target.value)} placeholder="日期、项目或备注"/></label><label>起始日期<input className="apple-input" type="date" value={from} onChange={e => setFrom(e.target.value)}/></label><label>结束日期<input className="apple-input" type="date" value={to} onChange={e => setTo(e.target.value)}/></label></div>

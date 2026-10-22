@@ -5,6 +5,8 @@ import { createApi } from './services/api';
 import { loadAppView } from './services/app-view';
 import { Message, Modal } from './components/ui';
 import LoginPanel from './components/LoginPanel';
+import LogoutDialog from './components/LogoutDialog';
+import { createDraftStore } from './services/drafts';
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const Plans = lazy(() => import('./components/PlanViewer'));
 const Records = lazy(() => import('./components/Records'));
@@ -22,6 +24,8 @@ const roleLabels = { owner: '家长管理', coach: '协作录入', viewer: '只�
 export default function App() {
   const [data, setData] = useState(emptyState), [tab, setTab] = useState('home'), [recordType, setRecordType] = useState('trainings'), [reviewTab, setReviewTab] = useState('report'), [role, setRole] = useState('viewer'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [auth, setAuth] = useState(false), [session, setSession] = useState(null), [published, setPublished] = useState(null), [story, setStory] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false), [passwordOpen, setPasswordOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false), [logoutBusy, setLogoutBusy] = useState(false), [logoutError, setLogoutError] = useState('');
+  const [mediaTarget, setMediaTarget] = useState(null), [quickEntry, setQuickEntry] = useState(false);
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
   const [mode, setMode] = useState(() => api.getMode());
@@ -35,6 +39,7 @@ export default function App() {
   const publicData = useMemo(() => ({ ...emptyState(), swim: publicSnapshot?.swim || [], media: publicSnapshot?.media || [] }), [publicSnapshot]);
   const reloadController = useRef(null);
   const hadSession = useRef(false);
+  const previousAccount = useRef(null);
   const reload = useCallback(async () => {
     reloadController.current?.abort();
     const controller = new AbortController(); reloadController.current = controller;
@@ -43,7 +48,8 @@ export default function App() {
       const result = await loadAppView(api, { mode: modeRef.current, adminCapable, base: import.meta.env.BASE_URL, signal: controller.signal, onSession: current => {
         if (controller.signal.aborted) return;
         setSession(current); setRole(current?.role || 'viewer');
-        if (!current?.authenticated || current.mustChangePassword) { setData(emptyState()); setLoaded(false); }
+        if (!current?.authenticated || current.mustChangePassword || previousAccount.current !== current.username) { setData(emptyState()); setLoaded(false); }
+        previousAccount.current = current?.authenticated ? current.username : null;
         if (hadSession.current && !current?.authenticated) { setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); setAuth(modeRef.current === 'manage'); }
         hadSession.current = !!current?.authenticated;
       } });
@@ -85,7 +91,7 @@ export default function App() {
     modeRef.current = next; api.setMode(next); setMode(next); setUserMenuOpen(false); setNotice('');
     setTab(lastTabs.current[next]); void reload();
   };
-  const navigate = (next, type) => { setTab(next); if (type) setRecordType(type); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  const navigate = (next, type) => { setQuickEntry(next === 'records' && type === 'trainings'); setTab(next); if (type) setRecordType(type); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const onSaved = (collection, record, removedId) => {
     setData(current => {
       if (!Array.isArray(current[collection])) return { ...current, [collection]: record };
@@ -102,16 +108,21 @@ export default function App() {
   };
   const readOnly = !authenticated || role === 'viewer';
   const canEditRecords = !readOnly && (role === 'owner' || ['swim', 'trainings'].includes(recordType));
-  const logout = async () => {
+  const logout = async (deleteDrafts = false) => {
+    const drafts = createDraftStore({ scope: api.getDraftScope() });
+    setLogoutBusy(true); setLogoutError('');
     setUserMenuOpen(false);
     let failed = false;
     try { await api.authRequest('logout', {}); } catch {
-      if (api.usesCookieSession) { setError('退出未获服务端确认，请恢复连接后重试。'); return; }
+      if (api.usesCookieSession) { setLogoutError('退出未获服务端确认，请恢复连接后重试；本机草稿仍保留。'); setLogoutBusy(false); return; }
       failed = true;
     }
     reloadController.current?.abort(); api.resetAuth(); setSession(null); setLoaded(false); setData(emptyState());
+    const cleared = deleteDrafts ? drafts.clear() : null;
+    setLogoutOpen(false); setLogoutBusy(false); setMediaTarget(null);
     modeRef.current = 'view'; api.setMode('view'); setMode('view'); setPasswordOpen(false); setAuth(false);
-    setNotice(failed ? '已清除本机登录；连接中断，服务端会话将在有效期结束后失效。' : '已退出管理员账号'); await reload();
+    const draftMessage = deleteDrafts ? cleared.status === 'cleared' ? '已删除本账号的新版草稿。' : '未能确认草稿已清除，请在下次登录后检查。' : '草稿按原账号保留，重新登录后可恢复。';
+    setNotice(`${failed ? '已清除本机登录；服务端会话将在有效期结束后失效。' : '已退出账号。'}${draftMessage}`); await reload();
   };
   const runSearch = event => {
     event.preventDefault();
@@ -141,7 +152,7 @@ export default function App() {
               {userMenuOpen && <div className="user-menu" role="menu">
                 {authenticated && <button type="button" role="menuitem" onClick={() => switchMode(fullView ? 'view' : 'manage')}>{fullView ? '切换到查看模式' : '返回管理模式'}</button>}
                 <button type="button" role="menuitem" onClick={() => { setUserMenuOpen(false); setPasswordOpen(true); }}>修改密码</button>
-                <button type="button" role="menuitem" className="danger" onClick={logout}>退出登录</button>
+                <button type="button" role="menuitem" className="danger" onClick={() => { setUserMenuOpen(false); setLogoutError(''); setLogoutOpen(true); }}>退出登录</button>
               </div>}
             </div>
           : <button type="button" className="login-trigger" onClick={() => { setAuth(true); setError(''); }}>登录</button>)}
@@ -166,12 +177,13 @@ export default function App() {
             {fullView && tab === 'today' && <Dashboard data={data} navigate={navigate} readOnly={readOnly}/>}
             {fullView && tab === 'week' && <Plans data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
             {fullView && tab === 'practice' && <Practice data={data} api={api} onSaved={onSaved} readOnly={readOnly} navigate={navigate}/>}
-            {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} manageTemplates={role === 'owner'} initialFilter={searchSeed}/>}
-            {fullView && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'}/>)}
+            {fullView && tab === 'records' && <Records key={recordType} type={recordType} data={data} api={api} onSaved={onSaved} readOnly={!canEditRecords} manageTemplates={role === 'owner'} initialFilter={searchSeed} initialOpen={quickEntry} onLinkMedia={record => { setMediaTarget({ recordId: record.id, date: record.date }); setReviewTab('media'); navigate('review'); }}/>}
+            {fullView && tab === 'review' && (reviewTab === 'report' ? <Reports data={data}/> : <Gallery data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} allowUpload={role === 'owner'} initialRecord={mediaTarget}/>)}
             {fullView && tab === 'profile' && <Profile data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
         {passwordOpen && session?.authenticated && <Suspense fallback={<Message>正在打开账号设置…</Message>}><Modal title="修改管理员密码" onClose={() => setPasswordOpen(false)}><ChangePassword api={api} onChanged={async () => { setPasswordOpen(false); await reload(); }}/></Modal></Suspense>}
+        {logoutOpen && <LogoutDialog api={api} busy={logoutBusy} error={logoutError} onLogout={logout} onClose={() => { if (!logoutBusy) setLogoutOpen(false); }}/>}
       </main>
     </div>
     <footer className="app-footer">公开内容经家长授权 · 完整档案需登录 · <a href={`${import.meta.env.BASE_URL}third-party-notices.html`} target="_blank" rel="noreferrer">开源组件声明</a></footer>

@@ -135,3 +135,19 @@ test('浏览器存储损坏或被禁用不阻断登录；本机 Cookie 模式不
     await createApi('', () => '', { storage }).authRequest('login', {}); assert.equal(storage.values().length, 0);
   } finally { globalThis.fetch = original; }
 });
+
+test('草稿身份只来自当前已验证会话，退出/强制改密不授予草稿访问，后续旧引用失效', async () => {
+  const original = globalThis.fetch, api = createApi('https://protocol.invalid');
+  try {
+    assert.equal(api.getDraftScope?.() ?? null, null);
+    globalThis.fetch = async () => new Response(JSON.stringify({ authenticated: true, username: 'protocol-a', role: 'owner', accessToken: 'a'.repeat(64), expiresAt: Date.now() + 60000 }));
+    await api.authRequest('login', {});
+    assert.equal(api.getDraftScope?.()?.account, 'protocol-a');
+    const old = api.getDraftScope();
+    api.resetAuth(); assert.equal(api.getDraftScope(), null);
+    globalThis.fetch = async () => new Response(JSON.stringify({ authenticated: true, username: 'protocol-b', role: 'owner', mustChangePassword: true }));
+    await api.authRequest('session'); assert.equal(api.getDraftScope(), null);
+    globalThis.fetch = async () => new Response(JSON.stringify({ authenticated: true, username: 'protocol-b', role: 'owner' }));
+    await api.authRequest('session'); assert.equal(api.getDraftScope().account, 'protocol-b'); assert.notEqual(api.getDraftScope(), old);
+  } finally { globalThis.fetch = original; }
+});
