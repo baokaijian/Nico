@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import { archiveHarness } from './archive-harness.mjs';
 import { emptyState, normalizeState } from '../shared/domain.mjs';
 import { reportStale } from '../shared/report-drafts.mjs';
+for(const runtime of ['local','cloud']) test(`${runtime}: A/B仅真实私有视频、人工观察、时间与技能关联`,async t=>{
+  const seed=emptyState();seed.media=[{id:'left',date:'2000-01-01',title:'协议视频A',type:'video',url:'/uploads/a.mp4',duration:30},{id:'right',date:'2000-01-02',title:'协议视频B',type:'video',url:'/uploads/b.mp4',duration:20},{id:'photo',date:'2000-01-02',title:'协议照片',type:'image',url:'/uploads/c.jpg'}];
+  const {read,send,create}=await archiveHarness(t,runtime,seed),input={title:'协议动作对比',date:'2000-01-03',leftMediaId:'left',rightMediaId:'right',leftSecond:5,rightSecond:2,mode:'同步',rate:0.75,observation:'手工观察到的事实',skillId:'',assessmentId:'',notes:''};
+  const {res,value}=await create('videoComparisons',input,'request-ab');assert.equal(res.status,201,value.error);assert.equal(value.status,'人工观察');
+  for(const extra of [{rightMediaId:'left'},{rightMediaId:'photo'},{leftSecond:31},{rightSecond:20},{rate:2},{observation:''},{assessmentId:'missing'},{skillId:'missing'}])assert.equal((await create('videoComparisons',{...input,...extra})).res.status,400);
+  assert.equal((await send('/api/media/left/content/playback','GET',undefined,undefined,'guest')).status,401);assert.equal(read().data.skillAssessments.length,0);assert.equal(read().data.swim.length,0);
+  assert.equal((await send('/api/videoComparisons','GET',undefined,undefined,'guest')).status,401);
+});
 for(const runtime of ['local','cloud']) test(`${runtime}: 故事身份隔离、人工确认、CAS、幂等、历史和旧备份恢复`,async t=>{
   const {read,send,create}=await archiveHarness(t,runtime), input={title:'协议故事',date:'2000-01-01',body:'实际观察',evidenceRefs:[],status:'待确认'}, old={format:'nico-backup-v1',data:emptyState()};
   delete old.data.growthStories;

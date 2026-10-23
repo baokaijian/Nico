@@ -2,7 +2,7 @@
 export const SKILL_DIMENSIONS = ['水中安全', '呼吸及水感', '自由泳', '仰泳', '蛙泳', '蝶泳', '出发和转身', '训练行为'] as const;
 export const SKILL_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'] as const;
 export const GOAL_STATUSES = ['待确认', '进行中', '已达成', '暂停', '已归档'] as const;
-export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts', 'competitionEvents'] as const;
+export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts', 'competitionEvents', 'videoComparisons'] as const;
 export const EVIDENCE_COLLECTIONS = ['swim', 'trainings', 'media', 'annotations', 'skillAssessments', 'checkins'] as const;
 export type SkillDimension = typeof SKILL_DIMENSIONS[number];
 export type SkillLevel = typeof SKILL_LEVELS[number];
@@ -40,6 +40,7 @@ const fields: Record<string, string[]> = {
   goals: ['title', 'category', 'targetMetric', 'deadline', 'status', 'currentProgress', 'ruleSource', 'reviewedBy', 'notes', 'baselineText', 'baselineRefs', 'targetResult', 'criteria', 'relatedTrainingIds', 'relatedSkillIds', 'targetSkillLevel'],
   milestones: ['title', 'date', 'status', 'evidenceNote', 'evidenceRefs', 'notes'],
   growthStories: ['title', 'date', 'body', 'status', 'evidenceRefs'],
+  videoComparisons: ['title', 'date', 'leftMediaId', 'rightMediaId', 'leftSecond', 'rightSecond', 'mode', 'rate', 'observation', 'skillId', 'assessmentId', 'notes'],
   competitionEvents: ['name', 'date', 'eventType', 'poolLength', 'performanceIds', 'mediaIds', 'certificateIds', 'notes', 'review', 'awards'],
   reportDrafts: ['title', 'periodType', 'period', 'parentSummary', 'childFeeling', 'nextFocus', 'selectedMediaIds'],
 };
@@ -79,6 +80,11 @@ function parseGrowth(key: string, input: ObjectRecord, stored = false): ObjectRe
     Object.assign(result, { title: growthText(input.title, '报告标题', true, 200), periodType, period, parentSummary: growthText(input.parentSummary, '家长总结', false, 12000), childFeeling: growthText(input.childFeeling, '孩子的个人感受', false, 12000), nextFocus: growthText(input.nextFocus, '下阶段观察重点', false, 12000), selectedMediaIds: growthIds(input.selectedMediaIds, '精选影像') });
   } else if (key === 'competitionEvents') {
     Object.assign(result, { name: growthText(input.name, '赛事名称', true, 200), date: growthDate(input.date), eventType: choice(input.eventType, ['正式比赛', '交流赛', '测试赛', '其他'], '赛事类型'), poolLength: choice(input.poolLength, ['25m', '50m', '未知'], '赛事池长'), performanceIds: growthIds(input.performanceIds, '比赛成绩'), mediaIds: growthIds(input.mediaIds, '关联影像'), certificateIds: growthIds(input.certificateIds, '证书照片'), notes: growthText(input.notes, '备注'), review: growthText(input.review, '比赛复盘', false, 12000), awards: growthText(input.awards, '奖项（依据实际凭证）') });
+  } else if (key === 'videoComparisons') {
+    const seconds = (value: unknown) => { if ((typeof value !== 'number' && (typeof value !== 'string' || !/^\d+(?:\.\d{1,3})?$/.test(value))) || !Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 86400) return failGrowth('对比时间点须为0–86400秒，最多三位小数'); return Number(value); };
+    const rate = Number(input.rate); if (![0.5, 0.75, 1].includes(rate)) return failGrowth('播放速度仅支持0.5x、0.75x、1x');
+    Object.assign(result, { title: growthText(input.title, '对比标题', true, 200), date: growthDate(input.date), leftMediaId: growthId(input.leftMediaId, '视频A'), rightMediaId: growthId(input.rightMediaId, '视频B'), leftSecond: seconds(input.leftSecond), rightSecond: seconds(input.rightSecond), mode: choice(input.mode, ['同步', '独立'], '播放模式'), rate, observation: growthText(input.observation, '手工技术观察', true, 12000), skillId: growthId(input.skillId, '技能标准', false), assessmentId: growthId(input.assessmentId, '技能测评', false), notes: growthText(input.notes, '证据限制与备注'), status: '人工观察' });
+    if (result.leftMediaId === result.rightMediaId) return failGrowth('请选择两个不同的真实视频');
   } else return failGrowth('不支持的成长集合');
   return result;
 }

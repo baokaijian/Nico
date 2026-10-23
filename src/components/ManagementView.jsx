@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { MANAGEMENT_NAV, SETTINGS_VIEWS } from '../services/management';
 import { Message } from './ui';
+const VideoCompare = lazy(() => import('./VideoCompare'));
 const Competitions = lazy(() => import('./CompetitionEvents'));
 const GrowthTimeline = lazy(() => import('./GrowthTimeline'));
 const DataQuality = lazy(() => import('./DataQuality'));
@@ -32,6 +33,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'growth' && view === 'practice' && <Practice {...shared} manageSkills={owner}/>}
       {section === 'growth' && view === 'skills' && <GrowthWorkspace {...shared} manageSkills={owner}/>}
       {section === 'growth' && view === 'goals' && <Goals {...shared} readOnly={readOnly || !owner}/>}
+      {section === 'review' && view === 'compare' && <VideoCompare {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'timeline' && <GrowthTimeline {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'quality' && <DataQuality {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'trends' && <Dashboard {...shared} detailOnly/>}

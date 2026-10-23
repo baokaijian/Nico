@@ -20,6 +20,24 @@ function snapshots(data, refs, oldRefs = [], oldSnapshots = [], { completed = fa
   });
 }
 export function validateGrowthRelations(data, key, record, previous = null) {
+  if (key === 'videoComparisons') {
+    for (const side of ['left','right']) {
+      const media = related(data,'media',record[`${side}MediaId`],previous?.[`${side}MediaId`] === record[`${side}MediaId`]);
+      if (media.type !== 'video') failGrowth('A/B对比只能选择真实视频');
+      if (media.duration != null && record[`${side}Second`] >= media.duration) failGrowth('对比时间点须小于视频时长');
+    }
+    if (record.skillId) {
+      const skill = related(data,'skillDefinitions',record.skillId,previous?.skillId === record.skillId);
+      record.skillVersion = previous?.skillId === record.skillId ? previous.skillVersion : skill.version;
+    } else if (record.assessmentId) failGrowth('关联测评前请选择对应技能标准');
+    if (record.assessmentId) {
+      const assessment = related(data,'skillAssessments',record.assessmentId,previous?.assessmentId === record.assessmentId);
+      if (assessment.skillId !== record.skillId) failGrowth('测评与技能标准不一致');
+      record.assessmentVersion = previous?.assessmentId === record.assessmentId ? previous.assessmentVersion : assessment.version;
+    }
+    if (!record.skillId) delete record.skillVersion;
+    if (!record.assessmentId) delete record.assessmentVersion;
+  }
   if (key === 'competitionEvents') {
     for (const id of record.performanceIds) {
       const score = related(data, 'swim', id, previous?.performanceIds?.includes(id));
