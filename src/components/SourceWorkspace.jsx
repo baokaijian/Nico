@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Modal, Message } from './ui';
+const Reports = lazy(() => import('./Reports'));
 const Timeline = lazy(() => import('./GrowthTimeline'));
 const Records = lazy(() => import('./Records'));
 const Skills = lazy(() => import('./Skills'));
@@ -16,6 +17,7 @@ export default function SourceWorkspace({ source, onClose, ...props }) {
     {['goals','milestones'].includes(collection) && <Goals {...shared}/>}
     {collection === 'media' && <Media {...shared}/>}
     {['weakpoints','checkins'].includes(collection) && <Practice {...shared}/>}
+    {collection === 'reportDrafts' && <Reports {...shared}/>}
     {collection === 'growthStories' && <Timeline {...shared}/>}
     {collection === 'plans' && <Plans {...shared}/>}
     <details><summary>完整原始记录</summary><pre className="source-json">{JSON.stringify(row, null, 2)}</pre></details>

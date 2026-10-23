@@ -1,3 +1,4 @@
+import { buildReportFacts, reportStale, validateReportSnapshot } from './report-drafts.mjs';
 import { GROWTH_COLLECTIONS, growthCollection, validateGrowthInput, validateStoredGrowth, evidenceRefs, growthText, objectRecord, SKILL_LEVELS, failGrowth } from './growth-model.ts';
 import { eligiblePerformance } from './performance.ts';
 const records = (data, key) => data[key] || [];
@@ -70,6 +71,10 @@ export function saveGrowth(data, key, input, { id, actor, now, request = null })
   const previous = records(data, key).find(row => row.id === id) || null;
   const record = { ...validateGrowthInput(key, input, previous), id };
   validateGrowthRelations(data, key, record, previous);
+  if (key === 'reportDrafts') {
+    if (previous && (previous.period !== record.period || previous.periodType !== record.periodType || canonical(previous.selectedMediaIds) !== canonical(record.selectedMediaIds))) failGrowth('已保存报告的来源范围不可直接更换，请新建草稿', 409);
+    if (!previous) Object.assign(record, buildReportFacts(data, record), { generatedAt: now, status: '待确认' });
+  }
   finish(data, key, record, previous, previous ? 'update' : 'create', actor, now, request);
   if (previous) data[key][data[key].findIndex(row => row.id === id)] = record; else data[key].push(record);
   return record;
@@ -86,18 +91,23 @@ const actionNote = input => {
 export function actGrowth(data, key, id, action, input, { actor, now }) {
   const previous = related(data, key, id), record = structuredClone(previous);
   if (!growthCollection(key, previous)) failGrowth('请先补充基线、结果和标准，明确采用新版目标流程');
-  if (action === 'confirm' && ['skillAssessments', 'goals', 'milestones', 'growthStories'].includes(key)) {
+  if (action === 'confirm' && ['skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts'].includes(key)) {
     const proof = confirmation(input), done = key === 'goals' ? '已达成' : '已确认';
     if (record.status === done || key === 'goals' && record.status === '已归档') {
       if (record.confirmedBy !== proof.confirmedBy || record.confirmationNote !== proof.confirmationNote || key === 'goals' && canonical(record.completionRefs) !== canonical(proof.refs)) failGrowth('原确认信息不同，请核对已有记录', 409);
       return previous;
     }
     if (record.status !== '待确认' && !(key === 'goals' && record.status === '进行中')) failGrowth('当前状态不能确认，请先核对或重新开启', 409);
+    if (key === 'reportDrafts' && reportStale(data, record)) failGrowth('报告来源基线已过期，请明确重新生成并核对', 409);
     if (key === 'goals') {
       if (!proof.refs.length) failGrowth('请关联至少一条可验证达成证据');
       record.completionRefs = proof.refs; record.completionSnapshots = snapshots(data, proof.refs, [], [], { completed: true, selfId: id });
     } else if (proof.refs.length) failGrowth('评估和里程碑使用本记录的证据，请先保存证据再确认');
     Object.assign(record, { status: done, confirmedAt: now, confirmedBy: proof.confirmedBy, confirmedActor: actor, confirmationNote: proof.confirmationNote });
+  } else if (action === 'refresh' && key === 'reportDrafts') {
+    actionNote(input);
+    if (record.status !== '待确认') failGrowth('已确认报告保留原事实；请新建同周期草稿', 409);
+    Object.assign(record, buildReportFacts(data, record), { generatedAt: now });
   } else if (action === 'archive' && key === 'goals') {
     if (Object.keys(objectRecord(input)).length) failGrowth('归档操作不接受额外字段');
     if (record.status === '已归档') return previous;
@@ -143,9 +153,9 @@ export function validateGrowthHistory(data) {
   if (!Array.isArray(data.growthHistory)) failGrowth('成长历史格式无效');
   const seen = new Set();
   for (const item of data.growthHistory) {
-    if (!item || !growthCollection(item.collection) || !Number.isSafeInteger(item.version) || item.version < 0 || typeof item.at !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(item.at) || !Number.isFinite(Date.parse(item.at)) || typeof item.by !== 'string' || !item.by || item.recordId !== item.record?.id || !['legacy', 'create', 'update', 'confirm', 'withdraw', 'archive', 'reopen', 'delete', 'restore', 'backup-restore', 'candidate'].includes(item.operation) || item.version > 0 && item.version !== item.record.version) failGrowth('成长历史条目无效');
+    if (!item || !growthCollection(item.collection) || !Number.isSafeInteger(item.version) || item.version < 0 || typeof item.at !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(item.at) || !Number.isFinite(Date.parse(item.at)) || typeof item.by !== 'string' || !item.by || item.recordId !== item.record?.id || !['legacy', 'create', 'update', 'confirm', 'withdraw', 'archive', 'reopen', 'delete', 'restore', 'backup-restore', 'candidate', 'refresh'].includes(item.operation) || item.version > 0 && item.version !== item.record.version) failGrowth('成长历史条目无效');
     const key = `${item.collection}/${item.recordId}/${item.version}`; if (seen.has(key)) failGrowth('成长历史版本重复'); seen.add(key);
-    if (item.version > 0) validateStoredGrowth(item.collection, item.record);
+    if (item.version > 0) { validateStoredGrowth(item.collection, item.record); if (item.collection === 'reportDrafts') validateReportSnapshot(item.record); }
   }
   const sameVersion = (key, record) => data.growthHistory.some(item => item.collection === key && item.recordId === record.id && item.version === record.version && canonical(item.record) === canonical(record));
   for (const { key, record } of all) {

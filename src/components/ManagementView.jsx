@@ -33,7 +33,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'review' && view === 'timeline' && <GrowthTimeline {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'quality' && <DataQuality {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'trends' && <Dashboard {...shared} detailOnly/>}
-      {section === 'review' && view === 'reports' && <Reports data={data}/>}
+      {section === 'review' && view === 'reports' && <Reports {...shared} readOnly={readOnly || !owner}/>}
       {archive && (view === 'archive' ? <Profile {...shared} role="viewer" view="archive" readOnly/> : <Records key={view} {...shared} type={view} readOnly={readOnly || !owner} initialFilter={initialFilter}/>)}
       {section === 'settings' && (view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view}/>)}
     </Suspense>

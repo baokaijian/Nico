@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archiveHarness } from './archive-harness.mjs';
 import { emptyState, normalizeState } from '../shared/domain.mjs';
+import { reportStale } from '../shared/report-drafts.mjs';
 for(const runtime of ['local','cloud']) test(`${runtime}: 故事身份隔离、人工确认、CAS、幂等、历史和旧备份恢复`,async t=>{
   const {read,send,create}=await archiveHarness(t,runtime), input={title:'协议故事',date:'2000-01-01',body:'实际观察',evidenceRefs:[],status:'待确认'}, old={format:'nico-backup-v1',data:emptyState()};
   delete old.data.growthStories;
@@ -17,4 +18,22 @@ for(const runtime of ['local','cloud']) test(`${runtime}: 故事身份隔离、�
   const history=read().data.growthHistory.length;assert.equal((await send('/api/restore','POST',old)).status,200);
   const trash=read().data.trash.find(row=>row.record.id===value.id);assert.ok(trash);assert.ok(read().data.growthHistory.length>=history);
   assert.equal((await send(`/api/trash/${trash.id}/restore`,'POST',{})).status,200);assert.ok(read().data.growthStories[0].version>value.version);assert.doesNotThrow(()=>normalizeState(read().data));
+});
+for(const runtime of ['local','cloud']) test(`${runtime}: 报告由服务端生成、来源冻结、确认与恢复`,async t=>{
+  const {read,send,create}=await archiveHarness(t,runtime), input={title:'协议报告',periodType:'year',period:'2000',parentSummary:'协议总结',childFeeling:'协议原话',nextFocus:'协议观察',selectedMediaIds:[]};
+  for(const extra of [{facts:{fake:1}},{baseline:'forged'},{status:'已确认'},{generatedAt:'2000-01-01T00:00:00Z'},{sourceRefs:[]}])assert.equal((await create('reportDrafts',{...input,...extra})).res.status,400);
+  const {res,value:report}=await create('reportDrafts',input,'request-report');assert.equal(res.status,201,report.error);assert.equal(report.facts.training.count,0);
+  const replay=await send('/api/reportDrafts','POST',{...input,clientRequestId:'request-report'},1);assert.equal(replay.status,200);
+  const train=await create('trainings',{date:'2000-01-01',entryMode:'快速',session:'协议训练',durationMinutes:30,completionStatus:'已完成'});assert.equal(train.res.status,201,train.value.error);
+  assert.equal(reportStale(read().data,read().data.reportDrafts[0]),true);
+  assert.equal((await send(`/api/reportDrafts/${report.id}/confirm`,'POST',{confirmedBy:'协议家长',note:'核对'})).status,409);
+  assert.equal((await send(`/api/reportDrafts/${report.id}`,'PUT',{parentSummary:'仅改总结'})).status,200);assert.equal(read().data.trainings[0].durationMinutes,30);assert.equal(read().data.reportDrafts[0].facts.training.count,0);
+  assert.equal((await send(`/api/reportDrafts/${report.id}`,'PUT',{period:'2001'})).status,409);
+  const refresh=await send(`/api/reportDrafts/${report.id}/refresh`,'POST',{note:'明确重算实际事实'});assert.equal(refresh.status,200,JSON.stringify(await refresh.json()));
+  assert.equal(read().data.reportDrafts[0].facts.training.minutes,30);assert.equal((await send(`/api/reportDrafts/${report.id}/confirm`,'POST',{confirmedBy:'协议家长',note:'核对真实来源'})).status,200);
+  assert.equal((await send(`/api/reportDrafts/${report.id}`,'PUT',{parentSummary:'覆盖已确认'})).status,400);
+  assert.equal((await send(`/api/reportDrafts/${report.id}/refresh`,'POST',{note:'覆盖'})).status,409);
+  const backup=await(await send('/api/backup')).json();assert.equal((await send('/api/restore','POST',backup)).status,200);assert.doesNotThrow(()=>normalizeState(read().data));
+  const forged=structuredClone(backup);forged.data.reportDrafts[0].facts.training.count=100;assert.equal((await send('/api/restore','POST',forged)).status,400);
+  const before=read();assert.equal((await send('/api/reportDrafts','GET',undefined,undefined,'guest')).status,401);assert.deepEqual(read(),before);
 });

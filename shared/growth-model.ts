@@ -2,7 +2,7 @@
 export const SKILL_DIMENSIONS = ['水中安全', '呼吸及水感', '自由泳', '仰泳', '蛙泳', '蝶泳', '出发和转身', '训练行为'] as const;
 export const SKILL_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'] as const;
 export const GOAL_STATUSES = ['待确认', '进行中', '已达成', '暂停', '已归档'] as const;
-export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories'] as const;
+export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts'] as const;
 export const EVIDENCE_COLLECTIONS = ['swim', 'trainings', 'media', 'annotations', 'skillAssessments', 'checkins'] as const;
 export type SkillDimension = typeof SKILL_DIMENSIONS[number];
 export type SkillLevel = typeof SKILL_LEVELS[number];
@@ -40,6 +40,7 @@ const fields: Record<string, string[]> = {
   goals: ['title', 'category', 'targetMetric', 'deadline', 'status', 'currentProgress', 'ruleSource', 'reviewedBy', 'notes', 'baselineText', 'baselineRefs', 'targetResult', 'criteria', 'relatedTrainingIds', 'relatedSkillIds', 'targetSkillLevel'],
   milestones: ['title', 'date', 'status', 'evidenceNote', 'evidenceRefs', 'notes'],
   growthStories: ['title', 'date', 'body', 'status', 'evidenceRefs'],
+  reportDrafts: ['title', 'periodType', 'period', 'parentSummary', 'childFeeling', 'nextFocus', 'selectedMediaIds'],
 };
 export function editableGrowth(key: string, value: ObjectRecord): ObjectRecord { return Object.fromEntries((fields[key] || []).filter(field => value[field] !== undefined).map(field => [field, value[field]])); }
 function parseGrowth(key: string, input: ObjectRecord, stored = false): ObjectRecord {
@@ -71,6 +72,10 @@ function parseGrowth(key: string, input: ObjectRecord, stored = false): ObjectRe
     const status = choice(input.status || '待确认', ['待确认', '已确认'], '故事状态');
     if (!stored && status !== '待确认') return failGrowth('成长故事须单独人工确认');
     Object.assign(result, { title: growthText(input.title, '故事标题', true, 200), date: growthDate(input.date), body: growthText(input.body, '实际成长观察', true, 12000), status, evidenceRefs: evidenceRefs(input.evidenceRefs) });
+  } else if (key === 'reportDrafts') {
+    const periodType = choice(input.periodType, ['month', 'year'], '报告模式'), period = growthText(input.period, '报告周期', true, 7);
+    if (!(periodType === 'month' ? /^(?:19|20|21)\d{2}-(?:0[1-9]|1[0-2])$/ : /^(?:19|20|21)\d{2}$/).test(period)) return failGrowth('报告周期无效');
+    Object.assign(result, { title: growthText(input.title, '报告标题', true, 200), periodType, period, parentSummary: growthText(input.parentSummary, '家长总结', false, 12000), childFeeling: growthText(input.childFeeling, '孩子的个人感受', false, 12000), nextFocus: growthText(input.nextFocus, '下阶段观察重点', false, 12000), selectedMediaIds: growthIds(input.selectedMediaIds, '精选影像') });
   } else return failGrowth('不支持的成长集合');
   return result;
 }
