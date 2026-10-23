@@ -91,3 +91,18 @@
 swim新增可选trainingId，指向真实已保存训练；旧记录保持未知，不回填关系。媒体仍沿用recordId，不合并实体。成绩、媒体、技术短板和打卡复用已有clientRequestId创建收据（服务端actor/hash/时间），同请求同内容重试返回原记录，不同内容或已删除返回409；媒体哈希包含服务端SHA256及元数据。更新继续使用CAS，原片失败不回滚训练。
 
 导航位置及QuickEntry流程仅为按API/账号/档案隔离的本机状态；流程只存已确认ID和请求标识，不存视频字节。实际表单仍受7天草稿及显式恢复保护。技能工作区通过已有sourceRef、weakPointId、relatedSkillIds、sourceGoalId组合，不新增合并实体或迁移，不改变成绩毫秒、PB、训练量、测评等级和目标证据规则。
+
+## V1.3–V1.4 私有档案实体
+
+|集合|业务字段|生命周期/关系|
+|---|---|---|
+|growthStories|title/date/body/evidenceRefs/status|待确认→独立confirm；作者与版本由服务端写入|
+|reportDrafts|title/periodType/period/selectedMediaIds、parentSummary/childFeeling/nextFocus；facts/start/end/baseline/sourceRefs/generatedAt|事实由服务端生成；周期固定；明确refresh保留旧历史；过期不可confirm；确认后只读|
+|competitionEvents|name/date/eventType/poolLength/performanceIds/mediaIds/certificateIds/notes/review/awards|手工关联同日同池长比赛成绩；证书照片；不补造历史赛事|
+|videoComparisons|title/date/leftMediaId/rightMediaId/leftSecond/rightSecond/mode/rate/observation/skillId/assessmentId/notes|真实私有视频、人工观察；保存技能/测评版本；不改等级|
+
+共用modelVersion=1、athleteId、createdBy/At、updatedBy/At、version、creationRequest与growthHistory；CAS与幂等复用既有双后端。服务端不接受客户端事实、版本、作者和确认元数据。仅家长管理者可写。公开白名单没有新增实体。normalizeState为旧备份补空集合，恢复保留后续事实于回收站及完整历史。
+
+质量中心、时间轴和日历是投影，不是第二份事实库。报告baseline使用规范序列化的来源快照进行精确比较（含周期外PB/技能基线与关联证据）；sourceRefs保留集合/ID/可用版本。生成时状态不冒充历史时点的审核状态。
+
+新增迁移按阶段只放宽台账约束与同步白名单，不改业务快照/版本，不增加匿名权限。已有新集合或历史后只能保留兼容读写适配、隐藏入口回滚；不能直接退到不识别新历史的旧服务或缩窄约束。隔离PostgreSQL演练脚本：scripts/verify-archive-migrations.mjs，外部安装固定PGlite0.5.11后传模块路径；脚本不接受数据库URL。

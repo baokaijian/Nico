@@ -694,3 +694,12 @@ dialog:has(.quick-entry) { width:min(760px,calc(100vw - 32px)); max-width:none; 
 .comparison-grid video { width:100%; max-height:26rem; background:#0d242c; border-radius:12px; }
 .preserve-lines { white-space:pre-wrap; overflow-wrap:anywhere; }
 @media(max-width:640px) { .comparison-grid { grid-template-columns:minmax(0,1fr); } }
+
+.training-calendar { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:.6rem; }
+.calendar-day { border:1px solid var(--border-color,#cedad9); background:var(--card-bg,#fff); border-radius:12px; padding:.6rem; min-width:0; }
+.calendar-day h2 { font-size:.85rem; }
+.calendar-day.is-today { outline:2px solid #147e91; }
+.calendar-item { display:flex; flex-direction:column; gap:.25rem; width:100%; padding:.65rem; margin:.5rem 0; min-height:44px; text-align:left; overflow-wrap:anywhere; background:#e7f2f2; border:1px solid #abcace; border-radius:8px; }
+.calendar-item.planned { background:#f9f6e8; border-style:dashed; border-color:#b8a875; }
+@media(max-width:1100px) { .training-calendar { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:640px) { .training-calendar { grid-template-columns:minmax(0,1fr); } .calendar-day { padding:1rem; } }
