@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyState } from '../shared/domain.mjs';
 import { resolveManagementLocation, sanitizeLocation, createManagementPosition, workbenchModel } from '../src/services/management.js';
+import { managementSaveRequiresSnapshot } from '../src/services/management.js';
+test('新私有版本实体保存后重载快照，立即显示服务端历史',()=>{
+  for(const key of ['growthStories','reportDrafts','competitionEvents','videoComparisons','skillAssessments','milestones','goals','plans'])assert.equal(managementSaveRequiresSnapshot(key),true,key);
+  assert.equal(managementSaveRequiresSnapshot('profile'),false);
+});
 
 test('旧入口可达四入口的真实功能，非法位置不创建额外入口', () => {
   assert.deepEqual(resolveManagementLocation('week'), { section: 'training', view: 'plans' });

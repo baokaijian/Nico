@@ -37,6 +37,13 @@ for(const runtime of ['local','cloud']) test(`${runtime}: 赛事手动多成绩�
   assert.equal((await send(`/api/competitionEvents/${value.id}`,'DELETE')).status,200);const item=read().data.trash.find(row=>row.record.id===value.id);assert.ok(item);assert.equal((await send(`/api/trash/${item.id}/restore`,'POST',{})).status,200);assert.ok(read().data.competitionEvents[0].version>value.version);
   assert.equal((await send('/api/competitionEvents','GET',undefined,undefined,'guest')).status,401);assert.equal((await create('competitionEvents',{...input,performanceIds:[]})).res.status,201,'不强制补造历史成绩');
 });
+for(const runtime of ['local','cloud']) test(`${runtime}: 赛事恢复遇到成绩归属冲突保留回收记录与历史`,async t=>{
+  const seed=emptyState();seed.swim=[{id:'s',date:'2000-01-01',distance:'50m',stroke:'自由泳',poolLength:'25m',time:'01:00:00',timeMs:60000,seconds:60,recordType:'比赛',validityStatus:'未核验'}];
+  const {read,send,create}=await archiveHarness(t,runtime,seed),input={name:'协议赛事A',date:'2000-01-01',eventType:'交流赛',poolLength:'25m',performanceIds:['s'],mediaIds:[],certificateIds:[],review:'',awards:'',notes:''};
+  const a=await create('competitionEvents',input);assert.equal(a.res.status,201);await send(`/api/competitionEvents/${a.value.id}`,'DELETE');const item=read().data.trash.find(row=>row.record.id===a.value.id);
+  const b=await create('competitionEvents',{...input,name:'协议赛事B'});assert.equal(b.res.status,201);const before=read();const restore=await send(`/api/trash/${item.id}/restore`,'POST',{});assert.equal(restore.status,409);assert.deepEqual(read(),before,'冲突不能消费回收记录或追加无效历史');
+  assert.equal((await send(`/api/competitionEvents/${b.value.id}`,'PUT',{performanceIds:[]})).status,200);assert.equal((await send(`/api/trash/${item.id}/restore`,'POST',{})).status,200);
+});
 for(const runtime of ['local','cloud']) test(`${runtime}: 报告由服务端生成、来源冻结、确认与恢复`,async t=>{
   const {read,send,create}=await archiveHarness(t,runtime), input={title:'协议报告',periodType:'year',period:'2000',parentSummary:'协议总结',childFeeling:'协议原话',nextFocus:'协议观察',selectedMediaIds:[]};
   for(const extra of [{facts:{fake:1}},{baseline:'forged'},{status:'已确认'},{generatedAt:'2000-01-01T00:00:00Z'},{sourceRefs:[]}])assert.equal((await create('reportDrafts',{...input,...extra})).res.status,400);

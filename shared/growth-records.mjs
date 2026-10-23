@@ -162,6 +162,7 @@ export function deleteGrowth(data, key, record, { actor, now }) {
   return finish(data, key, { ...record }, record, 'delete', actor, now);
 }
 export function restoreGrowth(data, key, record, { actor, now }) {
+  if (key === 'competitionEvents' && records(data, key).some(item => item.id !== record.id && item.performanceIds.some(id => record.performanceIds.includes(id)))) failGrowth('原赛事成绩已关联另一有效赛事；请先核对并解除冲突，回收记录仍保留', 409);
   return finish(data, key, { ...record }, record, 'restore', actor, now);
 }
 export function goalCandidates(data, goal) {

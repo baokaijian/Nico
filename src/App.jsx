@@ -7,7 +7,7 @@ import { Message, Modal } from './components/ui';
 import LoginPanel from './components/LoginPanel';
 import LogoutDialog from './components/LogoutDialog';
 import { createDraftStore, draftScopeKey } from './services/drafts';
-import { MANAGEMENT_NAV, resolveManagementLocation, createManagementPosition } from './services/management';
+import { MANAGEMENT_NAV, resolveManagementLocation, createManagementPosition, managementSaveRequiresSnapshot } from './services/management';
 import ManagementView from './components/ManagementView';
 const Showcase = lazy(() => import('./components/Showcase'));
 const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'private' || !!import.meta.env.VITE_API_URL;
@@ -106,7 +106,7 @@ export default function App() {
       const updated = current[collection].filter(r => r.id !== removedId && r.id !== record?.id);
       return { ...current, [collection]: record ? [...updated, record] : updated };
     });
-    if (removedId || ['plans', 'skillDefinitions', 'skillAssessments', 'milestones'].includes(collection)) { setNotice('上次提交已获服务端确认。'); reload(); return; }
+    if (removedId || managementSaveRequiresSnapshot(collection)) { setNotice('上次提交已获服务端确认。'); reload(); return; }
     if (EVIDENCE_COLLECTIONS.includes(collection)) {
       setNotice('已保存到私有档案。');
       reload();
