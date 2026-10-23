@@ -7,7 +7,7 @@ export const validGrowthDraft = value => plain(value) && plain(value.values) &&
   (value.editing == null || typeof value.editing === 'string') && (value.baseRevision == null || Number.isSafeInteger(value.baseRevision)) && typeof value.clientRequestId === 'string' &&
   Object.entries(value.values).every(([key, item]) => {
     if (['evidenceRefs', 'baselineRefs'].includes(key)) return Array.isArray(item) && item.every(ref => plain(ref) && typeof ref.collection === 'string' && typeof ref.id === 'string');
-    if (['checkinIds', 'relatedSkillIds', 'relatedTrainingIds', 'selectedMediaIds'].includes(key)) return Array.isArray(item) && item.every(id => typeof id === 'string');
+    if (['checkinIds', 'relatedSkillIds', 'relatedTrainingIds', 'selectedMediaIds', 'performanceIds', 'mediaIds', 'certificateIds'].includes(key)) return Array.isArray(item) && item.every(id => typeof id === 'string');
     if (key === 'levels') return plain(item) && ['L1', 'L2', 'L3', 'L4', 'L5'].every(level => typeof item[level] === 'string');
     if (['definitionVersion', 'modelVersion', 'currentProgress'].includes(key)) return typeof item === 'number' && Number.isFinite(item);
     if (['targetPerWeek', 'times', 'durationMinutes'].includes(key)) return typeof item === 'string' || typeof item === 'number' && Number.isFinite(item);

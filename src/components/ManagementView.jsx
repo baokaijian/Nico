@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { MANAGEMENT_NAV, SETTINGS_VIEWS } from '../services/management';
 import { Message } from './ui';
+const Competitions = lazy(() => import('./CompetitionEvents'));
 const GrowthTimeline = lazy(() => import('./GrowthTimeline'));
 const DataQuality = lazy(() => import('./DataQuality'));
 const GrowthWorkspace = lazy(() => import('./GrowthWorkspace'));
@@ -25,6 +26,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
     <Suspense fallback={<Message>正在打开记录…</Message>}>
       {section === 'workbench' && <Workbench {...shared} role={role} resumeVersion={resumeVersion} openQuickEntry={openQuickEntry}/>}
       {section === 'training' && ['trainings', 'swim'].includes(view) && <Records key={view} {...shared} type={view} readOnly={readOnly || !['owner', 'coach'].includes(role)} manageTemplates={owner} initialFilter={initialFilter} initialOpen={initialOpen} onLinkMedia={record => openQuickEntry('media', { trainingId: record.id })}/>}
+      {section === 'training' && view === 'competitions' && <Competitions {...shared} readOnly={readOnly || !owner}/>}
       {section === 'training' && view === 'plans' && <Plans {...shared}/>}
       {(section === 'training' || section === 'review') && view === 'media' && <Gallery {...shared} key={`${section}/${mediaTarget?.recordId || ''}`} allowUpload={owner} initialRecord={mediaTarget}/>}
       {section === 'growth' && view === 'practice' && <Practice {...shared} manageSkills={owner}/>}

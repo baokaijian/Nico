@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Modal, Message } from './ui';
+const Competitions = lazy(() => import('./CompetitionEvents'));
 const Reports = lazy(() => import('./Reports'));
 const Timeline = lazy(() => import('./GrowthTimeline'));
 const Records = lazy(() => import('./Records'));
@@ -17,6 +18,7 @@ export default function SourceWorkspace({ source, onClose, ...props }) {
     {['goals','milestones'].includes(collection) && <Goals {...shared}/>}
     {collection === 'media' && <Media {...shared}/>}
     {['weakpoints','checkins'].includes(collection) && <Practice {...shared}/>}
+    {collection === 'competitionEvents' && <Competitions {...shared}/>}
     {collection === 'reportDrafts' && <Reports {...shared}/>}
     {collection === 'growthStories' && <Timeline {...shared}/>}
     {collection === 'plans' && <Plans {...shared}/>}
