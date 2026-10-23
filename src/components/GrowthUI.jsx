@@ -21,7 +21,7 @@ export function GrowthHistory({ data, collection, id }) {
 }
 export function GrowthActionDialog({ collection, record, action, data, api, onSaved, onClose }) {
   const [name, setName] = useState(''), [note, setNote] = useState(''), [refs, setRefs] = useState([]), [candidates, setCandidates] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(() => api.getRevision()), [conflict, setConflict] = useState(false);
-  const titles = { confirm: collection === 'goals' ? '人工确认目标达成' : collection === 'milestones' ? '人工确认成长里程碑' : '人工确认技能测评', archive: '完成目标归档', reopen: '重新开启目标', withdraw: '撤销测评确认' };
+  const titles = { confirm: collection === 'goals' ? '人工确认目标达成' : collection === 'growthStories' ? '人工确认成长故事' : collection === 'reportDrafts' ? '人工确认成长报告' : collection === 'milestones' ? '人工确认成长里程碑' : '人工确认技能测评', archive: '完成目标归档', reopen: '重新开启目标', withdraw: '撤销测评确认' };
   const submit = async event => {
     event.preventDefault(); setBusy(true); setError('');
     try {

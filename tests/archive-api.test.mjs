@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { archiveHarness } from './archive-harness.mjs';
+import { emptyState, normalizeState } from '../shared/domain.mjs';
+for(const runtime of ['local','cloud']) test(`${runtime}: 故事身份隔离、人工确认、CAS、幂等、历史和旧备份恢复`,async t=>{
+  const {read,send,create}=await archiveHarness(t,runtime), input={title:'协议故事',date:'2000-01-01',body:'实际观察',evidenceRefs:[],status:'待确认'}, old={format:'nico-backup-v1',data:emptyState()};
+  delete old.data.growthStories;
+  assert.equal((await send('/api/growthStories','POST',input,undefined,'guest')).status,401);
+  if(runtime==='local')assert.equal((await send('/api/growthStories','POST',input,undefined,'coach')).status,403);
+  const {res,value}=await create('growthStories',input,'request-story');assert.equal(res.status,201,value.error);
+  const replay=await send('/api/growthStories','POST',{...input,clientRequestId:'request-story'},1);assert.equal(replay.status,200);assert.equal((await replay.json()).id,value.id);
+  assert.equal((await send('/api/growthStories','POST',{...input,body:'changed',clientRequestId:'request-story'})).status,409);
+  assert.equal((await send(`/api/growthStories/${value.id}`,'PUT',{body:'new'},1)).status,409);
+  assert.equal((await send(`/api/growthStories/${value.id}/confirm`,'POST',{confirmedBy:'协议家长',note:'人工核对'})).status,200);
+  assert.equal((await send(`/api/growthStories/${value.id}`,'PUT',{body:'覆盖'})).status,400);
+  const publicData=await(await send('/api/public-summary','GET',undefined,undefined,'guest')).json();assert.ok(!JSON.stringify(publicData).includes('协议故事'));
+  const history=read().data.growthHistory.length;assert.equal((await send('/api/restore','POST',old)).status,200);
+  const trash=read().data.trash.find(row=>row.record.id===value.id);assert.ok(trash);assert.ok(read().data.growthHistory.length>=history);
+  assert.equal((await send(`/api/trash/${trash.id}/restore`,'POST',{})).status,200);assert.ok(read().data.growthStories[0].version>value.version);assert.doesNotThrow(()=>normalizeState(read().data));
+});

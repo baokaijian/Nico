@@ -2,7 +2,7 @@
 export const SKILL_DIMENSIONS = ['水中安全', '呼吸及水感', '自由泳', '仰泳', '蛙泳', '蝶泳', '出发和转身', '训练行为'] as const;
 export const SKILL_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'] as const;
 export const GOAL_STATUSES = ['待确认', '进行中', '已达成', '暂停', '已归档'] as const;
-export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones'] as const;
+export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories'] as const;
 export const EVIDENCE_COLLECTIONS = ['swim', 'trainings', 'media', 'annotations', 'skillAssessments', 'checkins'] as const;
 export type SkillDimension = typeof SKILL_DIMENSIONS[number];
 export type SkillLevel = typeof SKILL_LEVELS[number];
@@ -39,6 +39,7 @@ const fields: Record<string, string[]> = {
   skillAssessments: ['skillId', 'definitionVersion', 'date', 'assessor', 'level', 'status', 'evidenceNote', 'evidenceRefs', 'improvementNote', 'previousAssessmentId', 'weakPointId', 'checkinIds'],
   goals: ['title', 'category', 'targetMetric', 'deadline', 'status', 'currentProgress', 'ruleSource', 'reviewedBy', 'notes', 'baselineText', 'baselineRefs', 'targetResult', 'criteria', 'relatedTrainingIds', 'relatedSkillIds', 'targetSkillLevel'],
   milestones: ['title', 'date', 'status', 'evidenceNote', 'evidenceRefs', 'notes'],
+  growthStories: ['title', 'date', 'body', 'status', 'evidenceRefs'],
 };
 export function editableGrowth(key: string, value: ObjectRecord): ObjectRecord { return Object.fromEntries((fields[key] || []).filter(field => value[field] !== undefined).map(field => [field, value[field]])); }
 function parseGrowth(key: string, input: ObjectRecord, stored = false): ObjectRecord {
@@ -66,6 +67,10 @@ function parseGrowth(key: string, input: ObjectRecord, stored = false): ObjectRe
     const status = choice(input.status || '待确认', ['待确认', '已确认'], '里程碑状态');
     if (!stored && status !== '待确认') return failGrowth('里程碑须由家长明确确认');
     Object.assign(result, { title: growthText(input.title, '里程碑名称', true, 250), date: growthDate(input.date), status, evidenceNote: growthText(input.evidenceNote, '成长证据', true), evidenceRefs: evidenceRefs(input.evidenceRefs), notes: growthText(input.notes, '备注') });
+  } else if (key === 'growthStories') {
+    const status = choice(input.status || '待确认', ['待确认', '已确认'], '故事状态');
+    if (!stored && status !== '待确认') return failGrowth('成长故事须单独人工确认');
+    Object.assign(result, { title: growthText(input.title, '故事标题', true, 200), date: growthDate(input.date), body: growthText(input.body, '实际成长观察', true, 12000), status, evidenceRefs: evidenceRefs(input.evidenceRefs) });
   } else return failGrowth('不支持的成长集合');
   return result;
 }

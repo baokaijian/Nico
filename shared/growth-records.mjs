@@ -1,4 +1,4 @@
-import { growthCollection, validateGrowthInput, validateStoredGrowth, evidenceRefs, growthText, objectRecord, SKILL_LEVELS, failGrowth } from './growth-model.ts';
+import { GROWTH_COLLECTIONS, growthCollection, validateGrowthInput, validateStoredGrowth, evidenceRefs, growthText, objectRecord, SKILL_LEVELS, failGrowth } from './growth-model.ts';
 import { eligiblePerformance } from './performance.ts';
 const records = (data, key) => data[key] || [];
 const canonical = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
@@ -48,7 +48,7 @@ export function validateGrowthRelations(data, key, record, previous = null) {
     });
     for (const id of record.relatedTrainingIds) related(data, 'trainings', id, previous?.relatedTrainingIds?.includes(id));
   }
-  if (key === 'milestones') record.evidenceSnapshots = snapshots(data, record.evidenceRefs, previous?.evidenceRefs, previous?.evidenceSnapshots, { selfId: record.id });
+  if (['milestones', 'growthStories'].includes(key)) record.evidenceSnapshots = snapshots(data, record.evidenceRefs, previous?.evidenceRefs, previous?.evidenceSnapshots, { selfId: record.id });
 }
 function historyVersion(data, key, id) {
   return Math.max(0, ...records(data, 'growthHistory').filter(item => item.collection === key && item.recordId === id).map(item => item.version), Number(lookup(data, key, id, true)?.version) || 0);
@@ -86,7 +86,7 @@ const actionNote = input => {
 export function actGrowth(data, key, id, action, input, { actor, now }) {
   const previous = related(data, key, id), record = structuredClone(previous);
   if (!growthCollection(key, previous)) failGrowth('请先补充基线、结果和标准，明确采用新版目标流程');
-  if (action === 'confirm' && ['skillAssessments', 'goals', 'milestones'].includes(key)) {
+  if (action === 'confirm' && ['skillAssessments', 'goals', 'milestones', 'growthStories'].includes(key)) {
     const proof = confirmation(input), done = key === 'goals' ? '已达成' : '已确认';
     if (record.status === done || key === 'goals' && record.status === '已归档') {
       if (record.confirmedBy !== proof.confirmedBy || record.confirmationNote !== proof.confirmationNote || key === 'goals' && canonical(record.completionRefs) !== canonical(proof.refs)) failGrowth('原确认信息不同，请核对已有记录', 409);
@@ -138,7 +138,7 @@ export function goalCandidates(data, goal) {
   return result;
 }
 export function validateGrowthHistory(data) {
-  const all = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones'].flatMap(key => records(data, key).map(record => ({ key, record }))).concat((data.trash || []).filter(item => growthCollection(item.collection, item.record)).map(item => ({ key: item.collection, record: item.record }))).filter(item => growthCollection(item.key, item.record));
+  const all = GROWTH_COLLECTIONS.flatMap(key => records(data, key).map(record => ({ key, record }))).concat((data.trash || []).filter(item => growthCollection(item.collection, item.record)).map(item => ({ key: item.collection, record: item.record }))).filter(item => growthCollection(item.key, item.record));
   if (data.growthHistory === undefined) { if (all.length) failGrowth('成长记录缺少服务端版本历史'); return; }
   if (!Array.isArray(data.growthHistory)) failGrowth('成长历史格式无效');
   const seen = new Set();
@@ -162,7 +162,7 @@ export function retainGrowthHistory(current, restored, { actor, now }) {
   }
   if (!merged.size) return restored;
   restored.growthHistory = [...merged.values()];
-  for (const key of ['skillDefinitions', 'skillAssessments', 'goals', 'milestones']) for (let index = 0; index < restored[key].length; index++) {
+  for (const key of GROWTH_COLLECTIONS) for (let index = 0; index < restored[key].length; index++) {
     const record = restored[key][index];
     if (!growthCollection(key, record)) continue;
     const previous = lookup(current, key, record.id, true) || record;
