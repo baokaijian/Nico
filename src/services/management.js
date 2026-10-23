@@ -5,7 +5,7 @@ import { trainingFacts, trainingSummary } from '../../shared/training.ts';
 import { draftScopeKey } from './drafts.js';
 export const MANAGEMENT_NAV = [
   { key: 'workbench', label: '工作台', views: [['home', '工作台']] },
-  { key: 'training', label: '训练记录', views: [['trainings', '日常训练'], ['swim', '成绩'], ['plans', '训练计划'], ['competitions', '赛事'], ['media', '影像关联']] },
+  { key: 'training', label: '训练记录', views: [['trainings', '日常训练'], ['swim', '成绩'], ['plans', '训练计划'], ['competitions', '赛事'], ['calendar', '训练日历'], ['media', '影像关联']] },
   { key: 'growth', label: '成长管理', views: [['skills', '技能工作区'], ['practice', '技术短板与打卡'], ['goals', '目标与里程碑']] },
   { key: 'review', label: '分析复盘', views: [['quality', '数据质量'], ['timeline', '成长时间轴'], ['trends', '历史趋势'], ['reports', '周期报告'], ['media', '视频技术复盘'], ['compare', '视频对比'], ['archive', '成长档案']] },
 ];

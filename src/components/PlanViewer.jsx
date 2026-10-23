@@ -20,12 +20,12 @@ function Dimension({ title, status = 'ok', value, detail, threshold, ids, data }
     : <><p>{value}</p>{detail && <p className="muted">{detail}</p>}</>}
     <RecordSources data={data} ids={ids || []}/></article>;
 }
-export default function PlanViewer({ data, api, onSaved, readOnly, navigate }) {
+export default function PlanViewer({ focusId, data, api, onSaved, readOnly, navigate }) {
   const result = useMemo(() => analysis(data), [data]);
   const context = useMemo(() => planContext(data, today(), result.version), [data, result.version]);
   const dimensions = useMemo(() => planDimensions(data), [data]);
   const draft = data.plans.find(p => p.id === PLAN_DRAFT_ID) || null;
-  const manualPlans = data.plans.filter(p => p.id !== PLAN_DRAFT_ID);
+  const manualPlans = data.plans.filter(p => p.id !== PLAN_DRAFT_ID && (!focusId || p.id === focusId));
   const [weekStart, weekEnd] = weekBounds(today());
   const coverage = useMemo(() => rangeSummary(data, weekStart, weekEnd), [data, weekStart, weekEnd]);
   const blank = () => Object.fromEntries(FIELDS.plans.map(f => [f.key, '']));
