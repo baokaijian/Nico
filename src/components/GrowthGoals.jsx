@@ -8,13 +8,13 @@ import { EvidencePicker, GrowthForm, GrowthHistory, GrowthActionDialog } from '.
 const goalDefaults = () => ({ modelVersion: 1, title: '', category: '', targetMetric: '', baselineText: '', baselineRefs: [], targetResult: '', deadline: '', criteria: '', relatedTrainingIds: [], relatedSkillIds: [], targetSkillLevel: '', status: '待确认', notes: '', ruleSource: '', reviewedBy: '' });
 const retainedIds = (ids, rows) => ids.filter(id => !rows.some(row => row.id === id));
 const milestoneDefaults = () => ({ modelVersion: 1, title: '', date: today(), status: '待确认', evidenceNote: '', evidenceRefs: [], notes: '' });
-export default function GrowthGoals({ data, api, onSaved, readOnly, focusedSkillId }) {
+export default function GrowthGoals({ focusId, data, api, onSaved, readOnly, focusedSkillId }) {
   const [completedGoalId, setCompletedGoalId] = useState(null);
   const [filter, setFilter] = useState(''), [status, setStatus] = useState(''), [action, setAction] = useState(null);
   const form = useGrowthForm({ collection: 'goals', defaults: goalDefaults, data, api, onSaved, readOnly, focusedSkillId });
   const milestone = useGrowthForm({ collection: 'milestones', defaults: milestoneDefaults, data, api, onSaved, readOnly, focusedSkillId });
-  const goals = data.goals.filter(row => (!focusedSkillId || (row.relatedSkillIds || []).includes(focusedSkillId)) && (!filter || `${row.title} ${row.baselineText || ''} ${row.targetResult || row.targetMetric || ''}`.includes(filter)) && (!status || row.status === status));
-  const milestones = (data.milestones || []).filter(row => !focusedSkillId || goals.some(goal => goal.id === row.sourceGoalId));
+  const goals = data.goals.filter(row => (!focusId || row.id === focusId) && (!focusedSkillId || (row.relatedSkillIds || []).includes(focusedSkillId)) && (!filter || `${row.title} ${row.baselineText || ''} ${row.targetResult || row.targetMetric || ''}`.includes(filter)) && (!status || row.status === status));
+  const milestones = (data.milestones || []).filter(row => !focusId || row.id === focusId).filter(row => !focusedSkillId || goals.some(goal => goal.id === row.sourceGoalId));
   const pendingMilestone = (data.milestones || []).find(row => row.sourceGoalId === completedGoalId && row.status === '待确认');
   const afterAction = (key, row, id) => { onSaved(key, row, id); if (key === 'goals' && row?.status === '已达成') setCompletedGoalId(row.id); };
   const legacy = row => form.replace({ ...editableGrowth('goals', row), status: ['待确认', '进行中', '暂停'].includes(row.status) ? row.status : '待确认', targetResult: row.targetMetric || '', baselineText: '', baselineRefs: [], criteria: '', relatedTrainingIds: [], relatedSkillIds: [], targetSkillLevel: '' }, row.id);

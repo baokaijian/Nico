@@ -15,7 +15,7 @@ const Skills = lazy(() => import('./Skills'));
 const splitRefs = value => String(value || '').split(/[,，、\s]+/).filter(Boolean);
 const statusHint = { 待确认: '待家长依据教练反馈核对', 练习中: '当前打卡目标', 已改善: '保留记录，不再计入周目标', 暂停: '暂不打卡，保留历史' };
 
-export default function Practice({ data, api, onSaved, readOnly = false, navigate, manageSkills = true, embedded = false, focusedSkillId, initialAssessment, onRetest, initialSection = 'practice' }) {
+export default function Practice({ focusId, data, api, onSaved, readOnly = false, navigate, manageSkills = true, embedded = false, focusedSkillId, initialAssessment, onRetest, initialSection = 'practice' }) {
   const [section, setSection] = useState(initialSection), [retestSeed, setRetestSeed] = useState(null);
   const scoped = useMemo(() => { if (!embedded) return data; const model = skillWorkspace(data, focusedSkillId); return { ...data, weakpoints: model.points, checkins: model.checkins }; }, [data, embedded, focusedSkillId]);
   const overview = useMemo(() => practiceOverview(scoped), [scoped]);
@@ -79,7 +79,7 @@ export default function Practice({ data, api, onSaved, readOnly = false, navigat
           <label className="search">备注<input className="apple-input" value={checkin.notes} onChange={e => setCheckinField('notes', e.target.value)}/></label>
         </div></GrowthForm>}
       </section>
-      <section className="glass-card"><div className="section-head"><h2>薄弱点与进度</h2><p className="muted">每条都标注来源与依据原文；周目标由家长填写，未填时不计算完成率。</p></div><div className="rule-list">{overview.points.map(point => <article className="rule-item" key={point.id}>
+      <section className="glass-card"><div className="section-head"><h2>薄弱点与进度</h2><p className="muted">每条都标注来源与依据原文；周目标由家长填写，未填时不计算完成率。</p></div><div className="rule-list">{overview.points.filter(point => !focusId || point.id === focusId).map(point => <article className="rule-item" key={point.id}>
         <div className="flex-between"><h3>{point.title}</h3><span className="badge">{point.status}</span></div>
         <p className="muted">{point.category} · 来源：{point.sourceType} · {statusHint[point.status] || ''}</p>
         {point.evidence && <p>依据原文：{point.evidence}</p>}
