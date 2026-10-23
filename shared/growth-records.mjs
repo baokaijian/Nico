@@ -20,6 +20,17 @@ function snapshots(data, refs, oldRefs = [], oldSnapshots = [], { completed = fa
   });
 }
 export function validateGrowthRelations(data, key, record, previous = null) {
+  if (key === 'competitionEvents') {
+    for (const id of record.performanceIds) {
+      const score = related(data, 'swim', id, previous?.performanceIds?.includes(id));
+      if (!previous?.performanceIds?.includes(id) || previous.date !== record.date || previous.poolLength !== record.poolLength) {
+        if (score.recordType !== '比赛' || score.date !== record.date || score.poolLength !== record.poolLength) failGrowth('关联成绩须为同日、同池长的比赛记录，请先核对真实来源');
+      }
+      if (records(data, key).some(item => item.id !== record.id && item.performanceIds.includes(id))) failGrowth('此成绩已属于另一赛事，请先核对或解除原关联', 409);
+    }
+    for (const id of record.mediaIds) related(data, 'media', id, previous?.mediaIds?.includes(id));
+    for (const id of record.certificateIds) if (related(data, 'media', id, previous?.certificateIds?.includes(id)).type !== 'image') failGrowth('证书请关联真实照片，不能把视频当作证书');
+  }
   if (key === 'skillAssessments') {
     if (previous?.skillId === record.skillId) {
       if (record.definitionVersion !== previous.definitionVersion) failGrowth('既有评估的标准版本不可替换；请新建复测', 409);

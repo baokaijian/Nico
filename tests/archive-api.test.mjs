@@ -19,6 +19,16 @@ for(const runtime of ['local','cloud']) test(`${runtime}: 故事身份隔离、�
   const trash=read().data.trash.find(row=>row.record.id===value.id);assert.ok(trash);assert.ok(read().data.growthHistory.length>=history);
   assert.equal((await send(`/api/trash/${trash.id}/restore`,'POST',{})).status,200);assert.ok(read().data.growthStories[0].version>value.version);assert.doesNotThrow(()=>normalizeState(read().data));
 });
+for(const runtime of ['local','cloud']) test(`${runtime}: 赛事手动多成绩关联，日期池长性质校验与回收恢复`,async t=>{
+  const seed=emptyState();seed.swim=[{id:'s1',date:'2000-01-01',distance:'50m',stroke:'自由泳',poolLength:'25m',time:'01:00:00',timeMs:60000,seconds:60,validityStatus:'未核验',recordType:'比赛'}, {id:'s2',date:'2000-01-01',distance:'100m',stroke:'仰泳',poolLength:'25m',time:'02:10:00',timeMs:130000,seconds:130,validityStatus:'有效',recordType:'比赛'}];
+  seed.media=[{id:'m',date:'2000-01-01',title:'协议证书照片',type:'image',url:'/uploads/protocol.jpg'}];
+  const {read,send,create}=await archiveHarness(t,runtime,seed),input={name:'协议赛事',date:'2000-01-01',eventType:'交流赛',poolLength:'25m',performanceIds:['s1','s2'],mediaIds:[],certificateIds:['m'],notes:'',review:'真实复盘',awards:'按证书填写'};
+  const before=structuredClone(seed.swim);const {res,value}=await create('competitionEvents',input);assert.equal(res.status,201,value.error);assert.equal(value.performanceIds.length,2);assert.deepEqual(read().data.swim,before);
+  for(const extra of [{date:'2000-01-02'},{poolLength:'50m'},{performanceIds:['missing']},{certificateIds:['missing']},{location:'敏感地点'}])assert.ok([400,409].includes((await create('competitionEvents',{...input,...extra})).res.status));
+  assert.equal((await create('competitionEvents',input)).res.status,409,'同成绩不可重复归属多个赛事');
+  assert.equal((await send(`/api/competitionEvents/${value.id}`,'DELETE')).status,200);const item=read().data.trash.find(row=>row.record.id===value.id);assert.ok(item);assert.equal((await send(`/api/trash/${item.id}/restore`,'POST',{})).status,200);assert.ok(read().data.competitionEvents[0].version>value.version);
+  assert.equal((await send('/api/competitionEvents','GET',undefined,undefined,'guest')).status,401);assert.equal((await create('competitionEvents',{...input,performanceIds:[]})).res.status,201,'不强制补造历史成绩');
+});
 for(const runtime of ['local','cloud']) test(`${runtime}: 报告由服务端生成、来源冻结、确认与恢复`,async t=>{
   const {read,send,create}=await archiveHarness(t,runtime), input={title:'协议报告',periodType:'year',period:'2000',parentSummary:'协议总结',childFeeling:'协议原话',nextFocus:'协议观察',selectedMediaIds:[]};
   for(const extra of [{facts:{fake:1}},{baseline:'forged'},{status:'已确认'},{generatedAt:'2000-01-01T00:00:00Z'},{sourceRefs:[]}])assert.equal((await create('reportDrafts',{...input,...extra})).res.status,400);
