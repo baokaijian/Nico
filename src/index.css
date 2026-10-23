@@ -686,3 +686,6 @@ dialog:has(.quick-entry) { width:min(760px,calc(100vw - 32px)); max-width:none; 
   .mobile-quick-options button { min-height:44px; padding:.6rem 1rem; }
   .app:has(.mobile-quick-entry) .shell { padding-bottom:96px; }
 }
+/* Private source details wrap safely on phones. */
+.source-id { overflow-wrap: anywhere; }
+.source-json { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 30rem; overflow: auto; }

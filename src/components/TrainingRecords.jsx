@@ -7,7 +7,7 @@ import TrainingSetEditor, { TrainingSetSummary } from './TrainingSetEditor';
 import useRecordDraft, { validTrainingDraft } from '../services/useRecordDraft';
 import DraftNotice, { draftHint } from './DraftNotice';
 const initialValues = kind => ({ ...Object.fromEntries(FIELDS[kind].map(f => [f.key, f.key === 'date' ? today() : ''])), entryMode: '快速', completionStatus: '未记录', sets: [], mediaIds: [] });
-export default function TrainingRecords({ data, api, onSaved, readOnly = false, manageTemplates = true, initialFilter = '', initialOpen = false, onLinkMedia, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange }) {
+export default function TrainingRecords({ focusId, data, api, onSaved, readOnly = false, manageTemplates = true, initialFilter = '', initialOpen = false, onLinkMedia, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange }) {
   const newDraft = (kind = 'trainings', values = {}) => ({ kind, editing: null, values: { ...initialValues(kind), ...(entryOnly && kind === 'trainings' ? initialContext : {}), ...values }, clientRequestId: entryOnly && clientRequestId || crypto.randomUUID(), baseRevision: api.getRevision() });
   const [draft, setDraft] = useState(() => newDraft()), [open, setOpen] = useState(initialOpen || entryOnly);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false);
@@ -56,7 +56,7 @@ export default function TrainingRecords({ data, api, onSaved, readOnly = false, 
   const allFields = FIELDS[kind];
   const field = key => allFields.find(f => f.key === key);
   const renderFields = keys => keys.map(key => field(key) && <Field key={key} field={field(key)} value={values[key]} onChange={v => change(key, v)}/>);
-  const records = ordered(data.trainings).reverse().filter(r => (!from || r.date >= from) && (!to || r.date <= to) && (!status || (r.completionStatus || '未记录') === status) && (!filter.trim() || JSON.stringify(r).includes(filter.trim())));
+  const records = ordered(data.trainings).reverse().filter(r => (!focusId || r.id === focusId) && (!from || r.date >= from) && (!to || r.date <= to) && (!status || (r.completionStatus || '未记录') === status) && (!filter.trim() || JSON.stringify(r).includes(filter.trim())));
   const summary = trainingSummary(records), latest = ordered(data.trainings).at(-1);
   const recentContents = [...new Set(ordered(data.trainings).reverse().map(row => row.trainingType?.trim()).filter(Boolean))].slice(0, 4);
   const plans = data.plans.flatMap(p => (p.sessions || []).filter(s => s.type === '训练').map(s => ({ id: `${p.id}/${s.id}`, label: `${s.date} · ${s.title || '训练'} · ${p.title} v${p.version}`, plan: p, session: s })));

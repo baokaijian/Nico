@@ -13,7 +13,7 @@ function valueLabel(value) { return value === true ? '按既有专业建议服�
 export default function Records(props) {
   return props.type === 'trainings' ? <TrainingRecords {...props}/> : <GenericRecords {...props}/>;
 }
-function GenericRecords({ type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
+function GenericRecords({ focusId, type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
   const fields = FIELDS[type];
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => ({ ...Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : ''])), ...(type === 'swim' ? { validityStatus: '未核验' } : {}), ...initialContext });
@@ -56,6 +56,7 @@ function GenericRecords({ type, data, api, onSaved, readOnly = false, allowAdd =
   const hasFilter = Boolean(filter.trim()) || Boolean(from) || Boolean(to) || (!publicMode && type === 'swim' && (scoreKind !== '全部' || Object.values(facets).some(Boolean)));
   const clearFilters = () => { setFilter(''); setFrom(''); setTo(''); setScoreKind('全部'); setFacets({ distance: '', stroke: '', poolLength: '', validityStatus: '' }); };
   const records = ordered(data[type]).reverse().filter(r => {
+    if (focusId && r.id !== focusId) return false;
     if (type === 'swim' && !publicMode) {
       if (scoreKind !== '全部' && (r.recordType || '未知') !== scoreKind) return false;
       for (const [key, value] of Object.entries(facets)) if (value && (key === 'validityStatus' ? validityLabel(r) : r[key]) !== value) return false;
