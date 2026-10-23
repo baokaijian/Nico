@@ -25,3 +25,9 @@ test('报告隔离泳姿、池长、距离；未核验不参与PB，叙事转义
   const html=growthReportHTML(r,false);assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('/uploads/'));assert.ok(html.includes('s0'));assert.ok(html.includes('生成'));
   data.profile.name='unrelated';assert.equal(reportStale(data,r),false);data.swim[0].timeMs=59000;assert.equal(reportStale(data,r),true);
 });
+test('同日复测优先明确前测；随机ID和未知的同日顺序不推导倒退',()=>{
+  const data=emptyState(),common={date:'2000-01-01',skillId:'skill',definitionVersion:1,status:'已确认',standardSnapshot:{name:'协议技能'}};
+  data.skillAssessments=[{...common,id:'z-first',level:'L1',previousAssessmentId:''},{...common,id:'a-retest',level:'L2',previousAssessmentId:'z-first'}];
+  let facts=buildReportFacts(data,draft).facts;assert.equal(facts.skills.find(row=>row.id==='a-retest').previousLevel,'L1');assert.notEqual(facts.skills.find(row=>row.id==='z-first').previousLevel,'L2');
+  data.skillAssessments[1].previousAssessmentId='';facts=buildReportFacts(data,draft).facts;assert.ok(facts.skills.every(row=>!['L1','L2'].includes(row.previousLevel)),'同日顺序未知不靠随机ID推导升降');
+});

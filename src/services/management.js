@@ -3,6 +3,8 @@ import { analysis, planContext, ordered } from '../../shared/domain.mjs';
 import { practiceOverview } from '../../shared/practice.mjs';
 import { trainingFacts, trainingSummary } from '../../shared/training.ts';
 import { draftScopeKey } from './drafts.js';
+import { growthCollection } from '../../shared/growth-model.ts';
+export const managementSaveRequiresSnapshot = collection => collection === 'plans' || growthCollection(collection);
 export const MANAGEMENT_NAV = [
   { key: 'workbench', label: '工作台', views: [['home', '工作台']] },
   { key: 'training', label: '训练记录', views: [['trainings', '日常训练'], ['swim', '成绩'], ['plans', '训练计划'], ['competitions', '赛事'], ['calendar', '训练日历'], ['media', '影像关联']] },

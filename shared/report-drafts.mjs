@@ -23,8 +23,15 @@ export function buildReportFacts(data, report) {
   for(const item of source.values()) for(const ref of recordReferences(item.collection,item.record)) {
     if(['swim','trainings','media','annotations','skillDefinitions','skillAssessments','goals','milestones','weakpoints','checkins','trainingTemplates','plans'].includes(ref.collection))add(ref.collection,resolveReference(data,ref));
   }
-  const ordered=assessments.filter(row=>row.status==='已确认').sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
-  const changes=ordered.filter(row=>inRange(row.date)).map(row=>{const prior=ordered.filter(p=>p.skillId===row.skillId&&p.definitionVersion===row.definitionVersion&&(p.date<row.date||p.date===row.date&&p.id<row.id)).at(-1);return {id:row.id,date:row.date,name:row.standardSnapshot?.name||'技能测评',level:row.level,previousLevel:prior?.level||'无同版本已确认基线',definitionVersion:row.definitionVersion};});
+  const ordered=assessments.filter(row=>row.status==='已确认').sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt||'').localeCompare(String(b.createdAt||''))||a.id.localeCompare(b.id));
+  const changes=ordered.filter(row=>inRange(row.date)).map(row=>{
+    const peers=ordered.filter(p=>p.id!==row.id&&p.skillId===row.skillId&&p.definitionVersion===row.definitionVersion&&p.date<=row.date);
+    // A date has no intra-day measurement order. Random IDs and entry times are not evidence.
+    const explicit=peers.find(p=>p.id===row.previousAssessmentId),earlier=peers.filter(p=>p.date<row.date),lastDay=earlier.at(-1)?.date;
+    const lastCandidates=earlier.filter(p=>p.date===lastDay),terminals=lastCandidates.filter(p=>!lastCandidates.some(other=>other.previousAssessmentId===p.id));
+    const prior=explicit||(terminals.length===1?terminals[0]:null);
+    return {id:row.id,date:row.date,name:row.standardSnapshot?.name||'技能测评',level:row.level,previousLevel:prior?.level||'无明确顺序的同版本已确认基线',definitionVersion:row.definitionVersion};
+  });
   const timeline=growthTimeline({...data,swim:scores,media:[],competitionEvents:[]});
   const facts={ training:trainingSummary(trainings), scores:scores.filter(row=>inRange(row.date)).map(row=>({id:row.id,date:row.date,stroke:row.stroke,distance:row.distance,poolLength:row.poolLength,time:performanceLabel(row),validityStatus:row.validityStatus||'未核验'})),
     pbEvents:timeline.filter(row=>row.collection==='swim'&&row.isPB&&inRange(row.date)).map(row=>({id:row.recordId,date:row.date,title:row.title,detail:row.detail})), skills:changes,pendingAssessments:assessments.filter(row=>inRange(row.date)&&row.status==='待确认').length,
