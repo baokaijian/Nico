@@ -10,7 +10,7 @@ export const validGrowthDraft = value => plain(value) && plain(value.values) &&
     if (['checkinIds', 'relatedSkillIds', 'relatedTrainingIds', 'selectedMediaIds', 'performanceIds', 'mediaIds', 'certificateIds'].includes(key)) return Array.isArray(item) && item.every(id => typeof id === 'string');
     if (key === 'levels') return plain(item) && ['L1', 'L2', 'L3', 'L4', 'L5'].every(level => typeof item[level] === 'string');
     if (['definitionVersion', 'modelVersion', 'currentProgress'].includes(key)) return typeof item === 'number' && Number.isFinite(item);
-    if (['targetPerWeek', 'times', 'durationMinutes'].includes(key)) return typeof item === 'string' || typeof item === 'number' && Number.isFinite(item);
+    if (['targetPerWeek', 'times', 'durationMinutes', 'leftSecond', 'rightSecond', 'rate'].includes(key)) return typeof item === 'string' || typeof item === 'number' && Number.isFinite(item);
     return typeof item === 'string';
   });
 export const validFeedbackDraft = value => plain(value) && plain(value.values) && Object.keys(value.values).length === 1 && typeof value.values.coachNotes === 'string' && Number.isSafeInteger(value.baseRevision) && value.baseRevision >= 0;
