@@ -3,7 +3,7 @@ import {verifyReleaseConsistency} from '../scripts/verify-release-consistency.mj
 const assets=['assets/index-ABC123.js','assets/domain-DEF456.js'];
 const build={release:'1.6.0',frontendCommit:'86be345000000000000000000000000000000000'};
 const apiHash='a'.repeat(64);
-const html=`<!doctype html><html><head><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="assets/index-ABC123.css"></head><body><script type="module" src="assets/index-ABC123.js"></script><script type="module" src="assets/domain-DEF456.js"></script></body></html>`;
+const html=`<!doctype html><html><head><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="/Nico/assets/index-ABC123.css"></head><body><script type="module" src="/Nico/assets/index-ABC123.js"></script><script type="module" src="/Nico/assets/domain-DEF456.js"></script></body></html>`;
 const responder=pages=>async url=>{
  if(url.endsWith('/api/version'))return {ok:true,text:async()=>JSON.stringify({schema:1,release:'1.5.2',sourceHash:apiHash,commit:'old'})};
  if(url.endsWith('/index.html'))return {ok:true,text:async()=>pages.index};
