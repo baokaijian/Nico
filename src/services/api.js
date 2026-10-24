@@ -1,3 +1,4 @@
+import {boundedMediaBlob} from './bounded-media.mjs';
 import { createSessionPersistence } from './session.js';
 import { createHealth } from '../../shared/runtime-health.mjs';
 export class ApiError extends Error {
@@ -8,7 +9,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
   const health = createHealth();
   let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {}, draftIdentity = null, childIdentity=null;
   const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; childIdentity=null; persistence.clear(); health.reset(); };
-  const unauthorized = () => { resetAuth(); onUnauthorized(); };
+  const unauthorized = reason => { resetAuth(); onUnauthorized(reason); };
   const credential = () => accessToken || getToken();
   const credentials = base ? 'omit' : 'same-origin';
   async function observedFetch(path,init) {
@@ -35,7 +36,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     try { result = await response.json(); } catch { throw new ApiError('服务返回格式异常，未确认保存成功', response.status); }
     if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧会话响应', 'AbortError');
     // Public browsing remains available; only an authenticated request can signal a lost session.
-    if (!response.ok) { if (!anonymous && response.status === 401 && (token || csrf)) unauthorized(); throw new ApiError(result.error || '请求失败，输入已保留', response.status); }
+    if (!response.ok) { if(!anonymous&&response.status===403&&childIdentity&&['/api/child-view','/api/child-reflections'].includes(path))unauthorized({scopeDenied:true}); if (!anonymous && response.status === 401 && (token || csrf)) unauthorized(); throw new ApiError(result.error || '请求失败，输入已保留', response.status); }
     const next = response.headers.get('X-Nico-Revision');
     if (!anonymous && next && (revision == null || Number(next) >= revision)) revision = Number(next);
     return result;
@@ -63,18 +64,20 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       xhr.send(body);
     });
   }
-  async function mediaFile(id, variant, signal, child=false) {
+  async function mediaFile(id, variant, signal, child=false, maxBytes=null) {
     const started = generation;
     const token = credential();
     try {
       const res = await observedFetch(child?`/api/child-media/${encodeURIComponent(id)}`:`/api/media/${encodeURIComponent(id)}/content/${variant}`, { credentials, headers: token ? { Authorization: `Bearer ${token}` } : {}, signal });
       if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧素材响应', 'AbortError');
+      if(child&&res.status===403&&childIdentity)unauthorized({scopeDenied:true});
       if (res.status === 401 && (token || csrf)) unauthorized();
       if (!res.ok) throw new ApiError('素材暂不可用，请刷新处理状态或选择原片', res.status);
-      const blob = await res.blob();
+      const blob = maxBytes?await boundedMediaBlob(res,maxBytes,signal):await res.blob();
       if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧素材响应', 'AbortError');
       return blob;
     } catch (problem) {
+      if(problem.status===413)throw new ApiError(problem.message,413);
       if (problem.name === 'AbortError' || problem instanceof ApiError) throw problem;
       throw new ApiError('连接中断，未能读取素材。请检查连接后重新打开。', 0);
     }
@@ -97,6 +100,6 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     if(result.authenticated&&result.role==='child'&&!result.mustChangePassword&&result.username&&result.expiresAt){if(childIdentity?.account!==result.username||childIdentity.epoch!==generation||childIdentity.expiresAt!==result.expiresAt)childIdentity={role:'child',backend:base||globalThis.location?.origin||'local',account:result.username,expiresAt:result.expiresAt,epoch:generation};}else if(result.authenticated||action==='session'||action==='logout')childIdentity=null;
     return result;
   }
-  return { health, childPhotoBlob:async(id,signal)=>URL.createObjectURL(await mediaFile(id,'original',signal,true)), cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getDraftScope: () => draftIdentity, getChildScope:()=>childIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
+  return { health, childPhotoBlob:async(id,signal)=>URL.createObjectURL(await mediaFile(id,'original',signal,true)), cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile:(id,variant,signal,options={})=>mediaFile(id,variant,signal,false,options.maxBytes), authRequest, resetAuth, getDraftScope: () => draftIdentity, getChildScope:()=>childIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };
 }

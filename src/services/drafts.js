@@ -6,6 +6,7 @@ const plain = value => value !== null && typeof value === 'object' && !Array.isA
 export const validGrowthDraft = value => plain(value) && plain(value.values) &&
   (value.editing == null || typeof value.editing === 'string') && (value.baseRevision == null || Number.isSafeInteger(value.baseRevision)) && typeof value.clientRequestId === 'string' &&
   Object.entries(value.values).every(([key, item]) => {
+    if(key==='sectionOrder'){const expected=['training','scores','skills','competitions','milestones','media','messages'];return Array.isArray(item)&&item.length===expected.length&&new Set(item).size===item.length&&expected.every(k=>item.includes(k));}
     if (['evidenceRefs', 'baselineRefs'].includes(key)) return Array.isArray(item) && item.every(ref => plain(ref) && typeof ref.collection === 'string' && typeof ref.id === 'string');
     if (['checkinIds', 'relatedSkillIds', 'relatedTrainingIds', 'selectedMediaIds', 'performanceIds', 'mediaIds', 'certificateIds'].includes(key)) return Array.isArray(item) && item.every(id => typeof id === 'string');
     if (key === 'levels') return plain(item) && ['L1', 'L2', 'L3', 'L4', 'L5'].every(level => typeof item[level] === 'string');
