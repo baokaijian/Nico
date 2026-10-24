@@ -71,13 +71,6 @@ export function performanceSeconds(record: PerformanceSource): number | null {
 export function performanceLabel(record: PerformanceSource, field: TimeField = 'time'): string {
   return formatMilliseconds(performanceMilliseconds(record, field)) || '未记录';
 }
-// 口语化辅注：56.17秒 / 1分02.05秒。原始主显示保持分:秒:百分秒不变，仅并列提示。
-export function readablePerformance(record: PerformanceSource, field: TimeField = 'time'): string {
-  const ms = performanceMilliseconds(record, field);
-  if (ms === null) return '';
-  const seconds = ms / 1000;
-  return seconds < 60 ? `${seconds.toFixed(2)}秒` : `${Math.floor(seconds / 60)}分${(seconds % 60).toFixed(2).padStart(5, '0')}秒`;
-}
 export function improvementRateLabel(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '数据不足';
   return value > 0 && value < 0.01 ? '小于0.01%' : `${value.toFixed(2)}%`;

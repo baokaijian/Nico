@@ -3,7 +3,8 @@ import {growthSetup} from '../../shared/growth-setup.mjs';
 import SourceWorkspace from './SourceWorkspace';
 import { workbenchModel } from '../services/management';
 import { today } from '../services/files';
-import { performanceLabel, readablePerformance, validityLabel } from '../../shared/performance.ts';
+import { performanceLabel, validityLabel } from '../../shared/performance.ts';
+import { readablePerformance } from '../../shared/score-conditions.mjs';
 import EntryResume from './EntryResume';
 import { Empty } from './ui';
 export default function Workbench({ data, navigate, openQuickEntry, readOnly, api, role, resumeVersion, onSaved:propsOnSaved, reload:propsReload }) {
