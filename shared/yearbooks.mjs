@@ -1,3 +1,4 @@
+import {hasKnownActualDistance,actualDistanceText} from './actual-display.mjs';
 import { reportStale,validateReportSnapshot } from './report-drafts.mjs';
 export const YEARBOOK_SECTIONS=['training','scores','skills','competitions','milestones','media','messages'];
 const canonical=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
@@ -10,10 +11,10 @@ export function freezeYearbook(data,book){
 export function yearbookStale(data,b){const r=data.reportDrafts?.find(r=>r.id===b.reportId);return !r||r.version!==b.reportVersion||canonical(r)!==canonical(b.reportSnapshot)||reportStale(data,b.reportSnapshot)||(b.mediaSnapshots||[]).some(m=>canonical(data.media?.find(r=>r.id===m.id))!==canonical(m));}
 export function validateYearbookSnapshot(b){if(b.reportSnapshot?.id!==b.reportId||b.reportSnapshot?.version!==b.reportVersion||b.reportSnapshot?.periodType!=='year'||b.reportSnapshot?.period!==b.year||b.reportSnapshot?.status!=='已确认')fail('纪念册年度报告快照不一致');validateReportSnapshot(b.reportSnapshot);if(!Array.isArray(b.mediaSnapshots)||b.mediaSnapshots.length!==b.selectedMediaIds.length||b.mediaSnapshots.some((m,i)=>m?.id!==b.selectedMediaIds[i]||m.date?.slice(0,4)!==b.year))fail('纪念册精选影像快照不一致');}
 export function yearbookSections(b){
- const f=b.reportSnapshot.facts,t=f.training,empty='此年度暂无适用记录，数据不足，不作推断。';
+ const f=b.reportSnapshot.facts,t=f.training;let trainingSources=[];try{trainingSources=JSON.parse(b.reportSnapshot.baseline).sources.filter(s=>s.collection==='trainings'&&s.record.date>=b.reportSnapshot.start&&s.record.date<=b.reportSnapshot.end).map(s=>s.record);}catch{/* Old presentation fallback uses stored counts without mutating facts. */}const empty='此年度暂无适用记录，数据不足，不作推断。';
  const list=(items,format)=>items.length?items.map(format):[empty];
  const content={
- training:{title:'我在水里度过的时光',lines:[`实际发生${t.count}次 / ${t.records}条记录；已知时长${t.minutes??'未记录'}分钟。`,t.metersCount===0&&t.knownMeters===0?'实际距离未记录。':`已知实际距离${t.knownMeters}米；${t.unknownSets}组实际次数未知。`,'计划量不作实际完成量，缺失不代表没有训练。']},
+ training:{title:'我在水里度过的时光',lines:[`实际发生${t.count}次 / ${t.records}条记录；已知时长${t.minutes??'未记录'}分钟。`,actualDistanceText(t,hasKnownActualDistance(trainingSources)),'计划量不作实际完成量，缺失不代表没有训练。']},
  scores:{title:'属于我的成绩',lines:[...list(f.scores,r=>`${r.date} · ${r.distance} ${r.stroke} / ${r.poolLength} · ${r.time} · ${r.validityStatus} [swim/${r.id}]`),'已核验有效的历史PB更新：',...list(f.pbEvents,r=>`${r.date} · ${r.title} · ${r.detail} [swim/${r.id}]`)]},
  skills:{title:'慢慢学会的本领',lines:list(f.skills,r=>`${r.date} · ${r.name}：${r.previousLevel} → ${r.level} · 标准v${r.definitionVersion} [skillAssessments/${r.id}]`)},
  competitions:{title:'比赛中的经历',lines:list(f.competitions,r=>`${r.date} · ${r.name} ${r.awards||''} [competitionEvents/${r.id}]`)},

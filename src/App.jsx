@@ -78,10 +78,10 @@ export default function App() {
     } finally { if (!controller.signal.aborted) setLoading(false); }
   }, [api]);
   useEffect(() => {
-    api.setOnUnauthorized(() => {
+    api.setOnUnauthorized(reason => {
       reloadController.current?.abort(); setSession(null); setChildData(null); setData(emptyState()); setLoaded(false); setEntry(null); setQuickMenuOpen(false); setRole('viewer');
       setAuth(modeRef.current === 'manage'); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。');
-      void reload();
+      if(reason?.scopeDenied){setLoading(false);setNotice('儿童查看授权已失效，旧资料已清除，请家长重新登录授权。');}else void reload();
     });
     return () => api.setOnUnauthorized(() => {});
   }, [api, reload]);
