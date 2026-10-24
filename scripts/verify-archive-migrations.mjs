@@ -15,9 +15,16 @@ try {
   await db.exec(fs.readFileSync(path.join(root,'backend/nico-soft-delete.sql'),'utf8'));
   await db.query('insert into public.nico_state(id,data,revision) values(1,$1::jsonb,7)',[JSON.stringify({swim:[{id:'legacy-protocol',timeMs:60000}],trash:[]})]);
   const before=await db.query('select * from public.nico_state');
+  await db.query("insert into public.nico_accounts(username,salt,password_hash) values('protocol-parent','protocol-salt','protocol-hash')");
+  await db.query('insert into public.nico_sessions(token_hash,username,expires_at) values($1,$2,$3)',['a'.repeat(64),'protocol-parent','2100-01-01T00:00:00Z']);
   const files=fs.readdirSync(path.join(root,'supabase/migrations')).filter(name=>name.endsWith('.sql')).sort();
   for(const name of files)await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',name),'utf8'));
   assert.deepEqual((await db.query('select * from public.nico_state')).rows,before.rows,'迁移不能重写状态或版本');
+  if(COLLECTIONS.includes('childViews')){
+    assert.equal((await db.query('select scope from public.nico_sessions')).rows[0].scope,'parent','旧会话保持家长权限');
+    await db.query('insert into public.nico_sessions(token_hash,username,expires_at,scope,parent_token_hash,context) values($1,$2,$3,$4,$5,$6)', ['b'.repeat(64),'protocol-parent','2100-01-01T00:00:00Z','child','a'.repeat(64),JSON.stringify({viewId:'protocol-view',viewVersion:1})]);
+    await assert.rejects(db.query('insert into public.nico_sessions(token_hash,username,expires_at,scope,parent_token_hash,context) values($1,$2,$3,$4,$5,$6)', ['c'.repeat(64),'protocol-parent','2100-01-01T00:00:00Z','child','a'.repeat(64),JSON.stringify({viewId:null,viewVersion:1})]));
+  }
   const snapshot=Object.fromEntries(COLLECTIONS.map(key=>[key,[{id:`protocol-${key}`,notes:'isolated protocol only'}]]));snapshot.trash=[];
   await db.query('select public.nico_sync_records($1::jsonb,8,$2)',[JSON.stringify(snapshot),'protocol-parent']);
   const ledger=await db.query('select collection,record_id,is_deleted from public.nico_records');

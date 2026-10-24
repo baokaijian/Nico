@@ -6,8 +6,8 @@ export class ApiError extends Error {
 export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = () => '', options = {}) {
   const persistence = createSessionPersistence(base, options);
   const health = createHealth();
-  let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {}, draftIdentity = null;
-  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; persistence.clear(); health.reset(); };
+  let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {}, draftIdentity = null, childIdentity=null;
+  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; childIdentity=null; persistence.clear(); health.reset(); };
   const unauthorized = () => { resetAuth(); onUnauthorized(); };
   const credential = () => accessToken || getToken();
   const credentials = base ? 'omit' : 'same-origin';
@@ -63,11 +63,11 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       xhr.send(body);
     });
   }
-  async function mediaFile(id, variant, signal) {
+  async function mediaFile(id, variant, signal, child=false) {
     const started = generation;
     const token = credential();
     try {
-      const res = await observedFetch(`/api/media/${encodeURIComponent(id)}/content/${variant}`, { credentials, headers: token ? { Authorization: `Bearer ${token}` } : {}, signal });
+      const res = await observedFetch(child?`/api/child-media/${encodeURIComponent(id)}`:`/api/media/${encodeURIComponent(id)}/content/${variant}`, { credentials, headers: token ? { Authorization: `Bearer ${token}` } : {}, signal });
       if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧素材响应', 'AbortError');
       if (res.status === 401 && (token || csrf)) unauthorized();
       if (!res.ok) throw new ApiError('素材暂不可用，请刷新处理状态或选择原片', res.status);
@@ -88,14 +88,15 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     if (started !== generation) throw new DOMException('登录状态已改变', 'AbortError');
     if (!response.ok) { if (action === 'session' && response.status === 401) resetAuth(); throw new ApiError(result.error || '账号操作失败', response.status); }
     if (action === 'logout' || (action === 'session' && !result.authenticated)) resetAuth();
-    if (result.accessToken || ['login','setup'].includes(action)) { generation++; revision = null; if(result.accessToken)accessToken = result.accessToken; health.reset(); }
+    if (result.accessToken || ['login','setup','child'].includes(action)) { generation++; revision = null; if(result.accessToken)accessToken = result.accessToken; health.reset(); }
     if (result.csrf) csrf = result.csrf;
     if (accessToken && result.expiresAt) persistence.save(accessToken, result.expiresAt);
     if (result.authenticated && !result.mustChangePassword && result.username && ['owner', 'coach'].includes(result.role)) {
       if (draftIdentity?.account !== result.username || draftIdentity.epoch !== generation) draftIdentity = { backend: base || globalThis.location?.origin || 'local', account: result.username, athlete: 'nico', epoch: generation };
-    } else if (action === 'session' || action === 'login') draftIdentity = null;
+    } else if (action === 'session' || action === 'login' || result.role==='child') draftIdentity = null;
+    if(result.authenticated&&result.role==='child'&&!result.mustChangePassword&&result.username&&result.expiresAt){if(childIdentity?.account!==result.username||childIdentity.epoch!==generation||childIdentity.expiresAt!==result.expiresAt)childIdentity={role:'child',backend:base||globalThis.location?.origin||'local',account:result.username,expiresAt:result.expiresAt,epoch:generation};}else if(result.authenticated||action==='session'||action==='logout')childIdentity=null;
     return result;
   }
-  return { health, cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getDraftScope: () => draftIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
+  return { health, childPhotoBlob:async(id,signal)=>URL.createObjectURL(await mediaFile(id,'original',signal,true)), cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getDraftScope: () => draftIdentity, getChildScope:()=>childIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };
 }

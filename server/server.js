@@ -17,6 +17,7 @@ import { processMedia, inspectMedia } from './media.mjs';
 import { exportPublic } from './public-export.mjs';
 import { createAccounts } from './accounts.mjs';
 import { createHealth,mediaHealth } from '../shared/runtime-health.mjs';
+import {childContext,childProjection,childReflectionInput,nicoDay} from '../shared/child-growth.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let sequence = 0;
@@ -82,6 +83,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       cookie(req, res, token, accounts.sessionMs); res.status(201).json({ ...session, fingerprint: undefined });
     });
     app.post('/api/auth/logout', (req, res) => { requireCSRF(req); accounts.logout(cookieToken(req)); cookie(req, res, '', 0); res.json({ success: true }); });
+    app.post('/api/auth/child',(req,res)=>{const parent=requireCSRF(req);if(parent.role!=='owner')throw httpError(403,'只有家长可以开启儿童查看');if(!req.body||Object.keys(req.body).some(key=>key!=='viewId'))throw httpError(400,'儿童授权参数无效');const view=store.read().data.childViews.find(row=>row.id===req.body.viewId&&row.status==='启用');if(!view)throw httpError(400,'请先保存并启用儿童页');const {token,session}=accounts.issueChild(cookieToken(req),{viewId:view.id,viewVersion:view.version});cookie(req,res,token,session.expiresAt-Date.now());res.json({authenticated:true,role:'child',username:session.username,csrf:session.csrf,expiresAt:session.expiresAt});});
   }
   app.use((req, _res, next) => {
     const credential = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
@@ -95,6 +97,17 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     req.role = role; req.username = credential ? role : session?.username || role; next();
   });
   app.use(express.json({ limit: '5mb' }));
+  app.use('/api',(req,res,next)=>{
+    if(req.role!=='child')return next();
+    const route=req.path,session=sessionFor(req);
+    if(!(req.method==='GET'&&route==='/child-view'||['GET','HEAD'].includes(req.method)&&/^\/child-media\/[^/]+$/.test(route)||req.method==='POST'&&route==='/child-reflections'))return next(httpError(403,'儿童查看不能访问完整档案或管理操作'));
+    try{
+      const current=store.read(),data=current.data,day=nicoDay(),view=childContext(data,session.context);res.set('X-Nico-Revision',String(current.revision));
+      if(route==='/child-view')return res.json(childProjection(data,view.id,day));
+      if(route.startsWith('/child-media/')){const id=decodeURIComponent(route.slice(13)),photo=data.media.find(row=>row.id===id&&view.selectedMediaIds.includes(row.id)&&['photo','image'].includes(row.type));if(!photo||!/^\/uploads\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(photo.url))throw httpError(404,'这张照片暂不可查看');return res.sendFile(path.resolve(uploadsDir,photo.url.slice(9)));}
+      void(async()=>{try{const input=childReflectionInput(data,session.context,req.body,day),actor=`${req.username}/child`,receipt=await creationRequest(input,actor),replay=creationReplay(data,'childReflections',receipt);if(replay)return res.json({id:replay.id,status:replay.status});const expected=req.headers['if-match'];if(!/^\d+$/.test(expected||''))throw httpError(428,'请先刷新儿童页面');const saved=store.change(Number(expected),state=>saveGrowth(state,'childReflections',input,{id:makeId('childReflections'),actor,now:new Date().toISOString(),request:receipt}),actor);res.set('X-Nico-Revision',String(saved.revision)).status(201).json({id:saved.result.id,status:saved.result.status});}catch(error){next(error);}})();
+    }catch(error){next(error);}
+  });
   const requireOwner = req => { if (req.role !== 'owner') throw httpError(403, '此操作仅限家长管理者'); };
   app.get('/api/health',(req,res)=>{requireOwner(req);const current=store.read(),files=fs.readdirSync(uploadsDir,{withFileTypes:true}).filter(row=>row.isFile()).map(row=>fs.statSync(path.join(uploadsDir,row.name)));res.json({release:{schema:1,release:'local-development',sourceHash:null},instance:health.snapshot(),operations:{storage:{count:files.length,bytes:files.reduce((n,row)=>n+row.size,0),complete:true},media:mediaHealth(current.data.media),backups:{mode:'before-write',latestAt:null,latestRevision:null,currentRevision:current.revision,scheduled:'not-configured',restoreVerification:'manual-isolated-only'}}});});
   const canWrite = (req, collection) => {

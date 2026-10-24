@@ -9,14 +9,14 @@ expect('访客未登录', (await session.json()).authenticated, false);
 const summary = await fetch(`${base}/api/public-summary`);
 expect('公开摘要可读', summary.status, 200);
 const published = await summary.json();
-for (const endpoint of ['/api/snapshot', '/api/health', ...COLLECTIONS.map(key => `/api/${key}`), '/api/skills-overview', '/api/goals/guest-probe/candidates', '/api/backup', '/api/public-preview', '/api/media/guest-probe/content/original']) {
+for (const endpoint of ['/api/snapshot', '/api/health', '/api/child-view', '/api/child-media/guest-probe', ...COLLECTIONS.map(key => `/api/${key}`), '/api/skills-overview', '/api/goals/guest-probe/candidates', '/api/backup', '/api/public-preview', '/api/media/guest-probe/content/original']) {
   for (const method of ['GET', 'HEAD']) expect(`${method} ${endpoint}`, (await fetch(base + endpoint, { method })).status, 401);
 }
 for (const item of published.media || []) for (const url of [item.url, item.posterUrl].filter(Boolean)) {
   expect('授权公开素材可读', (await fetch(`${base}/api/public-media/${url.split('/').at(-1)}`, { method: 'HEAD' })).status, 200);
 }
 expect('未授权素材不可读', (await fetch(`${base}/api/public-media/guest-probe-unpublished.mp4`, { method: 'HEAD' })).status, 404);
-for (const [method, endpoint] of [['POST', '/api/swim'], ['POST', '/api/trainings'], ['PUT', '/api/swim/guest-probe'], ['DELETE', '/api/swim/guest-probe']]) {
+for (const [method, endpoint] of [['POST','/api/auth/child'],['POST','/api/child-reflections'], ['POST', '/api/swim'], ['POST', '/api/trainings'], ['PUT', '/api/swim/guest-probe'], ['DELETE', '/api/swim/guest-probe']]) {
   expect(`${method} ${endpoint}`, (await fetch(base + endpoint, { method })).status, 401);
 }
 for (const key of ['skillDefinitions', 'skillAssessments', 'goals', 'milestones']) {

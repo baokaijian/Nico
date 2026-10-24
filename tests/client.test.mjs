@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { createApi } from '../src/services/api.js';
 import { loadPublicSummary } from '../src/services/public-summary.js';
 const memoryStorage = () => { const data = new Map(); return { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key), values: () => [...data.values()] }; };
+test('进入儿童会话替换家长凭据、清除草稿身份，旧事实响应失效',async()=>{
+  const old=globalThis.fetch,storage=memoryStorage(),api=createApi('https://protocol.invalid',()=>'',{storage});let release;
+  try{globalThis.fetch=async()=>new Response(JSON.stringify({authenticated:true,role:'owner',username:'protocol',accessToken:'a'.repeat(64),expiresAt:Date.now()+60000}));await api.authRequest('login',{});assert.ok(api.getDraftScope());globalThis.fetch=()=>new Promise(r=>{release=r;});const pending=api.request('/api/snapshot');globalThis.fetch=async()=>new Response(JSON.stringify({authenticated:true,role:'child',username:'protocol',accessToken:'b'.repeat(64),expiresAt:Date.now()+60000}));await api.authRequest('child',{viewId:'view'});assert.equal(api.getDraftScope(),null);assert.ok(!storage.values().join('').includes('a'.repeat(64)));release(new Response('{}'));await assert.rejects(pending,{name:'AbortError'});}finally{globalThis.fetch=old;}
+});
 test('有效云端会话可在同一标签页刷新后恢复，退出后不再恢复', async () => {
   const original = globalThis.fetch, storage = memoryStorage(), token = 'a'.repeat(64), expiresAt = Date.now() + 60000;
   try {

@@ -10,6 +10,7 @@ import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/pas
 import { preserveDeletedRecords } from '../shared/deletion.mjs';
 import { digestBytes, inspectPlayback, inspectPoster, validateVariantMetadata, MEDIA_MAX_BYTES, POSTER_MAX_BYTES } from '../shared/media-variants.mjs';
 import { createHealth } from '../shared/runtime-health.mjs';
+import {childContext,childProjection,childReflectionInput,nicoDay} from '../shared/child-growth.mjs';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw fail(400, error.message); } };
@@ -49,13 +50,15 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
     if (!token) return null;
     const session = await backend.session(await digestHex(token));
     if (!session || Date.parse(session.expires_at) <= now()) return null;
+    if(!['parent','child'].includes(session.scope||'parent'))return null;
+    if(session.scope==='child') {const parent=await backend.session(session.parent_token_hash);if(!parent||(parent.scope||'parent')!=='parent'||parent.username!==session.username||Date.parse(parent.expires_at)<=now())return null;}
     const account = await backend.account(session.username);
-    return account ? { ...session, mustChangePassword: account.must_change_password, role: 'owner', account } : null;
+    return account ? { ...session, mustChangePassword: account.must_change_password, role: session.scope==='child'?'child':'owner', account } : null;
   }
-  const viewSession = session => ({ authenticated: !!session, username: session?.username || '', role: session ? 'owner' : 'viewer', expiresAt: session ? Date.parse(session.expires_at) : null, mustChangePassword: !!session?.mustChangePassword, setupRequired: false });
-  async function issue(username) {
-    const token = randomHex(), expiresAt = now() + sessionMs;
-    await backend.createSession({ token_hash: await digestHex(token), username, expires_at: new Date(expiresAt).toISOString() });
+  const viewSession = session => ({ authenticated: !!session, username: session?.username || '', role: session?.role || 'viewer', expiresAt: session ? Date.parse(session.expires_at) : null, mustChangePassword: !!session?.mustChangePassword, setupRequired: false });
+  async function issue(username,child=null) {
+    const token = randomHex(), expiresAt = child?Math.min(now()+900000,Date.parse(child.parent.expires_at)):now() + sessionMs;
+    await backend.createSession({ token_hash: await digestHex(token), username, expires_at: new Date(expiresAt).toISOString(),...(child?{scope:'child',parent_token_hash:child.parent.token_hash,context:child.context}:{}) });
     return { accessToken: token, expiresAt };
   }
   const handle = async request => {
@@ -107,6 +110,23 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       // Only the explicit public routes above may bypass authentication.
       if (!session) throw fail(401, '完整档案需要登录后查看');
       if (session && endpoint === '/api/auth/logout' && method === 'POST') { await backend.deleteSession(session.token_hash); return json({ success: true }); }
+      if(session.role==='child') {
+        if(session.mustChangePassword)throw fail(403,'请交还家长重新登录');
+        if(!(method==='GET'&&endpoint==='/api/child-view'||['GET','HEAD'].includes(method)&&parts[1]==='child-media'&&parts.length===3||method==='POST'&&endpoint==='/api/child-reflections'))throw fail(403,'儿童查看不能访问完整档案或管理操作');
+        const current=await backend.read(),data=normalizeState(structuredClone(current.data)),day=nicoDay(now()),view=childContext(data,session.context);headers['X-Nico-Revision']=String(current.revision);
+        if(endpoint==='/api/child-view')return json(childProjection(data,view.id,day));
+        if(parts[1]==='child-media') {const photo=data.media.find(row=>row.id===parts[2]&&view.selectedMediaIds.includes(row.id)&&['photo','image'].includes(row.type));const file=photo&&fileFor(photo.url);if(!file)throw fail(404,'这张照片暂不可查看');return await stream(file);}
+        const input=childReflectionInput(data,session.context,await body(),day),actor=`${session.username}/child`,receipt=await creationRequest(input,actor),replay=creationReplay(data,'childReflections',receipt);
+        if(replay)return json({id:replay.id,status:replay.status});
+        const expected=request.headers.get('if-match');if(!/^\d+$/.test(expected||''))throw fail(428,'请先刷新儿童页面再留感受');if(Number(expected)!==current.revision)throw fail(409,'记录已更新，感受已保留，请刷新核对后重试');
+        const saved=saveGrowth(data,'childReflections',input,{id:`childReflections-${randomHex(16)}`,actor,now:new Date(now()).toISOString(),request:receipt});const revision=await backend.save(current.revision,data,actor);headers['X-Nico-Revision']=String(revision);return json({id:saved.id,status:saved.status},201);
+      }
+      if(endpoint==='/api/auth/child'&&method==='POST') {
+        if(session.mustChangePassword)throw fail(403,'请先替换临时密码');
+        const input=await body();if(Object.keys(input).some(key=>key!=='viewId'))throw fail(400,'儿童授权参数无效');
+        const data=normalizeState((await backend.read()).data),view=data.childViews.find(row=>row.id===input.viewId&&row.status==='启用');if(!view)throw fail(400,'请先由家长保存并启用儿童成长页');
+        return json({authenticated:true,username:session.username,role:'child',...await issue(session.username,{parent:session,context:{viewId:view.id,viewVersion:view.version}})});
+      }
       if (session && endpoint === '/api/auth/password' && method === 'POST') {
         const input = await body();
         if (await backend.loginAttempt(await digestHex(`password:${session.username}`)) > 5) throw fail(429, '密码验证次数过多，请稍后再试');

@@ -17,8 +17,9 @@ const Goals = lazy(() => import('./GrowthGoals'));
 const Reports = lazy(() => import('./Reports'));
 const Gallery = lazy(() => import('./MediaGallery'));
 const Profile = lazy(() => import('./Profile'));
+const ChildSettings = lazy(() => import('./ChildSettings'));
 const HealthPanel = lazy(() => import('./HealthPanel'));
-export default function ManagementView({ location, navigate, data, api, onSaved, reload, readOnly, role, openQuickEntry, initialOpen, initialFilter, mediaTarget, resumeVersion }) {
+export default function ManagementView({ location, navigate, data, api, onSaved, reload, readOnly, role, openQuickEntry, initialOpen, initialFilter, mediaTarget, resumeVersion, onEnterChild }) {
   const { section, view } = location, owner = role === 'owner';
   const shared = { data, api, onSaved, reload, readOnly, navigate };
   const views = section === 'settings' ? SETTINGS_VIEWS : MANAGEMENT_NAV.find(item => item.key === section)?.views || [];
@@ -42,7 +43,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'review' && view === 'trends' && <Dashboard {...shared} detailOnly/>}
       {section === 'review' && view === 'reports' && <Reports {...shared} readOnly={readOnly || !owner}/>}
       {archive && (view === 'archive' ? <Profile {...shared} role="viewer" view="archive" readOnly/> : <Records key={view} {...shared} type={view} readOnly={readOnly || !owner} initialFilter={initialFilter}/>)}
-      {section === 'settings' && (view === 'health' ? <HealthPanel api={api}/> : view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view}/>)}
+      {section === 'settings' && (view === 'child' ? <ChildSettings {...shared} onEnterChild={onEnterChild}/> : view === 'health' ? <HealthPanel api={api}/> : view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view}/>)}
     </Suspense>
   </div>;
 }

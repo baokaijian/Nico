@@ -61,7 +61,9 @@ export function createAccounts({ filename, setupCodePath, now = Date.now, sessio
     const key = hash(token), session = sessions.get(key);
     if (!session) return null;
     if (session.expiresAt <= now() || session.fingerprint !== account()?.passwordHash) { sessions.delete(key); return null; }
+    if(session.role==='child'){const parent=sessions.get(session.parentHash);if(!parent||parent.role!=='owner'||parent.expiresAt<=now()||parent.username!==session.username){sessions.delete(key);return null;}}
     return session;
   };
-  return { configured: () => !!account(), login, setup, readSession, logout: token => { if (token) sessions.delete(hash(token)); }, sessionMs };
+  const issueChild=(parentToken,context)=>{const parent=readSession(parentToken);if(parent?.role!=='owner')throw failure(403,'只有家长可以开启儿童查看');const result=issue(account());Object.assign(result.session,{role:'child',parentHash:hash(parentToken),context:structuredClone(context),expiresAt:Math.min(parent.expiresAt,now()+900000)});return result;};
+  return { configured: () => !!account(), login, setup, readSession, issueChild, logout: token => { if (token) sessions.delete(hash(token)); }, sessionMs };
 }
