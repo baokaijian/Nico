@@ -1,5 +1,9 @@
 # 测试与验收
 
+最新增量V1.5.3（2026-10-24）：完整检查 `NICO_TEST_PROTOCOL_ONLY=true npm run check` 189项协议/临时数据库测试、lint、typecheck、build及公开字段/素材白名单通过。新增activation/public-results覆盖空数据不造任务、八类来源、过滤优先级、过期不刷新、五步真实条件、账号/API偏好隔离、未知具体打腿PB隔离、整数毫秒/池长/核验及历史完整性。原CAS/幂等/历史/恢复/权限测试保留。
+
+隔离浏览器使用5294端口、内存服务与合成素材；不连接正式档案。真实设备、真人45秒、真实转码、PDF与大分卷操作使用[人工模板](manual-acceptance-template.md)，全部待验。软件交互结果及实际部署回执见[v1-5-3-acceptance.md](v1-5-3-acceptance.md)。下方历史阶段结果按原日期保留。
+
 当前已发布基线（2026-10-22复核）：V1.1代码9232a59，Edge v11及[Pages运行39714319021](https://github.com/baokaijian/Nico/actions/runs/39714319021)构建/发布成功。完整107项测试及lint/typecheck/build通过，实际核验见v1-1-acceptance.md；真人60秒由用户明确标记为暂未验收。下方各阶段数字为当时历史结果，不应当作当前测试总数。
 
 | 范围 | 必验案例 |

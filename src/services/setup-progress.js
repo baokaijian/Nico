@@ -1,0 +1,5 @@
+import {draftScopeKey} from './drafts.js';
+import {SETUP_STEPS} from '../../shared/growth-setup.mjs';
+const fresh=()=>({activeStep:'scores',deferredIds:[]});
+const valid=v=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>['activeStep','deferredIds'].includes(k))&&SETUP_STEPS.includes(v.activeStep)&&Array.isArray(v.deferredIds)&&v.deferredIds.length<=SETUP_STEPS.length&&new Set(v.deferredIds).size===v.deferredIds.length&&v.deferredIds.every(k=>SETUP_STEPS.includes(k));
+export function createSetupProgress({scope,storage,isCurrent=()=>true}={}){try{storage??=globalThis.localStorage;}catch{/* State still works in memory. */}const identity=draftScopeKey(scope),key=`nico.growth-setup.v1:${identity}`,active=()=>!!identity&&isCurrent(scope);return {read(){if(!active())return fresh();try{const v=JSON.parse(storage?.getItem(key)||'null');return valid(v)?v:fresh();}catch{return fresh();}},write(v){if(!active()||!valid(v))return false;try{if(!storage)return false;storage.setItem(key,JSON.stringify(v));return true;}catch{return false;}}};}

@@ -1,3 +1,4 @@
+import {adminTasks} from '../../shared/admin-tasks.mjs';
 import { eligiblePerformance, performanceMilliseconds } from '../../shared/performance.ts';
 import { analysis, planContext, ordered } from '../../shared/domain.mjs';
 import { practiceOverview } from '../../shared/practice.mjs';
@@ -6,7 +7,7 @@ import { draftScopeKey } from './drafts.js';
 import { growthCollection } from '../../shared/growth-model.ts';
 export const managementSaveRequiresSnapshot = collection => collection === 'plans' || growthCollection(collection);
 export const MANAGEMENT_NAV = [
-  { key: 'workbench', label: '工作台', views: [['home', '工作台']] },
+  { key: 'workbench', label: '工作台', views: [['home', '工作台'], ['setup','首次使用引导'], ['tasks','待办中心']] },
   { key: 'training', label: '训练记录', views: [['trainings', '日常训练'], ['swim', '成绩'], ['plans', '训练计划'], ['competitions', '赛事'], ['calendar', '训练日历'], ['media', '影像关联']] },
   { key: 'growth', label: '成长管理', views: [['skills', '技能工作区'], ['practice', '技术短板与打卡'], ['goals', '目标与里程碑']] },
   { key: 'review', label: '分析复盘', views: [['cockpit','阶段驾驶舱'], ['quality', '数据质量'], ['timeline', '成长时间轴'], ['trends', '历史趋势'], ['reports', '周期报告'], ['yearbooks','年度纪念册'], ['media', '视频技术复盘'], ['compare', '视频对比'], ['archive', '成长档案']] },
@@ -36,7 +37,7 @@ export function createManagementPosition({ scope, storage, isCurrent = () => tru
   };
 }
 export function workbenchModel(data, day) {
-  const pending = [['skillAssessments', '技能测评', 'skills'], ['weakpoints', '技术短板', 'practice'], ['goals', '阶段目标', 'goals'], ['milestones', '成长里程碑', 'goals']].flatMap(([key, label, view]) => (data[key] || []).filter(row => row.status === '待确认').map(row => ({ id: row.id, key, label, title: row.title || row.standardSnapshot?.name || '待核对记录', location: { section: 'growth', view } })));
+  const pending = adminTasks(data,day);
   const week = practiceOverview(data, day).week, result = analysis(data), context = planContext(data, day, result.version);
   const actual = ordered(data.trainings).filter(row => row.date <= day && trainingFacts(row).occurred);
   const latestScore = ordered(data.swim).filter(row => row.date <= day).at(-1);

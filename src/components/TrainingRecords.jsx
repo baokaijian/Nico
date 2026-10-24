@@ -7,7 +7,7 @@ import TrainingSetEditor, { TrainingSetSummary } from './TrainingSetEditor';
 import useRecordDraft, { validTrainingDraft } from '../services/useRecordDraft';
 import DraftNotice, { draftHint } from './DraftNotice';
 const initialValues = kind => ({ ...Object.fromEntries(FIELDS[kind].map(f => [f.key, f.key === 'date' ? today() : ''])), entryMode: '快速', completionStatus: '未记录', sets: [], mediaIds: [] });
-export default function TrainingRecords({ focusId, data, api, onSaved, readOnly = false, manageTemplates = true, initialFilter = '', initialOpen = false, onLinkMedia, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange }) {
+export default function TrainingRecords({ focusTemplateId, focusId, data, api, onSaved, readOnly = false, manageTemplates = true, initialFilter = '', initialOpen = false, onLinkMedia, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange }) {
   const newDraft = (kind = 'trainings', values = {}) => ({ kind, editing: null, values: { ...initialValues(kind), ...(entryOnly && kind === 'trainings' ? initialContext : {}), ...values }, clientRequestId: entryOnly && clientRequestId || crypto.randomUUID(), baseRevision: api.getRevision() });
   const [draft, setDraft] = useState(() => newDraft()), [open, setOpen] = useState(initialOpen || entryOnly);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false);
@@ -17,7 +17,7 @@ export default function TrainingRecords({ focusId, data, api, onSaved, readOnly 
   const { persist } = localDraft;
   useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const [savedTraining, setSavedTraining] = useState(null);
-  const templates = data.trainingTemplates || [], { kind, values, editing } = draft, template = kind === 'trainingTemplates';
+  const templates = (data.trainingTemplates || []).filter(t=>!focusTemplateId||t.id===focusTemplateId), { kind, values, editing } = draft, template = kind === 'trainingTemplates';
   useEffect(() => { setFilter(initialFilter); }, [initialFilter]);
   useEffect(() => { if (initialOpen) setOpen(true); }, [initialOpen]);
   useEffect(() => { if (dirty.current && !readOnly) persist(draft); }, [draft, readOnly, persist]);
@@ -56,7 +56,7 @@ export default function TrainingRecords({ focusId, data, api, onSaved, readOnly 
   const allFields = FIELDS[kind];
   const field = key => allFields.find(f => f.key === key);
   const renderFields = keys => keys.map(key => field(key) && <Field key={key} field={field(key)} value={values[key]} onChange={v => change(key, v)}/>);
-  const records = ordered(data.trainings).reverse().filter(r => (!focusId || r.id === focusId) && (!from || r.date >= from) && (!to || r.date <= to) && (!status || (r.completionStatus || '未记录') === status) && (!filter.trim() || JSON.stringify(r).includes(filter.trim())));
+  const records = ordered(data.trainings).reverse().filter(r => !focusTemplateId&& (!focusId || r.id === focusId) && (!from || r.date >= from) && (!to || r.date <= to) && (!status || (r.completionStatus || '未记录') === status) && (!filter.trim() || JSON.stringify(r).includes(filter.trim())));
   const summary = trainingSummary(records), latest = ordered(data.trainings).at(-1);
   const recentContents = [...new Set(ordered(data.trainings).reverse().map(row => row.trainingType?.trim()).filter(Boolean))].slice(0, 4);
   const plans = data.plans.flatMap(p => (p.sessions || []).filter(s => s.type === '训练').map(s => ({ id: `${p.id}/${s.id}`, label: `${s.date} · ${s.title || '训练'} · ${p.title} v${p.version}`, plan: p, session: s })));
@@ -75,11 +75,12 @@ export default function TrainingRecords({ focusId, data, api, onSaved, readOnly 
     dirty.current = true; setDraft(d => ({ ...d, values: { ...d.values, entryMode: next, sets: next === '快速' ? [] : d.values.sets, totalMeters: null, kickMeters: null } }));
   };
   const previous = editing ? data.trainings.find(r => r.id === editing) : null;
-  return <div className="stack fade-in training-records">{!entryOnly && <header><h1>水上训练记录</h1><p className="muted">记录实际训练；计划与模板是参考，留空表示未知，0表示实际为零。</p></header>}
+  return <div className="stack fade-in training-records">{!entryOnly && <header><h1>{focusTemplateId?'训练模板原记录':'水上训练记录'}</h1><p className="muted">记录实际训练；计划与模板是参考，留空表示未知，0表示实际为零。</p></header>}
     {message && <Message>{message}{savedTraining && onLinkMedia && <button type="button" onClick={() => onLinkMedia(savedTraining)}>为这次训练关联影像</button>}</Message>}<Message error>{error}</Message>
     {conflict && <Message>输入已保留。请先用顶部“刷新记录”核对最新数据。<button type="button" onClick={() => { setDraft(d => ({ ...d, baseRevision: api.getRevision() })); setConflict(false); setError('请确认是否已有同一次训练；同一新建请求不会重复创建。'); }}>已核对最新记录，允许重试</button></Message>}
+    {focusTemplateId&&readOnly&&templates.map(t=><article className="glass-card" key={t.id}><h2>{t.title} · v{t.version}</h2><p>模板仅为参考安排，不计入实际训练。</p><p>{t.trainingType||'内容未记录'} · 参考{t.plannedMeters??'未填'}米</p></article>)}
     {!readOnly && <>
-      {!entryOnly && <div className="actions"><button className="apple-btn apple-btn-primary" disabled={busy} onClick={() => { if (!open) setOpen(true); else replace(newDraft()); }}>记录本次训练</button><button className="apple-btn apple-btn-secondary" disabled={busy || !latest} onClick={() => copy(latest)}>复制上次训练安排</button></div>}
+      {!entryOnly&&!focusTemplateId && <div className="actions"><button className="apple-btn apple-btn-primary" disabled={busy} onClick={() => { if (!open) setOpen(true); else replace(newDraft()); }}>记录本次训练</button><button className="apple-btn apple-btn-secondary" disabled={busy || !latest} onClick={() => copy(latest)}>复制上次训练安排</button></div>}
       <DraftNotice draft={localDraft} onRestore={payload => { dirty.current = true; setDraft(payload); setOpen(true); }}/>
 
       <details className="glass-card" open={open} onToggle={e => setOpen(e.currentTarget.open)} ref={formRef}><summary>{template ? `${editing ? '编辑' : '新建'}训练模板` : `${editing ? '编辑' : '添加'}训练`}</summary>
