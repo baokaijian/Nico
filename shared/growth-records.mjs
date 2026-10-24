@@ -20,6 +20,8 @@ function snapshots(data, refs, oldRefs = [], oldSnapshots = [], { completed = fa
   });
 }
 export function validateGrowthRelations(data, key, record, previous = null) {
+  if(key==='childViews')for(const id of record.selectedMediaIds)if(!['photo','image'].includes(related(data,'media',id,previous?.selectedMediaIds?.includes(id)).type))failGrowth('儿童页只能选择照片');
+  if(key==='childReflections'){related(data,'childViews',record.viewId,previous?.viewId===record.viewId);if(record.trainingId)related(data,'trainings',record.trainingId,previous?.trainingId===record.trainingId);}
   if (key === 'videoComparisons') {
     for (const side of ['left','right']) {
       const media = related(data,'media',record[`${side}MediaId`],previous?.[`${side}MediaId`] === record[`${side}MediaId`]);
@@ -120,7 +122,7 @@ const actionNote = input => {
 export function actGrowth(data, key, id, action, input, { actor, now }) {
   const previous = related(data, key, id), record = structuredClone(previous);
   if (!growthCollection(key, previous)) failGrowth('请先补充基线、结果和标准，明确采用新版目标流程');
-  if (action === 'confirm' && ['skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts'].includes(key)) {
+  if (action === 'confirm' && ['skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts','childReflections'].includes(key)) {
     const proof = confirmation(input), done = key === 'goals' ? '已达成' : '已确认';
     if (record.status === done || key === 'goals' && record.status === '已归档') {
       if (record.confirmedBy !== proof.confirmedBy || record.confirmationNote !== proof.confirmationNote || key === 'goals' && canonical(record.completionRefs) !== canonical(proof.refs)) failGrowth('原确认信息不同，请核对已有记录', 409);

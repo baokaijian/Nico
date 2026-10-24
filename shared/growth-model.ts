@@ -2,7 +2,7 @@
 export const SKILL_DIMENSIONS = ['水中安全', '呼吸及水感', '自由泳', '仰泳', '蛙泳', '蝶泳', '出发和转身', '训练行为'] as const;
 export const SKILL_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'] as const;
 export const GOAL_STATUSES = ['待确认', '进行中', '已达成', '暂停', '已归档'] as const;
-export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts', 'competitionEvents', 'videoComparisons'] as const;
+export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts', 'competitionEvents', 'videoComparisons', 'childViews', 'childReflections'] as const;
 export const EVIDENCE_COLLECTIONS = ['swim', 'trainings', 'media', 'annotations', 'skillAssessments', 'checkins'] as const;
 export type SkillDimension = typeof SKILL_DIMENSIONS[number];
 export type SkillLevel = typeof SKILL_LEVELS[number];
@@ -35,6 +35,8 @@ export function evidenceRefs(value: unknown): EvidenceRef[] {
   if (new Set(refs.map(ref => `${ref.collection}/${ref.id}`)).size !== refs.length) return failGrowth('证据引用重复'); return refs;
 }
 const fields: Record<string, string[]> = {
+  childViews: ['title','theme','selectedMediaIds','status'],
+  childReflections: ['date','viewId','trainingId','mood','text','status'],
   skillDefinitions: ['name', 'dimension', 'levels', 'status', 'reviewedBy', 'notes'],
   skillAssessments: ['skillId', 'definitionVersion', 'date', 'assessor', 'level', 'status', 'evidenceNote', 'evidenceRefs', 'improvementNote', 'previousAssessmentId', 'weakPointId', 'checkinIds'],
   goals: ['title', 'category', 'targetMetric', 'deadline', 'status', 'currentProgress', 'ruleSource', 'reviewedBy', 'notes', 'baselineText', 'baselineRefs', 'targetResult', 'criteria', 'relatedTrainingIds', 'relatedSkillIds', 'targetSkillLevel'],
@@ -47,7 +49,13 @@ const fields: Record<string, string[]> = {
 export function editableGrowth(key: string, value: ObjectRecord): ObjectRecord { return Object.fromEntries((fields[key] || []).filter(field => value[field] !== undefined).map(field => [field, value[field]])); }
 function parseGrowth(key: string, input: ObjectRecord, stored = false): ObjectRecord {
   const result: ObjectRecord = { modelVersion: 1 };
-  if (key === 'skillDefinitions') {
+  if (key === 'childViews') {
+    const selectedMediaIds=growthIds(input.selectedMediaIds,'精选照片');if(selectedMediaIds.length>12)return failGrowth('儿童页最多选择12张照片');
+    Object.assign(result,{title:growthText(input.title,'儿童页标题',true,100),theme:growthText(input.theme,'当前成长主题',true,500),selectedMediaIds,status:choice(input.status||'停用',['启用','停用'],'儿童页状态')});
+  } else if (key === 'childReflections') {
+    const status=choice(input.status||'待确认',['待确认','已确认'],'感受状态');if(!stored&&status!=='待确认')return failGrowth('孩子感受须由家长独立确认');
+    Object.assign(result,{date:growthDate(input.date),viewId:growthId(input.viewId,'儿童页'),trainingId:growthId(input.trainingId,'关联训练',false),mood:choice(input.mood,['开心','平静','有点累','想再试试','不想说'],'本次心情'),text:growthText(input.text,'孩子的一句话',input.mood!=='不想说',500),status});
+  } else if (key === 'skillDefinitions') {
     const rawLevels = objectRecord(input.levels, '五级标准');
     if (Object.keys(rawLevels).length !== 5 || SKILL_LEVELS.some(level => !Object.hasOwn(rawLevels, level))) return failGrowth('须完整配置L1–L5五级标准');
     const status = choice(input.status || '停用', ['启用', '停用'], '标准状态');

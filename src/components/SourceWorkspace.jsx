@@ -10,6 +10,7 @@ const Goals = lazy(() => import('./GrowthGoals'));
 const Media = lazy(() => import('./MediaGallery'));
 const Practice = lazy(() => import('./Practice'));
 const Plans = lazy(() => import('./PlanViewer'));
+const ChildSettings = lazy(() => import('./ChildSettings'));
 export default function SourceWorkspace({ source, onClose, ...props }) {
   const { collection, id } = source, row = props.data[collection]?.find(item => item.id === id);
   const shared = { ...props, focusId: id };
@@ -24,6 +25,7 @@ export default function SourceWorkspace({ source, onClose, ...props }) {
     {collection === 'reportDrafts' && <Reports {...shared}/>}
     {collection === 'growthStories' && <Timeline {...shared}/>}
     {collection === 'plans' && <Plans {...shared}/>}
+    {['childViews','childReflections'].includes(collection)&&<ChildSettings {...shared}/>}
     <details><summary>完整原始记录</summary><pre className="source-json">{JSON.stringify(row, null, 2)}</pre></details>
   </Suspense>}</Modal>;
 }

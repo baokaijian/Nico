@@ -12,6 +12,7 @@ import ManagementView from './components/ManagementView';
 import { installPageHealth } from './services/health';
 const Showcase = lazy(() => import('./components/Showcase'));
 const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'private' || !!import.meta.env.VITE_API_URL;
+const ChildView = lazy(() => import('./components/ChildView'));
 const QuickEntry = lazy(() => import('./components/QuickEntry'));
 const ChangePassword = lazy(() => import('./components/ChangePassword'));
 const privateTabs = MANAGEMENT_NAV.map(item => [item.key, item.label]);
@@ -31,12 +32,13 @@ export default function App() {
   useEffect(()=>installPageHealth(api.health),[api]);
   const [mode, setMode] = useState(() => api.getMode());
   const modeRef = useRef(mode);
+  const [childData,setChildData]=useState(null);
   const [publicSnapshot, setPublicSnapshot] = useState(null);
   const lastTabs = useRef({ view: 'home', manage: 'workbench' });
   const authenticated = !!session?.authenticated && !session?.mustChangePassword;
   const [loaded, setLoaded] = useState(false);
-  const fullView = adminCapable && authenticated && mode === 'manage';
-  const selectedLoaded = fullView ? loaded : !!publicSnapshot;
+  const fullView = adminCapable && authenticated && session?.role!=='child' && mode === 'manage';
+  const selectedLoaded = session?.role==='child'?!!childData:fullView ? loaded : !!publicSnapshot;
   const publicData = useMemo(() => ({ ...emptyState(), swim: publicSnapshot?.swim || [], media: publicSnapshot?.media || [] }), [publicSnapshot]);
   const reloadController = useRef(null);
   const hadSession = useRef(false);
@@ -49,13 +51,15 @@ export default function App() {
       const result = await loadAppView(api, { mode: modeRef.current, adminCapable, base: import.meta.env.BASE_URL, signal: controller.signal, onSession: current => {
         if (controller.signal.aborted) return;
         setSession(current); setRole(current?.role || 'viewer');
-        if (!current?.authenticated || current.mustChangePassword || previousAccount.current !== current.username) { setData(emptyState()); setLoaded(false); positionIdentity.current = null; setEntry(null); setQuickMenuOpen(false); }
+        if (!current?.authenticated || current.role==='child' || current.mustChangePassword || previousAccount.current !== current.username) { setData(emptyState()); setLoaded(false); positionIdentity.current = null; setEntry(null); setQuickMenuOpen(false); }
         previousAccount.current = current?.authenticated ? current.username : null;
         if (hadSession.current && !current?.authenticated) { setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。'); setAuth(modeRef.current === 'manage'); }
         hadSession.current = !!current?.authenticated;
       } });
       if (controller.signal.aborted) return;
       if (result.session?.mustChangePassword) { setAuth(false); return; }
+      if(result.childSnapshot){setChildData(result.childSnapshot);setData(emptyState());setLoaded(false);setAuth(false);return;}
+      setChildData(null);
       if (result.privateSnapshot) {
         const current = result.privateSnapshot;
         if (current.revision < api.getRevision()) return;
@@ -75,7 +79,7 @@ export default function App() {
   }, [api]);
   useEffect(() => {
     api.setOnUnauthorized(() => {
-      reloadController.current?.abort(); setSession(null); setData(emptyState()); setLoaded(false); setEntry(null); setQuickMenuOpen(false); setRole('viewer');
+      reloadController.current?.abort(); setSession(null); setChildData(null); setData(emptyState()); setLoaded(false); setEntry(null); setQuickMenuOpen(false); setRole('viewer');
       setAuth(modeRef.current === 'manage'); setNotice('登录已失效，请重新登录；未提交的本机草稿不会自动写入。');
       void reload();
     });
@@ -84,7 +88,7 @@ export default function App() {
   useEffect(() => {
     if (!session?.expiresAt) return;
     const timer = setTimeout(() => {
-      api.resetAuth(); setSession(null); setData(emptyState()); setLoaded(false); setEntry(null); setQuickMenuOpen(false);
+      api.resetAuth(); setSession(null); setChildData(null); setData(emptyState()); setLoaded(false); setEntry(null); setQuickMenuOpen(false);
       setNotice('登录已到期，请重新登录。'); setAuth(modeRef.current === 'manage'); void reload();
     }, Math.max(0, session.expiresAt - Date.now()));
     return () => clearTimeout(timer);
@@ -139,6 +143,9 @@ export default function App() {
     setSearchSeed(query);
     if (query || location.section !== 'training') navigate('training', 'swim');
   };
+  const enterChild=async viewId=>{const granted=await api.authRequest('child',{viewId});setData(emptyState());setLoaded(false);setEntry(null);setQuickMenuOpen(false);setUserMenuOpen(false);setChildData(null);setSession(granted);setRole('child');await reload();};
+  const returnParent=async()=>{try{await api.authRequest('logout',{});}catch{setNotice('本机儿童授权已清除，服务端退出待连接恢复后核对。');}finally{api.resetAuth();setSession(null);setChildData(null);setData(emptyState());setLoaded(false);modeRef.current='manage';api.setMode('manage');setMode('manage');setAuth(true);await reload();}};
+  if(session?.authenticated&&session.role==='child')return <Suspense fallback={<Message>正在打开成长小岛…</Message>}><ChildView snapshot={childData} api={api} error={error} loading={loading} refresh={reload} onReturnParent={returnParent}/></Suspense>;
   const tabs = fullView ? privateTabs : publicTabs;
   const tabName = location.section === 'settings' ? '管理设置' : privateTabs.find(([key]) => key === location.section)?.[1] || '';
   return <div className="app">
@@ -154,6 +161,7 @@ export default function App() {
               <button type="button" className="user-chip" onClick={() => setUserMenuOpen(value => !value)} aria-expanded={userMenuOpen} aria-haspopup="menu" aria-label={`${session.username || '管理员'}，已登录，${fullView ? '管理模式' : '查看模式'}`}><span className="user-avatar" aria-hidden="true">{(roleLabels[role] || '访')[0]}</span>{fullView ? '管理模式' : '查看模式'} ▾</button>
               {userMenuOpen && <div className="user-menu" role="menu">
                 {authenticated && role === 'owner' && <button type="button" role="menuitem" onClick={() => { modeRef.current = 'manage'; api.setMode('manage'); setMode('manage'); setUserMenuOpen(false); const target = resolveManagementLocation('settings'); setLocation(target); positionStore.current?.write(target); void reload(); }}>管理设置</button>}
+                {authenticated && role==='owner' && <button type="button" role="menuitem" onClick={()=>{modeRef.current='manage';api.setMode('manage');setMode('manage');setUserMenuOpen(false);const target=resolveManagementLocation('settings','child');setLocation(target);positionStore.current?.write(target);void reload();}}>孩子的成长页</button>}
                 {authenticated && <button type="button" role="menuitem" onClick={() => switchMode(fullView ? 'view' : 'manage')}>{fullView ? '切换到查看模式' : '返回管理模式'}</button>}
                 <button type="button" role="menuitem" onClick={() => { setUserMenuOpen(false); setPasswordOpen(true); }}>修改密码</button>
                 <button type="button" role="menuitem" className="danger" onClick={() => { setUserMenuOpen(false); setLogoutError(''); setLogoutOpen(true); }}>退出登录</button>
@@ -173,7 +181,7 @@ export default function App() {
         {session?.authenticated && session.mustChangePassword
           ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
           : loading && !selectedLoaded ? <Message>正在读取记录…</Message> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense key={session?.authenticated ? session.username : 'guest'} fallback={<Message>正在打开页面…</Message>}>
-            {fullView && <ManagementView location={location} navigate={navigate} data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget} resumeVersion={resumeVersion}/>}
+            {fullView && <ManagementView location={location} navigate={navigate} onEnterChild={enterChild} data={data} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget} resumeVersion={resumeVersion}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
         {fullView && entry && !readOnly && <Suspense fallback={<Message>正在打开快捷录入…</Message>}><QuickEntry key={entry.type} {...entry} data={data} api={api} onSaved={onSaved} reload={reload} onClose={closeEntry} navigate={navigate} role={role} restoreFocus={() => { const target = entryOpener.current?.isConnected ? entryOpener.current : document.querySelector('.mobile-quick-entry > button'); target?.focus(); }}/></Suspense>}

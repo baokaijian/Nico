@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadAppView } from '../src/services/app-view.js';
+test('儿童角色只请求受限投影，不能因管理模式偏好读取完整snapshot',async()=>{
+  const calls=[],session={authenticated:true,role:'child'},childSnapshot={title:'我的成长'};
+  const api={authRequest:async()=>session,request:async path=>{calls.push(path);return childSnapshot;}};
+  assert.deepEqual(await loadAppView(api,{mode:'manage',adminCapable:true}),{session,childSnapshot});assert.deepEqual(calls,['/api/child-view']);
+});
 
 test('登录身份独立于查看模式，查看模式仅取公开白名单，返回管理模式才读取档案', async () => {
   const session = { authenticated: true, role: 'owner' }, calls = [];
