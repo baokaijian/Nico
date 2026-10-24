@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { sourceFingerprint } from './release-info.mjs';
 const PRODUCTION_PAGES=process.env.NICO_PAGES_URL||'https://baokaijian.github.io/Nico';
 const PRODUCTION_API=process.env.VITE_API_URL||'https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api';
-const assetNames=html=>[...new Set([...String(html).matchAll(/(?:src|href)="(assets\/[A-Za-z0-9_.-]+)"/g)].map(match=>match[1]))].sort();
+const assetNames=html=>[...new Set([...String(html).matchAll(/(?:src|href)="[^"]*\/?(assets\/[A-Za-z0-9_.-]+)"/g)].map(match=>match[1]))].sort();
 export async function verifyReleaseConsistency({pagesBase,apiBase,expectedAssets,expectedBuild,expectedApiHash,fetcher=fetch}){
  if(!Array.isArray(expectedAssets)||!expectedAssets.length)throw Error('缺少本地构建资源清单');
  const expected=[...new Set(expectedAssets)].sort();
