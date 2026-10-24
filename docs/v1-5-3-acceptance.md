@@ -30,6 +30,13 @@
 
 现有Git历史隐私风险、共享Supabase非Nico业务告警没有擅自清理。V1.6离站加密备份/独立恢复演练/持续通知与监控仅[设计](v1-6-reliability-design.md)，须真实启用和家长验收后再推进，未猜测目标/密钥/阈值。
 
-## 发布回执
+## 发布回执（2026-10-24实际结果）
 
-开发与本地软件检查、合并、Actions、Pages实际资源、API实际版本、迁移/权限和正式事实校验分开记录；本段在发布后填写真实结果。
+- 本地检查：`NICO_TEST_PROTOCOL_ONLY=true npm run check` 全绿；190项测试（含activation/public-results/source-focus新增）、lint、typecheck、构建、公开白名单64文件通过。
+- 分支与合并：`codex/v1-5-3-onboarding`（378f9c3）推送远端；master快进 `c0b5141..378f9c3`，无冲突，未改写历史。
+- Actions：[Publish selected Nico summary run 40091497334](https://github.com/baokaijian/Nico/actions/runs/40091497334) success；Deploy Nico cloud API run 40091497323 success（函数源码未变，复部署同一指纹，不作为新API版本）。
+- Pages实际资源：https://baokaijian.github.io/Nico/ 线上 `index-B9U_lfSq.js` 与本地验收构建哈希一致；`nico-build.json` 为 release 1.5.3、frontendCommit 378f9c3、contentSource api。
+- API实际版本：`/api/version` 返回 1.5.2 / 指纹 728cc4465d…/commit 3da87dc，与验收合同一致（前端1.5.3兼容复用API1.5.2/Edge17）。
+- 访客权限：`npm run verify:guest` 89项通过（匿名写全拒、授权媒体200、未授权404、GET/HEAD均覆盖）。
+- 公开范围：公开摘要只读核对仍为8条成绩/3项影像、publishedAt 2026-10-22，未扩大授权；无迁移/新集合/后端业务变更。
+- 正式事实：发布过程零生产写入；真人/真机九类模板验收仍全部待验，见[人工验收模板](manual-acceptance-template.md)。
