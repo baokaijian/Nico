@@ -18,6 +18,7 @@ const Goals = lazy(() => import('./GrowthGoals'));
 const Reports = lazy(() => import('./Reports'));
 const Gallery = lazy(() => import('./MediaGallery'));
 const Profile = lazy(() => import('./Profile'));
+const PrivateArchive = lazy(() => import('./PrivateArchive'));
 const ChildSettings = lazy(() => import('./ChildSettings'));
 const HealthPanel = lazy(() => import('./HealthPanel'));
 export default function ManagementView({ location, navigate, data, api, onSaved, reload, readOnly, role, openQuickEntry, initialOpen, initialFilter, mediaTarget, resumeVersion, onEnterChild }) {
@@ -45,7 +46,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'review' && view === 'yearbooks' && <Yearbooks {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'reports' && <Reports {...shared} readOnly={readOnly || !owner}/>}
       {archive && (view === 'archive' ? <Profile {...shared} role="viewer" view="archive" readOnly/> : <Records key={view} {...shared} type={view} readOnly={readOnly || !owner} initialFilter={initialFilter}/>)}
-      {section === 'settings' && (view === 'child' ? <ChildSettings {...shared} onEnterChild={onEnterChild}/> : view === 'health' ? <HealthPanel api={api}/> : view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view}/>)}
+      {section === 'settings' && (view === 'privateArchive' ? <PrivateArchive {...shared}/> : view === 'child' ? <ChildSettings {...shared} onEnterChild={onEnterChild}/> : view === 'health' ? <HealthPanel api={api}/> : view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view}/>)}
     </Suspense>
   </div>;
 }
