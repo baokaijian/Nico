@@ -47,9 +47,6 @@ export function validDate(value) {
 }
 export const parseTime = parseScore;
 export const timeLabel = seconds => seconds == null ? '未记录' : formatMilliseconds(Math.round(seconds * 1000));
-const SCORE_CONDITION_LABELS = { startType: '出发方式', timingMethod: '计时方式', recordType: '记录性质', poolLength: '池长' };
-export const scoreConditionLabel = key => SCORE_CONDITION_LABELS[key] || key;
-export const missingScoreConditions = row => ['startType', 'timingMethod', 'recordType', 'poolLength'].filter(key => !row?.[key] || ['未知', '其他'].includes(row[key]));
 export function validateRecord(collection, input, previous = null) {
   if (growthCollection(collection, input) || collection === 'goals' && (input?.modelVersion === 1 || previous?.modelVersion === 1)) return validateGrowthInput(collection, input, previous);
   const fields = FIELDS[collection];
@@ -66,19 +63,9 @@ export function validateRecord(collection, input, previous = null) {
         delete result[msKey]; delete result[`${field}Input`];
       }
     }
-    // 按未知保留裁决：仅记录裁决日期与裁决人，不改变成绩数值、有效性或PB参与规则。
-    if (Object.hasOwn(input, 'conditionsKeptUnknownAt') || Object.hasOwn(input, 'conditionsKeptUnknownBy')) {
-      const at = input.conditionsKeptUnknownAt ?? previous?.conditionsKeptUnknownAt ?? '';
-      const by = String(input.conditionsKeptUnknownBy ?? previous?.conditionsKeptUnknownBy ?? '');
-      if (at !== '' && !validDate(at)) throw new Error('按未知保留的裁决日期无效');
-      if (by.length > 50) throw new Error('按未知保留的裁决人须为50字以内');
-      if (at && !by.trim()) throw new Error('按未知保留需填写裁决人');
-      if (at) { result.conditionsKeptUnknownAt = at; result.conditionsKeptUnknownBy = by.trim(); }
-      else { delete result.conditionsKeptUnknownAt; delete result.conditionsKeptUnknownBy; }
-    }
   }
   const training = ['trainings', 'trainingTemplates'].includes(collection);
-  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy', ...(training ? ['sets', 'clientRequestId', ...(collection === 'trainings' ? ['mediaIds'] : [])] : []), ...(['swim', 'media', 'weakpoints', 'checkins'].includes(collection) ? ['clientRequestId'] : []), ...(collection === 'swim' ? [...TIME_FIELDS.map(key => `${key}Ms`), 'conditionsKeptUnknownAt', 'conditionsKeptUnknownBy'] : [])]);
+  const allowed = new Set([...fields.map(f => f.key), 'sessions', 'sourceIds', 'sourceVersion', 'generatedBy', ...(training ? ['sets', 'clientRequestId', ...(collection === 'trainings' ? ['mediaIds'] : [])] : []), ...(['swim', 'media', 'weakpoints', 'checkins'].includes(collection) ? ['clientRequestId'] : []), ...(collection === 'swim' ? TIME_FIELDS.map(key => `${key}Ms`) : [])]);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`不支持的字段：${key}`);
   for (const field of fields) {
     if (previous && input[field.key] === undefined) continue;
@@ -109,8 +96,6 @@ export function validateRecord(collection, input, previous = null) {
   if (collection === 'swim') {
     if (!/^\d{1,4}m$/.test(result.distance) || parseInt(result.distance) < 1 || parseInt(result.distance) > 5000) throw new Error('距离须填写1–5000米范围，如25m');
     normalizePerformanceRecord(result, true);
-    // 条件后来补齐为明确值时，过期裁决自动失效；仍是未知时保留裁决与事实。
-    if (result.conditionsKeptUnknownAt && missingScoreConditions(result).length === 0) { delete result.conditionsKeptUnknownAt; delete result.conditionsKeptUnknownBy; }
   }
   if (training) {
     result.sets = input.sets !== undefined ? input.sets : previous?.sets ?? [];

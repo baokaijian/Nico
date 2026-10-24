@@ -1,8 +1,9 @@
-import { TIME_FIELDS, performanceInput, performanceLabel, performanceMilliseconds, readablePerformance, validityLabel, eligiblePerformance } from '../../shared/performance.ts';
+import { TIME_FIELDS, performanceInput, performanceLabel, performanceMilliseconds, validityLabel, eligiblePerformance } from '../../shared/performance.ts';
 import { BODY_FIELDS, bodyFormat, dateFormat, derivePrdState } from '../../shared/prd.mjs';
+import { missingScoreConditions, scoreConditionLabel, readablePerformance } from '../../shared/score-conditions.mjs';
 import { downloadJSON, today } from '../services/files';
 import { useEffect, useRef, useState } from 'react';
-import { FIELDS, ordered, best, validateRecord, WOMEN_50, STANDARD_SOURCE, STANDARD_VERSION, missingScoreConditions, scoreConditionLabel } from '../../shared/domain.mjs';
+import { FIELDS, ordered, best, validateRecord, WOMEN_50, STANDARD_SOURCE, STANDARD_VERSION } from '../../shared/domain.mjs';
 import { Field, Message, Empty } from './ui';
 import TrainingRecords from './TrainingRecords';
 import useRecordDraft from '../services/useRecordDraft';
@@ -115,7 +116,7 @@ function KeepUnknown({ record, api, onSaved }) {
     try {
       const saved = await api.request(`/api/swim/${record.id}`, { method: 'PUT', body: { conditionsKeptUnknownAt: today(), conditionsKeptUnknownBy: name }, expectedRevision: api.getRevision() });
       onSaved('swim', saved);
-    } catch (problem) { setError(problem.message); } finally { setBusy(false); }
+    } catch (problem) { setError(String(problem?.message || '').includes('不支持的字段') ? '云端API尚未部署到支持“按未知保留”的版本，此操作暂不可用；已填内容保留，请稍后由管理员部署最新API后重试。' : problem.message); } finally { setBusy(false); }
   };
   return <details className="keep-unknown"><summary>计时条件确实未知？</summary>
     <p className="muted">当前缺失：{missingScoreConditions(record).map(scoreConditionLabel).join('、')}。核对原始来源后仍无法确认时，可按未知保留：这条记录不再出现在“计时条件缺失”待办；条件字段保持未知，成绩数值、有效性与PB参与规则不变，且保留裁决记录。</p>
