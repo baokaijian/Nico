@@ -9,6 +9,7 @@ import { syncPlanDraft, commitPlanUpdate, retainPlanHistory } from '../shared/pl
 import { randomHex, digestHex, passwordHash, constantEqual } from '../shared/password.mjs';
 import { preserveDeletedRecords } from '../shared/deletion.mjs';
 import { digestBytes, inspectPlayback, inspectPoster, validateVariantMetadata, MEDIA_MAX_BYTES, POSTER_MAX_BYTES } from '../shared/media-variants.mjs';
+import { createHealth } from '../shared/runtime-health.mjs';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw fail(400, error.message); } };
@@ -41,7 +42,8 @@ function relations(collection, record, data, previous = null) {
 }
 
 // Repository contains code only. The adapter holds privileged keys on the server.
-export function createCloudHandler({ backend, origins, now = Date.now, sessionMs = 60 * 60 * 1000 }) {
+export function createCloudHandler({ backend, origins, now = Date.now, sessionMs = 60 * 60 * 1000, release = {schema:1,release:'development',sourceHash:null}, emitHealth = () => {} }) {
+  const health=createHealth({now,emit:emitHealth});
   async function sessionFor(request) {
     const token = /^Bearer ([a-f0-9]{64})$/.exec(request.headers.get('authorization') || '')?.[1];
     if (!token) return null;
@@ -56,7 +58,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
     await backend.createSession({ token_hash: await digestHex(token), username, expires_at: new Date(expiresAt).toISOString() });
     return { accessToken: token, expiresAt };
   }
-  return async request => {
+  const handle = async request => {
     const origin = request.headers.get('origin');
     const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Access-Control-Expose-Headers': 'X-Nico-Revision, Content-Range', Vary: 'Origin' };
     const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers });
@@ -67,6 +69,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       const url = new URL(request.url), endpoint = url.pathname.replace(/^.*\/nico-api(?=\/|$)/, '').replace(/\/$/, '');
       const parts = endpoint.split('/').filter(Boolean).map(decodeURIComponent);
       const method = request.method;
+      if (['GET','HEAD'].includes(method) && endpoint === '/api/version') return method === 'HEAD' ? new Response(null,{headers}) : json(release);
       const body = async () => {
         if (!request.headers.get('content-type')?.startsWith('application/json')) throw fail(415, '请求内容格式无效');
         const text = await request.text(); if (text.length > 5 * 1024 * 1024) throw fail(413, '请求内容过大');
@@ -114,6 +117,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
         return json({ success: true, ...await issue(session.username) });
       }
       if (session?.mustChangePassword) throw fail(403, '请先替换临时密码，再录入信息');
+      if (endpoint === '/api/health' && method === 'GET') return json({release,instance:health.snapshot(),operations:backend.health?await backend.health():null});
       if (endpoint === '/api/storage-setup' && method === 'POST') { await backend.ensureBucket(); return json({ success: true }); }
       const current = await backend.read(), data = normalizeState(structuredClone(current.data));
       if (method === 'GET' && endpoint === '/api/skills-overview') return json(skillTimeline(data, url.searchParams.get('skillId') ? growthId(url.searchParams.get('skillId')) : ''));
@@ -261,5 +265,10 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
         throw error;
       }
     } catch (error) { return json({ error: error.status ? error.message : '后台读取或保存失败，请保留输入并稍后重试' }, error.status || 500); }
+  };
+  return async request => {
+    const start=now();const response=await handle(request);
+    health.record(new URL(request.url).pathname,request.method,response.status,now()-start);
+    return response;
   };
 }

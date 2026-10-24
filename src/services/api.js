@@ -1,14 +1,21 @@
 import { createSessionPersistence } from './session.js';
+import { createHealth } from '../../shared/runtime-health.mjs';
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
 export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = () => '', options = {}) {
   const persistence = createSessionPersistence(base, options);
+  const health = createHealth();
   let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {}, draftIdentity = null;
-  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; persistence.clear(); };
+  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; persistence.clear(); health.reset(); };
   const unauthorized = () => { resetAuth(); onUnauthorized(); };
   const credential = () => accessToken || getToken();
   const credentials = base ? 'omit' : 'same-origin';
+  async function observedFetch(path,init) {
+    const epoch=generation,start=Date.now();
+    try{const result=await fetch(`${base}${path}`,init);if(epoch===generation)health.record(path,init?.method||'GET',result.status,Date.now()-start);return result;}
+    catch(error){if(epoch===generation&&error.name!=='AbortError')health.record(path,init?.method||'GET',0,Date.now()-start);throw error;}
+  }
   async function request(path, { method = 'GET', body, signal, expectedRevision, anonymous = false } = {}) {
     const started = generation;
     const headers = {};
@@ -22,7 +29,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     const multipart = body instanceof FormData;
     if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
     let response;
-    try { response = await fetch(`${base}${path}`, { method, credentials: anonymous ? 'omit' : credentials, headers, body: body === undefined ? undefined : multipart ? body : JSON.stringify(body), signal }); }
+    try { response = await observedFetch(path, { method, credentials: anonymous ? 'omit' : credentials, headers, body: body === undefined ? undefined : multipart ? body : JSON.stringify(body), signal }); }
     catch (error) { if (error.name === 'AbortError') throw error; throw new ApiError('连接失败，输入已保留，尚未确认是否写入。请先刷新核对，再重试或导出草稿。', 0); }
     let result;
     try { result = await response.json(); } catch { throw new ApiError('服务返回格式异常，未确认保存成功', response.status); }
@@ -34,7 +41,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     return result;
   }
   function upload(body, onProgress, { expectedRevision } = {}) {
-    const started = generation;
+    const started = generation, start=Date.now();
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${base}/api/media`);
@@ -44,9 +51,10 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       if (revision == null) return reject(new ApiError('请先加载数据', 428));
       xhr.setRequestHeader('If-Match', String(expectedRevision ?? revision));
       xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
-      xhr.onerror = () => reject(new ApiError('上传结果未确认，文件选择与说明已保留；请先刷新核对再重试', 0));
+      xhr.onerror = () => { if(started===generation)health.record('/api/media','POST',0,Date.now()-start);reject(new ApiError('上传结果未确认，文件选择与说明已保留；请先刷新核对再重试', 0)); };
       xhr.onload = () => {
         if (started !== generation) return reject(new DOMException('登录状态已改变，已忽略旧上传响应', 'AbortError'));
+        health.record('/api/media','POST',xhr.status,Date.now()-start);
         let result; try { result = JSON.parse(xhr.responseText); } catch { return reject(new ApiError('上传响应无效', xhr.status)); }
         if (xhr.status < 200 || xhr.status >= 300) { if (xhr.status === 401 && (token || csrf)) unauthorized(); return reject(new ApiError(result.error || '上传失败', xhr.status)); }
         const next = xhr.getResponseHeader('X-Nico-Revision'); if (next && Number(next) >= revision) revision = Number(next);
@@ -59,7 +67,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     const started = generation;
     const token = credential();
     try {
-      const res = await fetch(`${base}/api/media/${encodeURIComponent(id)}/content/${variant}`, { credentials, headers: token ? { Authorization: `Bearer ${token}` } : {}, signal });
+      const res = await observedFetch(`/api/media/${encodeURIComponent(id)}/content/${variant}`, { credentials, headers: token ? { Authorization: `Bearer ${token}` } : {}, signal });
       if (started !== generation) throw new DOMException('登录状态已改变，已忽略旧素材响应', 'AbortError');
       if (res.status === 401 && (token || csrf)) unauthorized();
       if (!res.ok) throw new ApiError('素材暂不可用，请刷新处理状态或选择原片', res.status);
@@ -75,12 +83,12 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
   async function authRequest(action, body, { signal } = {}) {
     const started = generation;
     const token = credential();
-    const response = await fetch(`${base}/api/auth/${action}`, { method: body === undefined ? 'GET' : 'POST', signal, credentials, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const response = await observedFetch(`/api/auth/${action}`, { method: body === undefined ? 'GET' : 'POST', signal, credentials, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
     let result; try { result = await response.json(); } catch { throw new ApiError('登录服务暂不可用，请稍后重试', response.status); }
     if (started !== generation) throw new DOMException('登录状态已改变', 'AbortError');
     if (!response.ok) { if (action === 'session' && response.status === 401) resetAuth(); throw new ApiError(result.error || '账号操作失败', response.status); }
     if (action === 'logout' || (action === 'session' && !result.authenticated)) resetAuth();
-    if (result.accessToken) { generation++; revision = null; accessToken = result.accessToken; }
+    if (result.accessToken || ['login','setup'].includes(action)) { generation++; revision = null; if(result.accessToken)accessToken = result.accessToken; health.reset(); }
     if (result.csrf) csrf = result.csrf;
     if (accessToken && result.expiresAt) persistence.save(accessToken, result.expiresAt);
     if (result.authenticated && !result.mustChangePassword && result.username && ['owner', 'coach'].includes(result.role)) {
@@ -88,6 +96,6 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     } else if (action === 'session' || action === 'login') draftIdentity = null;
     return result;
   }
-  return { cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getDraftScope: () => draftIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
+  return { health, cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile, authRequest, resetAuth, getDraftScope: () => draftIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };
 }

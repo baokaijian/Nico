@@ -9,6 +9,7 @@ import LogoutDialog from './components/LogoutDialog';
 import { createDraftStore, draftScopeKey } from './services/drafts';
 import { MANAGEMENT_NAV, resolveManagementLocation, createManagementPosition, managementSaveRequiresSnapshot } from './services/management';
 import ManagementView from './components/ManagementView';
+import { installPageHealth } from './services/health';
 const Showcase = lazy(() => import('./components/Showcase'));
 const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'private' || !!import.meta.env.VITE_API_URL;
 const QuickEntry = lazy(() => import('./components/QuickEntry'));
@@ -27,6 +28,7 @@ export default function App() {
   const [mediaTarget, setMediaTarget] = useState(null), [quickEntry, setQuickEntry] = useState(false);
   const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
+  useEffect(()=>installPageHealth(api.health),[api]);
   const [mode, setMode] = useState(() => api.getMode());
   const modeRef = useRef(mode);
   const [publicSnapshot, setPublicSnapshot] = useState(null);

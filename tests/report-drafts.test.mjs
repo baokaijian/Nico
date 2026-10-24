@@ -5,6 +5,13 @@ import { saveGrowth, actGrowth } from '../shared/growth-records.mjs';
 import { buildReportFacts, reportStale, reportRange, growthReportHTML } from '../shared/report-drafts.mjs';
 const options={id:'report-protocol',actor:'protocol-parent',now:'2000-02-01T00:00:00Z'};
 const draft={title:'协议月报',periodType:'month',period:'2000-01',parentSummary:'真实家长总结',childFeeling:'孩子原话',nextFocus:'待观察',selectedMediaIds:[]};
+test('报告展示缺失距离为未记录，保留冻结事实和真实0米',()=>{
+  const data=emptyState();data.trainings=[{id:'unknown',date:'2000-01-01',durationMinutes:25}];
+  const report=saveGrowth(data,'reportDrafts',draft,options),before=structuredClone(report);
+  assert.match(growthReportHTML(report,false),/实际距离未记录/);assert.deepEqual(report,before);
+  const zero=emptyState();zero.trainings=[{id:'zero',date:'2000-01-01',totalMeters:0,durationMinutes:0}];
+  assert.match(growthReportHTML(saveGrowth(zero,'reportDrafts',draft,options),false),/已知实际距离0米/);
+});
 test('月年报告范围、空数据、事实只读和来源过期不静默覆盖',()=>{
   assert.deepEqual(reportRange('month','2000-02'),{start:'2000-02-01',end:'2000-02-29'});assert.deepEqual(reportRange('year','2000'),{start:'2000-01-01',end:'2000-12-31'});assert.throws(()=>reportRange('month','2000-13'));
   const data=emptyState();assert.equal(buildReportFacts(data,draft).facts.training.count,0);
