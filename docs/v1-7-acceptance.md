@@ -34,6 +34,11 @@
 
 真机/真人验收仍按[九类模板](manual-acceptance-template.md)执行。回滚：回退本期前端提交即可；1.7.1 未部署前无任何服务端/数据结构变化，不涉及回滚数据。
 
-## 发布回执
+## 发布回执（2026-10-24实际结果）
 
-本段于实际发布后填写：本地完整检查、Actions（Pages build/deploy/verify）、线上资源一致性、API 指纹（应保持 728cc4465d…）、访客权限与公开范围核对。
+- 本地检查：`NICO_TEST_PROTOCOL_ONLY=true npm run check` 全绿——lint 0警告、217项测试（含4项新增）、构建与公开白名单65文件通过；Edge 源码指纹与线上逐字节一致（728cc4465d…）。
+- 发布过程：首次随 79be718 推送后 Pages 与函数工作流均失败——仓库未配置 `SUPABASE_ACCESS_TOKEN`，函数部署步骤按设计跳过且指纹验证拒绝放行；本机 Supabase CLI（npx 缓存 2.121.0）未登录，无可用凭据。随即拆分：字节还原 Edge 依赖图内文件（domain/performance/data-quality），把展示辅助移至图外 `shared/score-conditions.mjs`，待办豁免与消息增强改在 admin-tasks 层，裁决 UI 对旧 API 显示"待部署"提示，形成纯前端先行版 ba50960。
+- 最终运行：[Pages 40099825723](https://github.com/baokaijian/Nico/actions/runs/40099825723) build/deploy/verify 三作业 success；[函数 40099825774](https://github.com/baokaijian/Nico/actions/runs/40099825774) success（源码与线上一致，无需部署，跳过不冒称已部署）。79be718 的两个失败运行保留为凭据缺失的客观记录。
+- 线上核对：`release:consistency` 全绿——9个资源与本地 ba50960 构建逐名一致；`nico-build.json` 1.7.0/ba50960；实际API 1.5.2/指纹 728cc4465d… 兼容复用。
+- 访客权限：`verify:guest` 89项通过；公开摘要只读核对仍为8条成绩/3项影像、publishedAt 2026-10-22，未扩大授权；发布全程零生产写入。
+- 1.7.1（服务端裁决字段与函数部署）：完整实现与7项测试在分支 `codex/v1-7-ux-optimizations`；待配置仓库 secret `SUPABASE_ACCESS_TOKEN` 或本机 `supabase login` 后合并即自动完成部署与验证。
