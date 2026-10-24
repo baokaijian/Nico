@@ -49,3 +49,28 @@ jobs:
     steps:
       - id: publish
         uses: actions/deploy-pages@v4
+  verify:
+    # V1.6 发布失败/版本不一致告警：部署后独立核对线上实际资源与本次构建、实际API指纹。
+    if: github.event_name != 'pull_request'
+    needs: deploy
+    runs-on: ubuntu-latest
+    env:
+      VITE_APP_MODE: public
+      VITE_API_URL: https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Verify deployed pages assets and live API fingerprint
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if node scripts/verify-release-consistency.mjs; then exit 0; fi
+            echo "verify attempt ${attempt} failed; waiting for pages propagation"
+            sleep 20
+          done
+          echo "发布验证失败：线上资源、版本或API指纹与本次发布不一致"
+          exit 1

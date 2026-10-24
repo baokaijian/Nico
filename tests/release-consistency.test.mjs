@@ -1,0 +1,17 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {verifyReleaseConsistency} from '../scripts/verify-release-consistency.mjs';
+const assets=['assets/index-ABC123.js','assets/domain-DEF456.js'];
+const build={release:'1.6.0',frontendCommit:'86be345000000000000000000000000000000000'};
+const apiHash='a'.repeat(64);
+const html=`<!doctype html><html><head><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="assets/index-ABC123.css"></head><body><script type="module" src="assets/index-ABC123.js"></script><script type="module" src="assets/domain-DEF456.js"></script></body></html>`;
+const responder=pages=>async url=>{
+ if(url.endsWith('/api/version'))return {ok:true,text:async()=>JSON.stringify({schema:1,release:'1.5.2',sourceHash:apiHash,commit:'old'})};
+ if(url.endsWith('/index.html'))return {ok:true,text:async()=>pages.index};
+ if(url.endsWith('/nico-build.json'))return {ok:true,text:async()=>JSON.stringify({...build,apiSourceHash:apiHash})};
+ throw Error('unexpected url');
+};
+test('线上资源、构建版本与API指纹全部一致时通过',async()=>{const result=await verifyReleaseConsistency({pagesBase:'https://pages.test/Nico',apiBase:'https://api.test/nico-api',expectedAssets:[...assets,'assets/index-ABC123.css'],expectedBuild:build,expectedApiHash:apiHash,fetcher:responder({index:html})});assert.equal(result.ok,true);assert.equal(result.category,null);assert.equal(result.checks.length,3);});
+test('线上资源与本地构建不一致时按mismatch失败',async()=>{const result=await verifyReleaseConsistency({pagesBase:'https://pages.test/Nico',apiBase:'https://api.test/nico-api',expectedAssets:[...assets,'assets/other-999.css'],expectedBuild:build,expectedApiHash:apiHash,fetcher:responder({index:html})});assert.equal(result.ok,false);assert.equal(result.category,'mismatch');assert.equal(result.checks.find(c=>c.name==='pages-index').status,'fail');});
+test('线上构建版本或API指纹不一致分别失败',async()=>{const version=async url=>{if(url.endsWith('/api/version'))return {ok:true,text:async()=>JSON.stringify({schema:1,release:'1.5.2',sourceHash:'b'.repeat(64)})};return responder({index:html})(url);};const result=await verifyReleaseConsistency({pagesBase:'https://pages.test/Nico',apiBase:'https://api.test/nico-api',expectedAssets:[...assets,'assets/index-ABC123.css'],expectedBuild:build,expectedApiHash:apiHash,fetcher:version});assert.equal(result.ok,false);assert.equal(result.checks.find(c=>c.name==='api-version').status,'fail');const wrongBuild=async url=>{if(url.endsWith('/nico-build.json'))return {ok:true,text:async()=>JSON.stringify({...build,release:'0.0.1',apiSourceHash:apiHash})};return responder({index:html})(url);};const buildCheck=await verifyReleaseConsistency({pagesBase:'https://pages.test/Nico',apiBase:'https://api.test/nico-api',expectedAssets:[...assets,'assets/index-ABC123.css'],expectedBuild:build,expectedApiHash:apiHash,fetcher:wrongBuild});assert.equal(buildCheck.checks.find(c=>c.name==='pages-build').status,'fail');});
+test('网络不可达按unreachable失败，不误判为版本问题',async()=>{const dead=async()=>{throw new TypeError('fetch failed');};const result=await verifyReleaseConsistency({pagesBase:'https://pages.test/Nico',apiBase:'https://api.test/nico-api',expectedAssets:assets,expectedBuild:build,expectedApiHash:apiHash,fetcher:dead});assert.equal(result.ok,false);assert.equal(result.category,'unreachable');});
+test('缺少本地资源清单时直接拒绝，不发起线上比对',async()=>{await assert.rejects(verifyReleaseConsistency({pagesBase:'x',apiBase:'y',expectedAssets:[],expectedBuild:build,expectedApiHash:apiHash,fetcher:responder({index:html})}),/缺少本地构建资源清单/);});
