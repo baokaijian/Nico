@@ -16,7 +16,7 @@ export default function SourceWorkspace({ source, onClose, ...props }) {
   const { collection, id } = source, row = props.data[collection]?.find(item => item.id === id);
   const restricted=props.readOnly||!!props.role&&props.role!=='owner';
   const shared = { ...props, readOnly:restricted, manageTemplates:!restricted&&props.role==='owner', allowUpload:!restricted&&props.role==='owner', focusId: id };
-  return <Modal title="原记录工作区" onClose={onClose}><p className="source-id">{collection}/{id}</p>{!row ? <Message error>原记录不在当前可访问档案。请在管理设置的回收站核对，平台不会自动重建。</Message> : <Suspense fallback={<Message>正在打开原记录…</Message>}>
+  return <Modal title="原记录工作区" onClose={onClose}><details className="source-id-fold"><summary>记录标识</summary><p className="source-id">{collection}/{id}</p></details>{!row ? <Message error>原记录不在当前可访问档案。请在管理设置的回收站核对，平台不会自动重建。</Message> : <Suspense fallback={<Message>正在打开原记录…</Message>}>
     {['swim','trainings','annotations','growth','fitness','nutrition'].includes(collection) && <Records {...shared} type={collection}/>}
     {['skillAssessments','skillDefinitions'].includes(collection) && <Skills {...shared} initialSection={collection === 'skillDefinitions' ? 'standards' : 'assessments'}/>}
     {['goals','milestones'].includes(collection) && <Goals {...shared}/>}
