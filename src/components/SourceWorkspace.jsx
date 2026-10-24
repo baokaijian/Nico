@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Modal, Message } from './ui';
 const VideoCompare = lazy(() => import('./VideoCompare'));
 const Competitions = lazy(() => import('./CompetitionEvents'));
+const Yearbooks = lazy(() => import('./Yearbooks'));
 const Reports = lazy(() => import('./Reports'));
 const Timeline = lazy(() => import('./GrowthTimeline'));
 const Records = lazy(() => import('./Records'));
@@ -22,6 +23,7 @@ export default function SourceWorkspace({ source, onClose, ...props }) {
     {['weakpoints','checkins'].includes(collection) && <Practice {...shared}/>}
     {collection === 'videoComparisons' && <VideoCompare {...shared}/>}
     {collection === 'competitionEvents' && <Competitions {...shared}/>}
+    {collection === 'yearbooks' && <Yearbooks {...shared}/>}
     {collection === 'reportDrafts' && <Reports {...shared}/>}
     {collection === 'growthStories' && <Timeline {...shared}/>}
     {collection === 'plans' && <Plans {...shared}/>}

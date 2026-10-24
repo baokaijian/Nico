@@ -39,5 +39,5 @@ export function sourceFingerprint(root=projectRoot,entry=edgeEntry) {
 }
 export function releaseInfo() {
   const commit=execFileSync('git',['rev-parse','HEAD'],{cwd:projectRoot,encoding:'utf8'}).trim();
-  return {schema:1,release:'1.5.0',sourceHash:sourceFingerprint(),commit};
+  return {schema:1,release:'1.5.1',sourceHash:sourceFingerprint(),commit};
 }

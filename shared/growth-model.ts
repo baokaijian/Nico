@@ -2,7 +2,7 @@
 export const SKILL_DIMENSIONS = ['水中安全', '呼吸及水感', '自由泳', '仰泳', '蛙泳', '蝶泳', '出发和转身', '训练行为'] as const;
 export const SKILL_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'] as const;
 export const GOAL_STATUSES = ['待确认', '进行中', '已达成', '暂停', '已归档'] as const;
-export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts', 'competitionEvents', 'videoComparisons', 'childViews', 'childReflections'] as const;
+export const GROWTH_COLLECTIONS = ['skillDefinitions', 'skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts', 'competitionEvents', 'videoComparisons', 'childViews', 'childReflections', 'yearbooks'] as const;
 export const EVIDENCE_COLLECTIONS = ['swim', 'trainings', 'media', 'annotations', 'skillAssessments', 'checkins'] as const;
 export type SkillDimension = typeof SKILL_DIMENSIONS[number];
 export type SkillLevel = typeof SKILL_LEVELS[number];
@@ -35,6 +35,7 @@ export function evidenceRefs(value: unknown): EvidenceRef[] {
   if (new Set(refs.map(ref => `${ref.collection}/${ref.id}`)).size !== refs.length) return failGrowth('证据引用重复'); return refs;
 }
 const fields: Record<string, string[]> = {
+  yearbooks: ['title','year','reportId','theme','parentMessage','childMessage','sectionOrder','selectedMediaIds'],
   childViews: ['title','theme','selectedMediaIds','status'],
   childReflections: ['date','viewId','trainingId','mood','text','status'],
   skillDefinitions: ['name', 'dimension', 'levels', 'status', 'reviewedBy', 'notes'],
@@ -49,7 +50,12 @@ const fields: Record<string, string[]> = {
 export function editableGrowth(key: string, value: ObjectRecord): ObjectRecord { return Object.fromEntries((fields[key] || []).filter(field => value[field] !== undefined).map(field => [field, value[field]])); }
 function parseGrowth(key: string, input: ObjectRecord, stored = false): ObjectRecord {
   const result: ObjectRecord = { modelVersion: 1 };
-  if (key === 'childViews') {
+  if(key==='yearbooks') {
+    const year=growthText(input.year,'纪念册年份',true,4);if(!/^(?:19|20|21)\d{2}$/.test(year))return failGrowth('年份须为1900–2199');
+    const sections=['training','scores','skills','competitions','milestones','media','messages'],order=growthIds(input.sectionOrder,'章节顺序');if(order.length!==sections.length||sections.some(k=>!order.includes(k)))return failGrowth('须保留全部章节，可调整顺序');
+    const ids=growthIds(input.selectedMediaIds,'精选素材');if(ids.length>12)return failGrowth('纪念册最多选择12份影像');
+    Object.assign(result,{title:growthText(input.title,'纪念册标题',true,200),year,reportId:growthId(input.reportId,'年度报告'),theme:growthText(input.theme,'年度成长主题',true,500),parentMessage:growthText(input.parentMessage,'家长寄语',false,12000),childMessage:growthText(input.childMessage,'孩子成长感言',false,12000),sectionOrder:order,selectedMediaIds:ids,status:stored?choice(input.status,['待确认','已确认'],'纪念册状态'):'待确认'});
+  } else if (key === 'childViews') {
     const selectedMediaIds=growthIds(input.selectedMediaIds,'精选照片');if(selectedMediaIds.length>12)return failGrowth('儿童页最多选择12张照片');
     Object.assign(result,{title:growthText(input.title,'儿童页标题',true,100),theme:growthText(input.theme,'当前成长主题',true,500),selectedMediaIds,status:choice(input.status||'停用',['启用','停用'],'儿童页状态')});
   } else if (key === 'childReflections') {
@@ -112,7 +118,7 @@ export function validateStoredGrowth(key: string, raw: unknown): void {
   growthId(record.id);
   if (record.createdAt !== undefined && (!iso(record.createdAt) || !growthText(record.createdBy, '创建人', true, 100))) return failGrowth('成长创建信息无效');
   if (key !== 'goals' && record.createdAt === undefined) return failGrowth('新成长实体缺少创建信息');
-  parseGrowth(key, editableGrowth(key, record), true);
+  parseGrowth(key, {...editableGrowth(key, record),...(key==='yearbooks'?{status:record.status}:{})}, true);
   if (['已确认', '已达成', '已归档'].includes(String(record.status)) && key !== 'skillDefinitions') {
     if (!iso(record.confirmedAt) || !growthText(record.confirmedBy, '确认人', true, 100) || !growthText(record.confirmedActor, '确认账号', true, 100)) return failGrowth('成长记录缺少人工确认信息');
     growthText(record.confirmationNote, '人工确认说明', true);
