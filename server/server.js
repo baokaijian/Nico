@@ -16,6 +16,7 @@ import { openStore } from './store.mjs';
 import { processMedia, inspectMedia } from './media.mjs';
 import { exportPublic } from './public-export.mjs';
 import { createAccounts } from './accounts.mjs';
+import { createHealth,mediaHealth } from '../shared/runtime-health.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let sequence = 0;
@@ -31,6 +32,8 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   for (const token of Object.values(tokens)) if (token && token.length < 32) throw new Error('访问密钥至少需要32个字符');
   fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o700 });
   const app = express();
+  const health=createHealth();
+  app.use((req,res,next)=>{const start=Date.now();res.once('finish',()=>health.record(req.path,req.method,res.statusCode,Date.now()-start));next();});
   app.disable('x-powered-by');
   if (readOnly) app.use((req, res, next) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? next() : res.set('Allow', 'GET, HEAD, OPTIONS').status(405).json({ error: '此服务只读，公网不接受新增、修改、删除或上传' }));
   // The web shell contains no private records. Only API/media requests require credentials.
@@ -50,6 +53,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     next();
   });
   const publicSummary = () => publicSnapshot(store.read().data);
+  app.get('/api/version',(_req,res)=>res.json({schema:1,release:'local-development',sourceHash:null}));
   app.get('/api/public-summary', (_req, res) => res.json(publicSummary()));
   app.get('/api/public-media/:file', (req, res) => {
     const files = publicSummary().media.flatMap(item => [item.url, item.posterUrl].filter(Boolean).map(url => path.basename(url)));
@@ -92,6 +96,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   });
   app.use(express.json({ limit: '5mb' }));
   const requireOwner = req => { if (req.role !== 'owner') throw httpError(403, '此操作仅限家长管理者'); };
+  app.get('/api/health',(req,res)=>{requireOwner(req);const current=store.read(),files=fs.readdirSync(uploadsDir,{withFileTypes:true}).filter(row=>row.isFile()).map(row=>fs.statSync(path.join(uploadsDir,row.name)));res.json({release:{schema:1,release:'local-development',sourceHash:null},instance:health.snapshot(),operations:{storage:{count:files.length,bytes:files.reduce((n,row)=>n+row.size,0),complete:true},media:mediaHealth(current.data.media),backups:{mode:'before-write',latestAt:null,latestRevision:null,currentRevision:current.revision,scheduled:'not-configured',restoreVerification:'manual-isolated-only'}}});});
   const canWrite = (req, collection) => {
     // Parents are the operators; the collaborator account only enters records.
     if (req.role === 'owner' || req.role === 'coach' && ['plans', 'annotations', 'trainings', 'swim', 'weakpoints', 'checkins'].includes(collection)) return;

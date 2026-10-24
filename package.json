@@ -18,6 +18,8 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run verify:public",
     "verify:public": "node scripts/verify-public.mjs",
     "verify:guest": "node scripts/verify-guest-read.mjs",
+    "release:prepare": "node scripts/prepare-release.mjs",
+    "release:verify": "node scripts/verify-deployment.mjs",
     "media:prepare": "node scripts/media-prepare.mjs",
     "init:data": "node scripts/init-data.mjs",
     "audit:data": "node scripts/prd-audit.mjs",
@@ -27,7 +29,7 @@
     "@ffmpeg/core": "0.12.10",
     "@ffmpeg/ffmpeg": "0.12.15",
     "express": "^5.2.1",
-    "multer": "^2.2.0",
+    "multer": "2.5.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -37,6 +39,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.3",
     "oxlint": "^1.69.0",
+    "rolldown": "1.1.5",
     "typescript": "7.0.2",
     "vite": "8.1.6"
   },

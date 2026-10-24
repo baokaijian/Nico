@@ -27,6 +27,9 @@ jobs:
       - run: npm run check
       - name: Refuse an empty replacement for the existing public site
         run: node scripts/check-public-release.mjs
+      - name: Require actual compatible API before publishing Pages
+        if: github.event_name != 'pull_request'
+        run: node scripts/verify-deployment.mjs --wait
       - uses: actions/configure-pages@v5
         if: github.event_name != 'pull_request'
       - uses: actions/upload-pages-artifact@v3

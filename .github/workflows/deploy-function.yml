@@ -7,6 +7,9 @@ on:
       - server/**
       - shared/**
       - supabase/functions/**
+      - scripts/release-info.mjs
+      - scripts/prepare-release.mjs
+      - scripts/verify-deployment.mjs
       - .github/workflows/deploy-function.yml
   workflow_dispatch:
 permissions:
@@ -39,15 +42,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+      - run: npm ci
       - uses: supabase/setup-cli@v1
         if: env.SUPABASE_ACCESS_TOKEN != ''
         with:
           version: 2.121.0
+      - run: node scripts/prepare-release.mjs
       - run: supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit --no-verify-jwt --use-api
         if: env.SUPABASE_ACCESS_TOKEN != ''
       - name: No deployment credential configured
         if: env.SUPABASE_ACCESS_TOKEN == ''
-        run: echo 'API deployment skipped; deploy the tested function separately with the connected Supabase tool.'
+        run: echo 'No CLI credential. An actual matching API deployment is required below; a skipped CLI step is not deployment success.'
+      - name: Verify actual API fingerprint (also required without CLI credentials)
+        run: node scripts/verify-deployment.mjs --wait
       - name: Guest read check against the deployed function
-        if: env.SUPABASE_ACCESS_TOKEN != ''
         run: node scripts/verify-guest-read.mjs https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api

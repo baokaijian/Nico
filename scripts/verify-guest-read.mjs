@@ -9,7 +9,7 @@ expect('访客未登录', (await session.json()).authenticated, false);
 const summary = await fetch(`${base}/api/public-summary`);
 expect('公开摘要可读', summary.status, 200);
 const published = await summary.json();
-for (const endpoint of ['/api/snapshot', ...COLLECTIONS.map(key => `/api/${key}`), '/api/skills-overview', '/api/goals/guest-probe/candidates', '/api/backup', '/api/public-preview', '/api/media/guest-probe/content/original']) {
+for (const endpoint of ['/api/snapshot', '/api/health', ...COLLECTIONS.map(key => `/api/${key}`), '/api/skills-overview', '/api/goals/guest-probe/candidates', '/api/backup', '/api/public-preview', '/api/media/guest-probe/content/original']) {
   for (const method of ['GET', 'HEAD']) expect(`${method} ${endpoint}`, (await fetch(base + endpoint, { method })).status, 401);
 }
 for (const item of published.media || []) for (const url of [item.url, item.posterUrl].filter(Boolean)) {

@@ -1,5 +1,7 @@
 import { createCloudHandler } from '../../../server/cloud-api.mjs';
 import { applyDeletionFlags } from '../../../shared/deletion.mjs';
+import { mediaHealth } from '../../../shared/runtime-health.mjs';
+import release from './_release.mjs';
 const base = Deno.env.get('SUPABASE_URL')!;
 const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 if (!base || !secret) throw new Error('后台服务凭据未配置');
@@ -15,6 +17,14 @@ async function rest(resource: string, method = 'GET', body?: unknown) {
   return response.status === 204 ? null : response.json();
 }
 const backend = {
+  health: async () => {
+    const response = await fetch(`${base}/storage/v1/object/list/${bucket}`, {method:'POST',headers,body:JSON.stringify({prefix:'',limit:1000,offset:0})});
+    if (!response.ok) throw new Error('Health storage lookup failed');
+    const objects = await response.json();
+    const latest = await rest('nico_backups?is_deleted=eq.false&select=revision,saved_at&order=revision.desc&limit=1');
+    const state = await rest('rpc/nico_read_state');
+    return {storage:{count:objects.filter((row: {metadata: unknown})=>row.metadata).length,bytes:objects.reduce((sum: number,row: {metadata?: {size?: number}})=>sum+Number(row.metadata?.size||0),0),complete:objects.length<1000&&objects.every((row: {metadata: unknown})=>!!row.metadata)},backups:{mode:'before-write',latestAt:latest[0]?.saved_at||null,latestRevision:latest[0]?.revision??null,currentRevision:state.revision,scheduled:'not-configured',restoreVerification:'manual-isolated-only'},media:mediaHealth(applyDeletionFlags(state.data,state.deleted_records).media||[])};
+  },
   account: async (username: string) => (await rest(`nico_accounts?username=eq.${encodeURIComponent(username)}&enabled=eq.true&is_deleted=eq.false&select=*`))[0] || null,
   session: async (hash: string) => (await rest(`nico_sessions?token_hash=eq.${hash}&select=*`))[0] || null,
   createSession: async (body: unknown) => {
@@ -40,4 +50,4 @@ const backend = {
 };
 // Only the confirmed public summary and selected playback assets are anonymous.
 // Full archives and writes require a hashed, expiring, server-revocable session.
-Deno.serve(createCloudHandler({ backend, origins: ['https://baokaijian.github.io', 'http://127.0.0.1:5173', 'http://localhost:5173'] }));
+Deno.serve(createCloudHandler({ backend, release, emitHealth: (event: object) => console.log(JSON.stringify({...event,sourceHash:release.sourceHash})), origins: ['https://baokaijian.github.io', 'http://127.0.0.1:5173', 'http://localhost:5173'] }));

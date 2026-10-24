@@ -13,6 +13,7 @@ dist-private
 dist-ssr
 *.local
 .generated-public/
+supabase/functions/nico-api/_release.mjs
 supabase/.temp/
 release.stage/
 release.previous/
