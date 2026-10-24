@@ -5,6 +5,7 @@
 - 发布工作流新增部署后verify作业：独立核对线上Pages资源、构建版本与实际API指纹，不一致即失败告警；本地可用 `npm run release:consistency` 复核。
 - 新增脱敏监控白名单与永不阻塞业务的外发队列（重试/超限/心跳缺失可观测），私有目的地未配置故未接线；新增本地存储只读观测基线脚本。
 - 23项新增隔离测试；无新集合、无迁移、无后端业务源码改动，Edge指纹保持728cc4465d…兼容复用API 1.5.2。真实离站目的地、密钥保管人、通知渠道与阈值仍未启用，见[V1.6验收](v1-6-acceptance.md)与[设计](v1-6-reliability-design.md)。
+- 发布已核验：master 6f17e6a，[Pages运行40093432423](https://github.com/baokaijian/Nico/actions/runs/40093432423)三作业（build/deploy/verify）全部成功；首次运行verify作业因资源正则未匹配Vite base失败，当日修复重发布。线上index-BJPoeq9k.js与本地构建一致，访客89项检查通过，公开范围8成绩/3影像未变。
 
 ## 2026-10-24 — V1.5.3 真实档案启用与统一待办
 
