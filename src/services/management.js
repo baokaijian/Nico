@@ -11,7 +11,7 @@ export const MANAGEMENT_NAV = [
   { key: 'growth', label: '成长管理', views: [['skills', '技能工作区'], ['practice', '技术短板与打卡'], ['goals', '目标与里程碑']] },
   { key: 'review', label: '分析复盘', views: [['quality', '数据质量'], ['timeline', '成长时间轴'], ['trends', '历史趋势'], ['reports', '周期报告'], ['yearbooks','年度纪念册'], ['media', '视频技术复盘'], ['compare', '视频对比'], ['archive', '成长档案']] },
 ];
-export const SETTINGS_VIEWS = [['profile', '基础档案'], ['publishing', '公开展示'], ['backup', '备份与回收'], ['standards', '技能标准'], ['health', '运行健康'], ['child', '孩子的成长页']];
+export const SETTINGS_VIEWS = [['profile', '基础档案'], ['publishing', '公开展示'], ['backup', '备份与回收'], ['privateArchive','私人年度归档'], ['standards', '技能标准'], ['health', '运行健康'], ['child', '孩子的成长页']];
 const home = () => ({ section: 'workbench', view: 'home' });
 export function sanitizeLocation(value) {
   const views = value?.section === 'settings' ? SETTINGS_VIEWS : MANAGEMENT_NAV.find(item => item.key === value?.section)?.views;
