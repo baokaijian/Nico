@@ -35,6 +35,12 @@
 
 回退本期提交即移除工具与CI验证作业；不涉及数据库、Edge函数或事实数据。已生成的密文包与密钥恢复说明按私有资料保留，不删除真实备份；恢复演练不改写生产。
 
-## 发布回执
+## 发布回执（2026-10-24实际结果）
 
-本段于实际发布后填写：本地完整检查、Actions（build/deploy/verify）、线上资源一致性、API指纹、访客权限与公开范围核对。
+- 本地检查：`NICO_TEST_PROTOCOL_ONLY=true npm run check` 全绿——lint 0警告、213项测试（含23项新增）、构建与公开白名单64文件通过。
+- 分支与合并：`codex/v1-6-reliability`（f3f4ddc，修复 6f17e6a）推送远端；master两次快进合并，无冲突，未改写历史。
+- 首次发布[运行40093002904](https://github.com/baokaijian/Nico/actions/runs/40093002904)：build/deploy成功，**新增verify作业失败**——本地复现定位为资源提取正则未匹配Vite base（`/Nico/`）绝对路径导致清单为空；当日修复正则并补充带base前缀的测试后重发布。失败即告警的通道按设计生效。
+- 最终[运行40093432423](https://github.com/baokaijian/Nico/actions/runs/40093432423)：build/deploy/verify三作业全部success；verify从独立运行器核对线上Pages资源、构建版本与实际API指纹。
+- 线上核对：`npm run release:consistency` 全绿——线上8个资源与本地6f17e6a构建逐名一致（`index-BJPoeq9k.js`）；`nico-build.json` 为1.6.0/6f17e6a；API实际1.5.2/指纹728cc4465d…兼容复用（未把函数复部署当作新API版本）。
+- 访客权限：`npm run verify:guest` 89项通过；公开摘要只读核对仍为8条成绩/3项影像、publishedAt 2026-10-22，未扩大授权。
+- 正式事实：发布过程零生产写入；隔离恢复演练回执仅含数量与摘要。离站目的地、密钥保管人、外部通知与阈值仍未启用，见启用门槛。
