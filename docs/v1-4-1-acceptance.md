@@ -53,4 +53,12 @@ Git本地可达对象路径盘点发现原uploads素材5项、已授权release�
 
 ## 实际发布
 
-待最终检查、独立审查和生产回执后补录，不能将本地完成标成已上线。
+业务代码6f343971已推送功能分支并快进合并master。实际后端通过连接器部署为Edge v14 ACTIVE（20文件），回读全部源码逐文件一致，部署包SHA256为adbf412ffd7a4c38c86b7885136aa575be0b726a4e44fcccc5e07ad6db7f8920；实际/api/version的sourceHash为4c15137baddba33bf0c3792519363b0ef19d68f5607358051031d8ca6757fc1a。
+
+[Pages运行40062647791](https://github.com/baokaijian/Nico/actions/runs/40062647791)与[后端运行40062647800](https://github.com/baokaijian/Nico/actions/runs/40062647800)均成功。后端工作流虽然没有CLI凭据，已强制查询并验证提前通过连接器部署的真实指纹，随后执行访客边界检查；未将跳过CLI当作部署成功。Pages在上传/部署前同样通过真实API指纹门槛。
+
+正式站点：[Nico](https://baokaijian.github.io/Nico/)。实际页面主资源、nico-build.json、HealthPanel及七个业务资源与正式配置本机构建逐字节一致（九个JS资源）。生产77项匿名检查通过，包含新健康接口GET/HEAD拒绝；20文件实际源码和版本回执共同确认后端部署。私有健康页有效账号的软件验证使用隔离服务，未代家长执行正式录入验收。
+
+发布后业务revision20、内容校验c65a2be0f85cce6afacde584dc19109e、台账22、媒体对象9均与发布前相同。当前既有公开范围为8条成绩/3项媒体，公开摘要规范序列化SHA256 b6139738f159abf56d035c5bc99199f7fdedb444ca45a40fedc003451f6479e6与发布前私有备份计算结果相同，未扩大公开授权。平台v14已记录79条Log事件（只读聚合），观测仍不能替代真实业务基线。
+
+后续验收文档/健康表格间距补录提交仍使用相同API指纹和发布门槛；最新前端提交可从站点nico-build.json只读核对。完整生产元数据与资源校验结果保存在忽略的review目录。没有新迁移、没有正式模拟档案写入、没有删除或重写历史。

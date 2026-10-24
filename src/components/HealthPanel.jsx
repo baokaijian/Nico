@@ -4,7 +4,7 @@ const labels={login:'登录',session:'会话',health:'健康检查',publicRead:'
 const time=value=>value?new Date(value).toLocaleString():'未采集';
 function Counts({value}) {
   if(!value)return <p className="muted">尚无观测样本。</p>;
-  return <><p className="muted">窗口：{time(value.startedAt)} 至 {time(value.observedAt)}；异常 {value.pageErrors} 次；日志限流丢弃 {value.droppedLogs} 条。</p><div className="history-table-container"><table><thead><tr><th>请求</th><th>次数</th><th>成功</th><th>权限拒绝</th><th>冲突</th><th>其他错误</th><th>平均耗时</th></tr></thead><tbody>{Object.entries(value.groups).map(([key,row])=><tr key={key}><td>{labels[key]||'其他'}</td><td>{row.requests}</td><td>{row.ok}</td><td>{row.unauthorized}</td><td>{row.conflict}</td><td>{row.invalid+row.serverError+row.networkError}</td><td>{Math.round(row.durationMs/row.requests)} ms</td></tr>)}</tbody></table></div></>;
+  return <><p className="muted">窗口：{time(value.startedAt)} 至 {time(value.observedAt)}；异常 {value.pageErrors} 次；日志限流丢弃 {value.droppedLogs} 条。</p><div className="history-table-container"><table className="history-table"><thead><tr><th>请求</th><th>次数</th><th>成功</th><th>权限拒绝</th><th>冲突</th><th>其他错误</th><th>平均耗时</th></tr></thead><tbody>{Object.entries(value.groups).map(([key,row])=><tr key={key}><td>{labels[key]||'其他'}</td><td>{row.requests}</td><td>{row.ok}</td><td>{row.unauthorized}</td><td>{row.conflict}</td><td>{row.invalid+row.serverError+row.networkError}</td><td>{Math.round(row.durationMs/row.requests)} ms</td></tr>)}</tbody></table></div></>;
 }
 export default function HealthPanel({api}) {
   const [server,setServer]=useState(null),[device,setDevice]=useState(()=>api.health.snapshot()),[error,setError]=useState(''),[busy,setBusy]=useState(false);
