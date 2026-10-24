@@ -12,6 +12,8 @@ export const MANAGEMENT_NAV = [
   { key: 'growth', label: '成长管理', views: [['skills', '技能工作区'], ['practice', '技术短板与打卡'], ['goals', '目标与里程碑']] },
   { key: 'review', label: '分析复盘', views: [['cockpit','阶段驾驶舱'], ['quality', '数据质量'], ['timeline', '成长时间轴'], ['trends', '历史趋势'], ['reports', '周期报告'], ['yearbooks','年度纪念册'], ['media', '视频技术复盘'], ['compare', '视频对比'], ['archive', '成长档案']] },
 ];
+// 分析复盘按任务分组展示：回顾近期、产出报告、整理素材、核对档案；入口不变，仅降低寻找成本。
+export const REVIEW_GROUPS = [['回顾', ['cockpit', 'timeline', 'trends', 'quality']], ['产出', ['reports', 'yearbooks']], ['素材', ['media', 'compare']], ['档案', ['archive']]];
 export const SETTINGS_VIEWS = [['profile', '基础档案'], ['publishing', '公开展示'], ['backup', '备份与回收'], ['privateArchive','私人年度归档'], ['standards', '技能标准'], ['health', '运行健康'], ['child', '孩子的成长页']];
 const home = () => ({ section: 'workbench', view: 'home' });
 export function sanitizeLocation(value) {

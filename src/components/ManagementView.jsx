@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { MANAGEMENT_NAV, SETTINGS_VIEWS } from '../services/management';
+import { MANAGEMENT_NAV, SETTINGS_VIEWS, REVIEW_GROUPS } from '../services/management';
 import { Message } from './ui';
 const GrowthSetupWizard=lazy(()=>import('./GrowthSetupWizard'));
 const TodoCenter=lazy(()=>import('./TodoCenter'));
@@ -30,13 +30,13 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
   const views = section === 'settings' ? SETTINGS_VIEWS : MANAGEMENT_NAV.find(item => item.key === section)?.views || [];
   const archive = section === 'review' && ['archive', 'growth', 'fitness', 'nutrition'].includes(view);
   if (section === 'settings' && !owner) return <Message>管理设置仅限家长管理者。</Message>;
-  return <div className="management-view stack">{(section !== 'workbench'||views.length>1) && <nav className="management-sections" aria-label={`${section === 'settings' ? '管理设置' : MANAGEMENT_NAV.find(item => item.key === section)?.label}分类`}>{views.map(([key, label]) => <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{label}</button>)}</nav>}
+  return <div className="management-view stack">{(section !== 'workbench'||views.length>1) && <nav className="management-sections" aria-label={`${section === 'settings' ? '管理设置' : MANAGEMENT_NAV.find(item => item.key === section)?.label}分类`}>{section === 'review' ? REVIEW_GROUPS.map(([group, keys]) => <span className="nav-group" key={group}><small className="nav-group-label">{group}</small>{keys.map(key => { const item = views.find(([value]) => value === key); return item ? <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{item[1]}</button> : null; })}</span>) : views.map(([key, label]) => <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{label}</button>)}</nav>}
     {archive && <div className="ctx-tabs" role="group" aria-label="成长档案内容">{[['archive', '基础档案'], ['growth', '身体测量'], ['fitness', '体能测量'], ['nutrition', '恢复与饮食']].map(([key, label]) => <button key={key} aria-pressed={view === key} onClick={() => navigate('review', key)}>{label}</button>)}</div>}
     <Suspense fallback={<Message>正在打开记录…</Message>}>
       {section === 'workbench' && view==='home' && <Workbench {...shared} role={role} resumeVersion={resumeVersion} openQuickEntry={openQuickEntry}/>}
       {section==='workbench'&&view==='setup'&&<GrowthSetupWizard {...shared} openQuickEntry={openQuickEntry}/>}
       {section==='workbench'&&view==='tasks'&&<TodoCenter {...shared} readOnly={readOnly||!owner}/>}
-      {section === 'training' && ['trainings', 'swim'].includes(view) && <Records key={view} {...shared} type={view} readOnly={readOnly || !['owner', 'coach'].includes(role)} manageTemplates={owner} initialFilter={initialFilter} initialOpen={initialOpen} onLinkMedia={record => openQuickEntry('media', { trainingId: record.id })}/>}
+      {section === 'training' && ['trainings', 'swim'].includes(view) && <Records key={view} {...shared} type={view} readOnly={readOnly || !['owner', 'coach'].includes(role)} manageTemplates={owner} initialFilter={initialFilter} initialOpen={initialOpen} openQuickEntry={openQuickEntry} onLinkMedia={record => openQuickEntry('media', { trainingId: record.id })}/>}
       {section === 'training' && view === 'calendar' && <Calendar {...shared}/>}
       {section === 'training' && view === 'competitions' && <Competitions {...shared} readOnly={readOnly || !owner}/>}
       {section === 'training' && view === 'plans' && <Plans {...shared}/>}

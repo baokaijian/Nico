@@ -1,4 +1,5 @@
 import { trainingFacts } from './training.ts';
+import { missingScoreConditions, scoreConditionLabel } from './domain.mjs';
 export const rows = (data, key) => data[key] || [];
 export function recordReferences(key, row) {
   const refs = [], add = (collection, id) => { if (id) refs.push({ collection, id }); };
@@ -29,7 +30,9 @@ export function diagnoseQuality(data, day) {
   const issues = [], add = (ruleId, collection, row, type, message, priority = '中', targetRef = null) => issues.push({ id: `${ruleId}/${collection}/${row.id}/${targetRef ? `${targetRef.collection}/${targetRef.id}` : ''}`, ruleId, collection, recordId: row.id, type, message, priority, targetRef });
   for (const row of rows(data, 'swim')) {
     if (!row.validityStatus || row.validityStatus === '未核验') add('DQ-SCORE-REVIEW', 'swim', row, '未核验成绩', '成绩尚未人工核验，不参与有效PB。', '高');
-    if (['startType','timingMethod','recordType','poolLength'].some(key => !row[key] || ['未知','其他'].includes(row[key]))) add('DQ-SCORE-CONDITIONS', 'swim', row, '计时条件缺失', '出发、计时、记录性质或池长不明确，请按真实来源补充。');
+    const missing = missingScoreConditions(row);
+    // 家长已按未知保留裁决的记录不再催办；成绩事实与“未知不参与PB”规则不变。
+    if (missing.length && !row.conditionsKeptUnknownAt) add('DQ-SCORE-CONDITIONS', 'swim', row, '计时条件缺失', `${missing.map(scoreConditionLabel).join('、')}不明确；请按真实来源补充，或核对后确认按未知保留。`);
   }
   for (const row of rows(data, 'trainings')) if (!['未完成','已取消'].includes(row.completionStatus) && (trainingFacts(row).unknownSets > 0 || row.durationMinutes == null && row.totalMeters == null)) add('DQ-TRAINING-ACTUAL', 'trainings', row, '实际信息缺失', '实际时长或距离未记录（不代表训练未完成）。');
   for (const row of rows(data, 'media')) if (!row.recordId && !rows(data, 'trainings').some(t => t.mediaIds?.includes(row.id)) && !['competitionEvents','videoComparisons','skillAssessments','milestones','growthStories'].some(key => rows(data, key).some(item => recordReferences(key, item).some(ref => ref.collection === 'media' && ref.id === row.id)))) add('DQ-MEDIA-LINK', 'media', row, '影像未关联', '素材尚未关联明确训练、成绩或成长证据。', '低');

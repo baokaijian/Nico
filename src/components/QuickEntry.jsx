@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { newEntryFlow, advanceEntryFlow, entryContext, entryDefaults, validEntryFlow, canFinishEntryFlow } from '../services/entry-flow';
 import { createDraftStore } from '../services/drafts';
 import useRecordDraft from '../services/useRecordDraft';
-import { performanceLabel } from '../../shared/performance.ts';
+import { performanceLabel, readablePerformance } from '../../shared/performance.ts';
 import { trainingFacts } from '../../shared/training.ts';
 import { Modal, Message } from './ui';
 import DraftNotice from './DraftNotice';
@@ -27,7 +27,7 @@ export default function QuickEntry({ type, context = {}, data, api, onSaved, rel
     {!draft.blocked && <>{current.blocked ? <Message error>{current.message}</Message> : <>
       {current.training && <p className="entry-context">本次训练：{current.training.date} · {current.training.session || current.training.trainingType || '水上训练'} <span>已保存</span></p>}
       {flow.step === 'summary' ? <section className="entry-summary"><h3>已保存到私有档案</h3>{current.training && <p>实际时长{trainingFacts(current.training).minutes ?? '未记录'}分钟 · 实际距离{trainingFacts(current.training).meters ?? '未记录'}米</p>}<Message>{flow.error}</Message>
-        <ul>{flow.scoreIds.map(id => <li key={id}>{data.swim.find(row => row.id === id) ? `成绩已保存：${performanceLabel(data.swim.find(row => row.id === id))}` : '成绩已获保存确认；请刷新核对当前状态。'}</li>)}{flow.mediaIds.map(id => <li key={id}>{flow.trainingId ? '影像已关联：' : '影像已保存：'}{data.media.find(row => row.id === id)?.title || '请刷新核对当前状态'}</li>)}{flow.assessmentIds.map(id => <li key={id}>技能测评已保存，等待独立人工确认。</li>)}{flow.feedbackSaved && <li>教练反馈已保存。</li>}</ul>
+        <ul>{flow.scoreIds.map(id => <li key={id}>{data.swim.find(row => row.id === id) ? `成绩已保存：${performanceLabel(data.swim.find(row => row.id === id))}${readablePerformance(data.swim.find(row => row.id === id)) ? `（${readablePerformance(data.swim.find(row => row.id === id))}）` : ''}` : '成绩已获保存确认；请刷新核对当前状态。'}</li>)}{flow.mediaIds.map(id => <li key={id}>{flow.trainingId ? '影像已关联：' : '影像已保存：'}{data.media.find(row => row.id === id)?.title || '请刷新核对当前状态'}</li>)}{flow.assessmentIds.map(id => <li key={id}>技能测评已保存，等待独立人工确认。</li>)}{flow.feedbackSaved && <li>教练反馈已保存。</li>}</ul>
         <p>以下补充步骤可自由跳过；公开展示需要另行选择。</p><div className="entry-next-actions">{flow.trainingId && <button onClick={() => changeStep('score')}>添加成绩</button>}<button onClick={() => changeStep('media')}>{role === 'owner' ? '上传视频或关联影像' : '关联已有影像'}</button>{flow.trainingId && <button onClick={() => changeStep('feedback')}>记录教练反馈</button>}{flow.assessmentIds.length > 0 && <button onClick={() => { finish(); navigate('growth', 'skills'); }}>前往成长管理确认测评</button>}<button className="apple-btn apple-btn-primary" onClick={finish}>结束</button></div>
       </section> : <Suspense fallback={<Message>正在打开录入表单…</Message>}>
         {flow.step === 'training' && <Records {...shared} key={`training-${flow.id}`} type="trainings"/>}
@@ -39,6 +39,6 @@ export default function QuickEntry({ type, context = {}, data, api, onSaved, rel
     </>}
       {flow.step !== 'summary' && flow.trainingId && <button disabled={busy} className="entry-back" onClick={() => changeStep('summary')}>回到本次完成摘要（可跳过补充）</button>}
     </>}
-    <div className="entry-tools"><button disabled={busy} onClick={reload}>刷新服务端记录</button><button disabled={busy} onClick={close}>暂存并关闭</button></div><small className="muted">保存失败时保留输入；主记录成功与后续关联分别确认。视频文件需在刷新后重新选择。</small>
+    <div className="entry-tools"><button disabled={busy} onClick={close}>暂存并关闭</button><details className="more-actions"><summary aria-label="更多操作" title="更多操作">⋯</summary><div className="more-menu" role="menu"><button disabled={busy} role="menuitem" onClick={reload}>刷新服务端记录</button></div></details></div><small className="muted">保存失败时保留输入；主记录成功与后续关联分别确认。视频文件需在刷新后重新选择。</small>
   </div></Modal>;
 }

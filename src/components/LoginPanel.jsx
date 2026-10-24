@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Message } from './ui';
 export default function LoginPanel({ api, setupRequired, onLoggedIn, onClose }) {
-  const [username, setUsername] = useState('admin'), [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState(''), [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [username, setUsername] = useState(''), [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState(''), [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const firstInput = useRef(null);
   useEffect(() => { firstInput.current?.focus(); }, []);
   useEffect(() => {
