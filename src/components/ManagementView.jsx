@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { MANAGEMENT_NAV, SETTINGS_VIEWS } from '../services/management';
 import { Message } from './ui';
+const GrowthCockpit = lazy(() => import('./GrowthCockpit'));
 const Yearbooks = lazy(() => import('./Yearbooks'));
 const Calendar = lazy(() => import('./TrainingCalendar'));
 const VideoCompare = lazy(() => import('./VideoCompare'));
@@ -43,6 +44,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'review' && view === 'timeline' && <GrowthTimeline {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'quality' && <DataQuality {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'trends' && <Dashboard {...shared} detailOnly/>}
+      {section === 'review' && view === 'cockpit' && <GrowthCockpit {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'yearbooks' && <Yearbooks {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'reports' && <Reports {...shared} readOnly={readOnly || !owner}/>}
       {archive && (view === 'archive' ? <Profile {...shared} role="viewer" view="archive" readOnly/> : <Records key={view} {...shared} type={view} readOnly={readOnly || !owner} initialFilter={initialFilter}/>)}
