@@ -1,0 +1,1 @@
+Noto Sans SC by the Noto Project, SIL OFL 1.1 (OFL.txt). Source: https://github.com/google/fonts/tree/main/ofl/notosanssc . Generated static wght=400 from NotoSansSC[wght].ttf with fontTools 4.60.2 varLib.instancer, without changing names. Font fully embedded for reliable CJK glyph mapping in private PDFs; font asset contains no business data.

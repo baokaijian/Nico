@@ -4,6 +4,7 @@ export function recordReferences(key, row) {
   const refs = [], add = (collection, id) => { if (id) refs.push({ collection, id }); };
   for (const field of ['evidenceRefs', 'baselineRefs', 'completionRefs', 'sourceRefs']) for (const ref of row[field] || []) add(ref.collection, ref.id);
   if (key === 'swim') add('trainings', row.trainingId);
+  if(key==='yearbooks'){add('reportDrafts',row.reportId);for(const id of row.selectedMediaIds||[])add('media',id);}
   if(key==='childViews')for(const id of row.selectedMediaIds||[])add('media',id);
   if(key==='childReflections'){add('childViews',row.viewId);add('trainings',row.trainingId);}
   if (key === 'media' || key === 'annotations') { const target = row.recordId; if (target) add('activity', target); }

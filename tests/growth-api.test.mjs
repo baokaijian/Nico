@@ -73,6 +73,11 @@ for (const runtime of ['local', 'cloud']) test(`${runtime}：技能评估→短�
   const unchanged = read();
   const forged = { format: 'nico-backup-v1', data: structuredClone(unchanged.data) }; forged.data.skillDefinitions[0].name = '伪造的同版本内容';
   assert.equal((await send('/api/restore', 'POST', forged)).status, 400, '同版本活动记录不能与历史矛盾'); assert.deepEqual(read(), unchanged);
+  const yr=await send('/api/reportDrafts','POST',{title:'协议年报',periodType:'year',period:'2000',selectedMediaIds:[],clientRequestId:'year-report'});assert.equal(yr.status,201);const y=await yr.json();
+  assert.equal((await send(`/api/reportDrafts/${y.id}/confirm`,'POST',{confirmedBy:'协议家长',note:'年度事实已核对'})).status,200);
+  const bookBody={title:'协议纪念册',year:'2000',reportId:y.id,theme:'慢慢成长',parentMessage:'原话',childMessage:'原话',selectedMediaIds:[],sectionOrder:['training','scores','skills','competitions','milestones','media','messages'],clientRequestId:'year-book'};
+  const br=await send('/api/yearbooks','POST',bookBody);assert.equal(br.status,201);const b=await br.json();assert.equal((await send('/api/yearbooks','POST',bookBody,1)).status,200,'纪念册稳定请求重放');assert.equal((await send('/api/yearbooks','POST',{...bookBody,title:'冲突'},1)).status,409);
+  assert.equal((await send(`/api/yearbooks/${b.id}/confirm`,'POST',{confirmedBy:'协议家长',note:'编排和来源核对'})).status,200);assert.equal(read().data.yearbooks[0].status,'已确认');
   const historyCount = read().data.growthHistory.length;
   assert.equal((await send('/api/restore', 'POST', oldBackup)).status, 200); assert.ok(read().data.growthHistory.length >= historyCount);
   for (const [key, id] of [['skillDefinitions', definition.id], ['skillAssessments', first.id], ['skillAssessments', retest.id], ['goals', goal.id], ['milestones', milestoneId]]) {
