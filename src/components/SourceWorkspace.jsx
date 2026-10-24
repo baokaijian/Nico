@@ -14,13 +14,17 @@ const Plans = lazy(() => import('./PlanViewer'));
 const ChildSettings = lazy(() => import('./ChildSettings'));
 export default function SourceWorkspace({ source, onClose, ...props }) {
   const { collection, id } = source, row = props.data[collection]?.find(item => item.id === id);
-  const shared = { ...props, focusId: id };
+  const restricted=props.readOnly||!!props.role&&props.role!=='owner';
+  const shared = { ...props, readOnly:restricted, manageTemplates:!restricted&&props.role==='owner', allowUpload:!restricted&&props.role==='owner', focusId: id };
   return <Modal title="原记录工作区" onClose={onClose}><p className="source-id">{collection}/{id}</p>{!row ? <Message error>原记录不在当前可访问档案。请在管理设置的回收站核对，平台不会自动重建。</Message> : <Suspense fallback={<Message>正在打开原记录…</Message>}>
     {['swim','trainings','annotations','growth','fitness','nutrition'].includes(collection) && <Records {...shared} type={collection}/>}
     {['skillAssessments','skillDefinitions'].includes(collection) && <Skills {...shared} initialSection={collection === 'skillDefinitions' ? 'standards' : 'assessments'}/>}
     {['goals','milestones'].includes(collection) && <Goals {...shared}/>}
     {collection === 'media' && <Media {...shared}/>}
-    {['weakpoints','checkins'].includes(collection) && <Practice {...shared}/>}
+    {collection==='weakpoints' && <Practice {...shared}/>}
+    {collection==='checkins'&&<Records {...shared} type="checkins" allowAdd={false}/>}
+    {collection==='trainingTemplates'&&<Records {...shared} type="trainings" focusId={undefined} focusTemplateId={id}/>}
+
     {collection === 'videoComparisons' && <VideoCompare {...shared}/>}
     {collection === 'competitionEvents' && <Competitions {...shared}/>}
     {collection === 'yearbooks' && <Yearbooks {...shared}/>}

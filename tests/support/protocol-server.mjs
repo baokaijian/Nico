@@ -8,6 +8,8 @@ import { emptyState, validateRecord } from '../../shared/domain.mjs';
 if(process.env.NICO_TEST_PROTOCOL_ONLY !== 'true') throw Error('Protocol-only test server required');
 import {releaseInfo} from '../../scripts/release-info.mjs';
 import {mediaHealth} from '../../shared/runtime-health.mjs';
+const port=Number(process.env.NICO_PROTOCOL_PORT||5293);if(![5293,5294].includes(port))throw Error('Isolated UI port must be 5293 or 5294');
+const origin=`http://127.0.0.1:${port}`;
 const mediaDir=process.env.NICO_PROTOCOL_MEDIA_DIR;if(!mediaDir||!path.isAbsolute(mediaDir))throw Error('Absolute synthetic-media directory required');
 const raw=emptyState();
 raw.swim=[{...validateRecord('swim',{date:'2000-01-01',distance:'50m',stroke:'自由泳',poolLength:'25m',time:'01:00:00',recordType:'比赛',validityStatus:'未核验',timingMethod:'未知',startType:'未知'}),id:'protocol-score'}];
@@ -28,11 +30,11 @@ const backend = {
 objects.set('protocol-a.mp4',{bytes:fs.readFileSync(path.join(mediaDir,'protocol-a.mp4')),type:'video/mp4'}); objects.set('protocol-b.mp4',{bytes:fs.readFileSync(path.join(mediaDir,'protocol-b.mp4')),type:'video/mp4'});
 objects.set('protocol-photo.png',{bytes:fs.readFileSync(path.join(mediaDir,'protocol-photo.png')),type:'image/png'});
 backend.health=async()=>({storage:{count:objects.size,bytes:[...objects.values()].reduce((n,item)=>n+item.bytes.length,0),complete:true},media:mediaHealth(current.data.media),backups:{mode:'before-write',currentRevision:current.revision}});
-const handler = createCloudHandler({ backend, release:releaseInfo(), origins: ['http://127.0.0.1:5293'] });
+const handler = createCloudHandler({ backend, release:releaseInfo(), origins: [origin] });
 const app = express(); app.use('/functions/v1/nico-api', express.raw({ type: () => true, limit:'51mb' }), async (req, res) => {
   calls.push({ path: req.originalUrl, credentialed: !!req.headers.authorization });
   if (offline || blockWrites && ['POST','PUT','DELETE'].includes(req.method) && !req.originalUrl.includes('/auth/')) return res.status(503).json({ error: '隔离测试：临时断网' });
-  const response = await handler(new Request('http://127.0.0.1:5293' + req.originalUrl, { method: req.method, headers: req.headers, ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: req.body }) }));
+  const response = await handler(new Request(origin + req.originalUrl, { method: req.method, headers: req.headers, ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: req.body }) }));
   if (dropNext && req.originalUrl.endsWith(dropNext) && req.method === 'POST' && response.status === 201) { dropNext = ''; res.destroy(); return; }
   res.status(response.status); response.headers.forEach((v, k) => res.setHeader(k, v)); res.send(Buffer.from(await response.arrayBuffer()));
 });
@@ -44,5 +46,5 @@ app.use('/protocol-control', express.json(), (req, res) => {
   res.json({ stories:current.data.growthStories.length,reports:current.data.reportDrafts.map(row=>({id:row.id,status:row.status,version:row.version})),competitions:current.data.competitionEvents.length,comparisons:current.data.videoComparisons.length, revision: current.revision, sessions: sessions.size, trainings: current.data.trainings.length, scores: current.data.swim.length, media: current.data.media.length, files: objects.size, trainingIds: current.data.trainings.map(row=>row.id), scoreLinks: current.data.swim.filter(row=>row.trainingId).map(row=>({id:row.id,trainingId:row.trainingId})), mediaLinks: current.data.media.map(row=>({id:row.id,recordId:row.recordId})), feedback: current.data.trainings.map(row=>!!row.coachNotes), skills:current.data.skillDefinitions.length, assessments:current.data.skillAssessments.map(row=>({id:row.id,level:row.level,status:row.status,checkins:row.checkinIds.length})), points:current.data.weakpoints.length, checkins:current.data.checkins.length, goals:current.data.goals.filter(row=>row.modelVersion===1).map(row=>row.status), milestones:current.data.milestones.map(row=>row.status) });
 });
 app.use('/Nico', express.static(path.resolve('dist')));
-const server = app.listen(5293, '127.0.0.1', () => console.log('Isolated Nico protocol UI ready on port 5293'));
+const server = app.listen(port, '127.0.0.1', () => console.log(`Isolated Nico protocol UI ready on port ${port}`));
 const stop = () => server.close(() => process.exit(0)); process.on('SIGTERM', stop); process.on('SIGINT', stop);

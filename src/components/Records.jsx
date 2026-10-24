@@ -8,12 +8,12 @@ import TrainingRecords from './TrainingRecords';
 import useRecordDraft from '../services/useRecordDraft';
 import DraftNotice, { draftHint } from './DraftNotice';
 import { recordFormFields, changeRecordField } from '../services/record-form';
-const names = { swim: '成绩', trainings: '水上训练', fitness: '体能', nutrition: '恢复与饮食', growth: '身体测量', goals: '个人目标', annotations: '录像批注', media: '素材说明' };
+const names = { checkins:'练习打卡', swim: '成绩', trainings: '水上训练', fitness: '体能', nutrition: '恢复与饮食', growth: '身体测量', goals: '个人目标', annotations: '录像批注', media: '素材说明' };
 function valueLabel(value) { return value === true ? '按既有专业建议服用' : value === false ? '未服用' : value == null || value === '' ? '未填写' : String(value); }
 export default function Records(props) {
   return props.type === 'trainings' ? <TrainingRecords {...props}/> : <GenericRecords {...props}/>;
 }
-function GenericRecords({ focusId, type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
+function GenericRecords({ focusMediaId, focusId, type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
   const fields = FIELDS[type];
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => ({ ...Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : ''])), ...(type === 'swim' ? { validityStatus: '未核验' } : {}), ...initialContext });
@@ -57,6 +57,7 @@ function GenericRecords({ focusId, type, data, api, onSaved, readOnly = false, a
   const clearFilters = () => { setFilter(''); setFrom(''); setTo(''); setScoreKind('全部'); setFacets({ distance: '', stroke: '', poolLength: '', validityStatus: '' }); };
   const records = ordered(data[type]).reverse().filter(r => {
     if (focusId && r.id !== focusId) return false;
+    if (focusMediaId && r.mediaId !== focusMediaId) return false;
     if (type === 'swim' && !publicMode) {
       if (scoreKind !== '全部' && (r.recordType || '未知') !== scoreKind) return false;
       for (const [key, value] of Object.entries(facets)) if (value && (key === 'validityStatus' ? validityLabel(r) : r[key]) !== value) return false;

@@ -30,7 +30,7 @@ test('工作台空库没有虚构待办，真实待确认事项才出现，计�
   const data = emptyState(); assert.deepEqual(workbenchModel(data, '2000-01-05').pending, []);
   data.skillAssessments = [{ id: 'draft', status: '待确认', date: '2000-01-04', standardSnapshot: { name: '协议标准' } }, { id: 'confirmed', status: '已确认', date: '2000-01-01' }];
   data.milestones = [{ id: 'candidate', status: '待确认', title: '协议事件' }];
-  data.goals = [{ id: 'paused', status: '暂停' }, { id: 'active', status: '进行中', title: '协议目标' }];
+  data.goals = [{ id: 'paused', modelVersion: 1, status: '暂停' }, { id: 'active', modelVersion: 1, status: '进行中', title: '协议目标' }];
   data.trainings = [{ id: 'cancelled', date: '2000-01-04', completionStatus: '已取消', plannedMeters: 100 }, { id: 'actual', date: '2000-01-03', totalMeters: 50, durationMinutes: 10 }];
   const result = workbenchModel(data, '2000-01-05');
   assert.deepEqual(result.pending.map(item => item.id).sort(), ['candidate', 'draft']);
