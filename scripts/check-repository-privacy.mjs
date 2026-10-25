@@ -32,6 +32,7 @@ export function inspectContent(name,text){
  }
  if(name.endsWith('.json'))try{
   const parsed=JSON.parse(text),state=parsed?.format==='nico-backup-v1'?parsed.data:parsed;
+  if(['nico-backup-v1','nico-backup-seal-v1'].includes(parsed?.format))result.push(finding(name,'private-backup'));
   if(state&&typeof state==='object'&&!Array.isArray(state)&&['growth','trainings','fitness','nutrition','goals','swim','media','skillAssessments','reportDrafts','yearbooks'].filter(k=>Array.isArray(state[k])).length>=3&&Object.values(state).some(v=>Array.isArray(v)&&v.length))result.push(finding(name,'private-dataset'));
  }catch{/* package metadata and JSON source fragments need no fact projection. */}
  return result;
