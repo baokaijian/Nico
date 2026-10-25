@@ -1,5 +1,6 @@
+import {createBusyRegistry} from '../services/busy-registry';
 import SourceWorkspace from './SourceWorkspace';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { newEntryFlow, advanceEntryFlow, entryContext, entryDefaults, validEntryFlow, canFinishEntryFlow } from '../services/entry-flow';
 import { createDraftStore } from '../services/drafts';
 import useRecordDraft from '../services/useRecordDraft';
@@ -15,6 +16,7 @@ const Gallery = lazy(() => import('./MediaGallery'));
 const labels = { training: '记录训练', score: '记录成绩', skill: '技能测评', media: '添加影像', feedback: '教练反馈', summary: '本次完成摘要', goals:'关联成长目标', review:'本次成长复盘' };
 export default function QuickEntry({ type, context = {}, data, api, onSaved, reload, onClose, navigate, role, restoreFocus }) {
   const [flow, setFlow] = useState(() => newEntryFlow(type, context)), [busy, setBusy] = useState(false), [info, setInfo] = useState(''), [source,setSource]=useState(null),[standardsOpen,setStandardsOpen]=useState(false);
+  const busyRegistry=useMemo(()=>createBusyRegistry(setBusy),[]);
   const draft = useRecordDraft(api, 'quickEntry', validEntryFlow), { persist } = draft;
   useEffect(() => { if (!draft.blocked) persist(flow); }, [flow, draft.blocked, persist]);
   const current = entryContext(flow, data), defaults = entryDefaults(flow.step, current, data);
@@ -24,7 +26,7 @@ export default function QuickEntry({ type, context = {}, data, api, onSaved, rel
   };
   const finish = () => { const list = createDraftStore({scope: api.getDraftScope()}).list(); if (canFinishEntryFlow(list, flow.id)) draft.clear(); onClose(); };
   const close = () => { if (busy) { setInfo('正在确认保存结果，请稍候。'); return; } onClose(); };
-  const shared = { data, api, onSaved, readOnly: false, entryOnly: true, initialOpen: true, initialContext: defaults, draftKey: flow.id, clientRequestId: flow.requests[flow.step], onRecordSaved: saved, onBusyChange: setBusy };
+  const shared = { data, api, onSaved, readOnly: false, entryOnly: true, initialOpen: true, initialContext: defaults, draftKey: flow.id, clientRequestId: flow.requests[flow.step], onRecordSaved: saved, onBusyChange: busyRegistry.channel('entry') };
   return <Modal title={labels[flow.step]} onClose={close} restoreFocus={restoreFocus}><div className="quick-entry" aria-busy={busy}><Message>{info}</Message><DraftNotice draft={draft} onRestore={setFlow}/>
     {!draft.blocked && <>{current.blocked ? <Message error>{current.message}</Message> : <>
       {current.training && <p className="entry-context">本次训练：{current.training.date} · {current.training.session || current.training.trainingType || '水上训练'} <span>已保存</span></p>}
@@ -34,15 +36,15 @@ export default function QuickEntry({ type, context = {}, data, api, onSaved, rel
       </section> : <Suspense fallback={<Message>正在打开录入表单…</Message>}>
         {flow.step === 'training' && <Records {...shared} key={`training-${flow.id}`} type="trainings"/>}
         {flow.step === 'score' && <Records {...shared} key={flow.requests.score} type="swim"/>}
-        {flow.step === 'skill' && role === 'owner' && <><p>本次训练已作为证据引用带入；实际等级和可见观察仍需填写，日期可按实际测评日调整。</p><button onClick={()=>setStandardsOpen(true)}>配置或审核技能标准</button><Skills {...shared} key={flow.requests.skill}/></>}
+        {flow.step === 'skill' && role === 'owner' && <><p>本次训练已作为证据引用带入；实际等级和可见观察仍需填写，日期可按实际测评日调整。</p><button disabled={busy} onClick={()=>{if(!busy)setStandardsOpen(true);}}>配置或审核技能标准</button><Skills {...shared} key={flow.requests.skill}/></>}
         {flow.step === 'media' && <Gallery {...shared} key={flow.requests.media} allowUpload={role === 'owner'} initialRecord={defaults} reload={reload}/>}
-        {flow.step === 'feedback' && current.training && <TrainingFeedback training={current.training} api={api} draftKey={flow.id} onSaved={onSaved} onDone={() => setFlow(value => advanceEntryFlow(value, { type: 'feedback' }))} onBusyChange={setBusy}/>}
+        {flow.step === 'feedback' && current.training && <TrainingFeedback training={current.training} api={api} draftKey={flow.id} onSaved={onSaved} onDone={() => setFlow(value => advanceEntryFlow(value, { type: 'feedback' }))} onBusyChange={busyRegistry.channel('entry')}/>}
       </Suspense>}
     </>}
       {flow.step !== 'summary' && flow.trainingId && <button disabled={busy} className="entry-back" onClick={() => changeStep('summary')}>回到本次完成摘要（可跳过补充）</button>}
     </>}
-    {source&&<SourceWorkspace source={source} data={data} api={api} onSaved={onSaved} reload={reload} role={role} readOnly={role!=='owner'} contextTrainingId={flow.trainingId} onBusyChange={setBusy} onClose={()=>{if(!busy)setSource(null);}}/>}
-    {standardsOpen&&<Modal title="配置真实技能标准" onClose={()=>{if(!busy)setStandardsOpen(false);}}><Suspense fallback={<Message>正在打开标准…</Message>}><Skills data={data} api={api} onSaved={onSaved} readOnly={role!=='owner'} initialSection="standards" onBusyChange={setBusy}/></Suspense></Modal>}
+    {source&&<SourceWorkspace source={source} data={data} api={api} onSaved={onSaved} reload={reload} role={role} readOnly={role!=='owner'} contextTrainingId={flow.trainingId} onBusyChange={busyRegistry.channel('source')} onClose={()=>{if(!busy)setSource(null);}}/>}
+    {standardsOpen&&<Modal title="配置真实技能标准" onClose={()=>{if(!busy)setStandardsOpen(false);}}><Suspense fallback={<Message>正在打开标准…</Message>}><Skills data={data} api={api} onSaved={onSaved} readOnly={role!=='owner'} initialSection="standards" onBusyChange={busyRegistry.channel('standards')}/></Suspense></Modal>}
     <div className="entry-tools"><button disabled={busy} onClick={close}>暂存并关闭</button><details className="more-actions"><summary aria-label="更多操作" title="更多操作">⋯</summary><div className="more-menu" role="menu"><button disabled={busy} role="menuitem" onClick={reload}>刷新服务端记录</button></div></details></div><small className="muted">保存失败时保留输入；主记录成功与后续关联分别确认。视频文件需在刷新后重新选择。</small>
   </div></Modal>;
 }

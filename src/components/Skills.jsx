@@ -9,8 +9,9 @@ const standardDefaults = () => ({ modelVersion: 1, name: '', dimension: '水中�
 const assessmentDefaults = () => ({ modelVersion: 1, skillId: '', definitionVersion: 0, date: today(), assessor: '', level: '', status: '待确认', evidenceNote: '', evidenceRefs: [], improvementNote: '', previousAssessmentId: '', weakPointId: '', checkinIds: [] });
 export default function Skills({ focusId, data, api, onSaved, readOnly, onCreatePoint, retestSeed, workspace = false, focusedSkillId, onSkillChange, assessmentSeed, initialSection = 'assessments', entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange }) {
   const [section, setSection] = useState(initialSection), [skillId, setSkillId] = useState(retestSeed?.skillId || ''), [dimension, setDimension] = useState(''), [action, setAction] = useState(null);
-  const assessment = useGrowthForm({ collection: 'skillAssessments', defaults: assessmentDefaults, data, api, onSaved, readOnly, initialValues: initialContext, requestId: clientRequestId, draftCollection: entryOnly ? `quick.${draftKey}.skillAssessments` : undefined, onRecordSaved, onBusyChange });
+  const assessment = useGrowthForm({ collection: 'skillAssessments', defaults: assessmentDefaults, data, api, onSaved, readOnly, initialValues: initialContext, requestId: clientRequestId, draftCollection: entryOnly ? `quick.${draftKey}.skillAssessments` : undefined, onRecordSaved });
   const standard = useGrowthForm({ collection: 'skillDefinitions', defaults: standardDefaults, data, api, onSaved, readOnly });
+  useEffect(()=>{onBusyChange?.(assessment.busy||standard.busy);return()=>onBusyChange?.(false);},[assessment.busy,standard.busy,onBusyChange]);
   const timeline = useMemo(() => skillTimeline(data), [data]);
   const latest = [...new Map(timeline.map(row => [row.skillId, row])).values()];
   const definitions = data.skillDefinitions || [], assessments = data.skillAssessments || [];

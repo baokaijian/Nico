@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {createBusyRegistry} from '../src/services/busy-registry.js';
+test('嵌套空闲表单和卸载回调不能清除另一表单的在途保存状态',()=>{let busy=false;const r=createBusyRegistry(v=>{busy=v;}),entry=r.channel('entry'),standards=r.channel('standards');assert.equal(r.channel('entry'),entry);entry(true);standards(false);assert.equal(busy,true);standards(true);entry(false);assert.equal(busy,true);entry(false);assert.equal(busy,true);standards(false);assert.equal(busy,false);});
