@@ -14,7 +14,15 @@
 
 实际命令行 `operations:run -- --rehearse` 完成合成快照+1媒体字节占位→加密→本机验证→私有目标→回读→错误密钥/篡改/缺条目/过期反例→隔离库恢复摘要一致。回执明确 mode=isolated-protocol、productionRestore=false。不是视频解码/正式离站或生产恢复验收。
 
-当前发布基线V1.8 master2f1d44f，Pages40186357292及函数核验40186357288全部success，实际资源/指纹/89项访客核对通过。V1.9生产回执发布后追加；实现和自动测试不等同实际上线。
+前期V1.8 master2f1d44f，Pages40186357292及函数核验40186357288全部success，实际资源/指纹/89项访客核对通过。
+
+## V1.9 实际生产回执
+
+master f13add8已合并并发布1.9.0：[Pages40187319547](https://github.com/baokaijian/Nico/actions/runs/40187319547) build/deploy/verify全部success，[API核验40187319554](https://github.com/baokaijian/Nico/actions/runs/40187319554) check/deploy核验success。两条失败通知作业正常skipped，没有对外发通知。
+
+线上nico-build.json与本地生产构建的1.9.0/f13add8一致，index及52个非wasm资源逐字节SHA256匹配，组件声明匹配，实际API指纹ef38b3dd7e358f48038b99f3e51acbd2a5469c77407da4d9721bb78d8c8616e8兼容。再次回读实际Edge18 ACTIVE，24个传递依赖源码逐文件哈希与仓库一致，生成元数据仍1.7.1/8909062；不是因缺CLI凭据跳过就宣称后端部署。本期没有后端源码变化，未重部署函数。
+
+89项正式访客权限通过。发布后只读复核revision22/内容校验/23台账/14备份/9对象94,317,512字节均未改变，6表RLS与角色边界不变，15项迁移不变。私有现场回执在忽略review目录，未进入公开仓库或Pages。访问：https://baokaijian.github.io/Nico/ 。本次回执描述上述实际发布，后续仅补记文档的提交不改变业务代码或授权。
 
 ## 只读安全核对与未启用项
 
