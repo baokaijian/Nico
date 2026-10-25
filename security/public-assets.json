@@ -28,6 +28,20 @@
     {
       "path": "release/uploads/file-1789893938254-176345168-poster.jpg",
       "sha256": "40a48b61651ab1c857b20e7cebd9fa0ad912e2f464bf8c09ec6066f5d8f941ef"
+    },
+    {
+      "path": "src/assets/fonts/NotoSansSC-Regular.ttf",
+      "sha256": "c31acbe59790e7dead20e076ff996134723c9e8a3bf09be1df5c6126ed3d6e81"
+    }
+  ],
+  "historicalFiles": [
+    {
+      "path": "src/assets/hero.png",
+      "sha256": "881ffbcaafc212e49addad08846a5b82761355fa20624253af3477ba33262c5c"
+    },
+    {
+      "path": "release/public-summary.json",
+      "sha256": "a95be52c41364c68191652e35ae82a817e151f8b9fd0b2f0c759f1575e27ae68"
     }
   ]
 }

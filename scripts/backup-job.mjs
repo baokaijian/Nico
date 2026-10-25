@@ -16,6 +16,20 @@ export function assertSafeOutputDir(target){
  if(physical===root||physical.startsWith(root+path.sep)||resolved===projectRoot||resolved.startsWith(projectRoot+path.sep))throw Error('输出目录不能落在仓库内，请使用仓库外的私有目录');
  return resolved;
 }
+function privateDirectory(target){
+ const dir=assertSafeOutputDir(target);fs.mkdirSync(dir,{recursive:true,mode:0o700});
+ if(fs.statSync(dir).mode&0o077)throw Error('备份输出目录须为私有目录（权限0700）');return dir;
+}
+function writePrivate(file,bytes,{exclusive=false}={}){
+ let fd;
+ try{
+  assertSafeOutputDir(path.dirname(file));
+  fd=fs.openSync(file,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_NOFOLLOW|(exclusive?fs.constants.O_EXCL:0),0o600);
+  const stat=fs.fstatSync(fd);if(!stat.isFile()||stat.nlink!==1)throw Error();
+  fs.fchmodSync(fd,0o600);fs.ftruncateSync(fd,0);fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);
+ }catch{throw Error('备份文件写入被拒绝：目标须为私有普通文件，禁止链接或覆盖已有密钥');}
+ finally{if(fd!==undefined)fs.closeSync(fd);}
+}
 export function collectFiles(inputDir){
  const files=[],root=path.resolve(inputDir);
  const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
@@ -32,13 +46,14 @@ export function collectFiles(inputDir){
 const phase=async(receipt,name,run)=>{const startedAt=Date.now();try{const detail=await run();receipt.phases.push({name,status:'pass',elapsedMs:Date.now()-startedAt});return detail;}catch(error){receipt.phases.push({name,status:'fail',elapsedMs:Date.now()-startedAt});throw error;}};
 const baseReceipt=(taskType,runId)=>({schema:1,taskType,runId,startedAt:new Date().toISOString(),endedAt:null,source:null,targetDigest:null,phases:[],ok:false,failCategory:null,counts:null,nextRetryAt:null,lastSuccessAt:null});
 const finish=(receipt,ok,{failCategory=null,counts=null,targetDigest=null,source=null}={})=>{receipt.endedAt=new Date().toISOString();receipt.ok=ok;receipt.failCategory=failCategory;receipt.counts=counts;receipt.targetDigest=targetDigest;receipt.source=source;receipt.lastSuccessAt=ok?receipt.endedAt:receipt.lastSuccessAt;return receipt;};
-export function writeReceipt(outDir,receipt){const dir=assertSafeOutputDir(outDir);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'receipt.json'),JSON.stringify(receipt,null,2)+'\n');return path.join(dir,'receipt.json');}
+export function writeReceipt(outDir,receipt){const dir=privateDirectory(outDir);writePrivate(path.join(dir,'receipt.json'),JSON.stringify(receipt,null,2)+'\n');return path.join(dir,'receipt.json');}
 export async function runKeygen({outDir}){
  const runId=crypto.randomUUID(),receipt=baseReceipt('keygen',runId);
  try{
   const pair=await phase(receipt,'generate',()=>generateBackupKeyPair());
-  const dir=assertSafeOutputDir(outDir);fs.mkdirSync(dir,{recursive:true});
-  await phase(receipt,'write',()=>{fs.writeFileSync(path.join(dir,'backup-public.key'),pair.publicKey+'\n');fs.writeFileSync(path.join(dir,'backup-private.key'),pair.privateKey+'\n',{mode:0o600});});
+  const dir=privateDirectory(outDir);
+  for(const name of ['backup-public.key','backup-private.key']){try{fs.lstatSync(path.join(dir,name));throw Error('拒绝覆盖已有密钥文件');}catch(error){if(error.code!=='ENOENT')throw error;}}
+  await phase(receipt,'write',()=>{writePrivate(path.join(dir,'backup-public.key'),pair.publicKey+'\n',{exclusive:true});writePrivate(path.join(dir,'backup-private.key'),pair.privateKey+'\n',{exclusive:true});});
   return finish(receipt,true,{counts:{keyFiles:2}});
  }catch(error){return finish(receipt,false,{failCategory:error.message});}
 }
@@ -50,7 +65,7 @@ export async function runSeal({inputDir,keyFile,outDir,info={},now=new Date().to
   await phase(receipt,'read',()=>{files=collectFiles(inputDir);});
   await phase(receipt,'encrypt',async()=>{pkg=await sealBackupFiles({files,recipientPublicKey:readKey(keyFile),info,archiveId:runId,now});});
   const envelope=JSON.stringify(pkg);
-  await phase(receipt,'write',()=>{const dir=assertSafeOutputDir(outDir);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'package.json'),envelope+'\n');});
+  await phase(receipt,'write',()=>{const dir=privateDirectory(outDir);writePrivate(path.join(dir,'package.json'),envelope+'\n');});
   return finish(receipt,true,{counts:{files:pkg.entries.length-1,bytes:pkg.entries.reduce((sum,entry)=>sum+entry.data.length,0)},targetDigest:await digestBytes(new TextEncoder().encode(envelope)),source:{revision:info.revision??null,release:info.release??null}});
  }catch(error){return finish(receipt,false,{failCategory:error.message});}
 }
@@ -72,12 +87,12 @@ export function protocolSampleState(){
 }
 export async function runRehearsal({workdir=null}={}){
  const runId=crypto.randomUUID(),receipt=baseReceipt('rehearse',runId);
- const dir=workdir?assertSafeOutputDir(workdir):fs.mkdtempSync(path.join(os.tmpdir(),'nico-backup-drill-'));
  try{
+  const dir=workdir?fs.mkdtempSync(path.join(privateDirectory(workdir),'drill-')):fs.mkdtempSync(path.join(os.tmpdir(),'nico-backup-drill-'));
   const {openStore}=await import('../server/store.mjs');
   const sample=await phase(receipt,'sample',()=>protocolSampleState());
   fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,'seed.json'),JSON.stringify(sample.state));
+  writePrivate(path.join(dir,'seed.json'),JSON.stringify(sample.state));
   let source;
   await phase(receipt,'source-read',()=>{const store=openStore({filename:path.join(dir,'source.sqlite'),seedPath:path.join(dir,'seed.json'),backupDir:path.join(dir,'backups')});source={revision:store.read().revision,data:store.read().data};store.close();});
   const snapshotBytes=new TextEncoder().encode(JSON.stringify({format:'nico-backup-v1',revision:source.revision,data:source.data},null,2));
@@ -96,7 +111,7 @@ export async function runRehearsal({workdir=null}={}){
    const snapshot=JSON.parse(new TextDecoder().decode(restoredFile.bytes));
    if(snapshot.format!=='nico-backup-v1'||snapshot.revision!==source.revision)throw Error('恢复快照格式或版本与源不一致');
    const restoreDir=path.join(dir,'restore');fs.mkdirSync(restoreDir,{recursive:true});
-   fs.writeFileSync(path.join(restoreDir,'seed.json'),JSON.stringify(snapshot.data));
+   writePrivate(path.join(restoreDir,'seed.json'),JSON.stringify(snapshot.data));
    const store=openStore({filename:path.join(restoreDir,'restored.sqlite'),seedPath:path.join(restoreDir,'seed.json'),backupDir:path.join(restoreDir,'backups')});
    const restored=store.read();store.close();
    const sourceDigest=await digestBytes(new TextEncoder().encode(JSON.stringify(normalizeState(source.data))));
