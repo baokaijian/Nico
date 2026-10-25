@@ -1,6 +1,6 @@
 import { today } from './files.js';
 const types = ['training', 'score', 'skill', 'media'];
-const steps = [...types, 'feedback', 'summary'];
+const steps = [...types, 'feedback', 'summary', 'goals', 'review'];
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 const ids = value => Array.isArray(value) && value.length <= 100 && value.every(id) && new Set(value).size === value.length;
 export function newEntryFlow(type, context = {}) {
@@ -42,7 +42,7 @@ export function entryDefaults(type, context, data) {
   if (type === 'skill') {
     const recent = [...data.skillAssessments].sort((a, b) => b.date.localeCompare(a.date)).find(row => data.skillDefinitions.some(definition => definition.id === row.skillId && definition.status === '启用'));
     const definition = data.skillDefinitions.find(row => row.id === recent?.skillId);
-    return { date: today(), ...(definition ? { skillId: definition.id, definitionVersion: definition.version } : {}), level: '', evidenceNote: '' };
+    return { date, evidenceRefs:training?[{collection:'trainings',id:training.id}]:[], ...(definition ? { skillId: definition.id, definitionVersion: definition.version } : {}), level: '', evidenceNote: '' };
   }
   return { date, recordId: record?.id || '' };
 }

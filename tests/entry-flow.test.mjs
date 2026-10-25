@@ -40,3 +40,4 @@ test('结束时未提交的补充草稿仍有恢复入口，未知存储状态�
   assert.equal(canFinishEntryFlow({status:'ready',items:[{collection:'quick.flow-b.swim',status:'ready'}]},'flow-a'),true);
   assert.equal(canFinishEntryFlow({status:'unavailable',items:[]},'flow-a'),false);
 });
+test('训练后的测评沿用本次日期和来源，新增目标/复盘步骤可恢复且不复制等级',()=>{const d=emptyState();d.trainings=[{id:'t',date:'2000-01-03',totalMeters:100,stroke:'自由泳'}];const flow=advanceEntryFlow(newEntryFlow('training'),{type:'saved',collection:'trainings',id:'t'});const context=entryContext(flow,d),skill=entryDefaults('skill',context,d);assert.equal(skill.date,'2000-01-03');assert.deepEqual(skill.evidenceRefs,[{collection:'trainings',id:'t'}]);assert.equal(skill.level,'');assert.equal(skill.evidenceNote,'');for(const step of ['goals','review']){const next=advanceEntryFlow(flow,{type:'step',step});assert.equal(validEntryFlow(next),true);assert.equal(next.trainingId,'t');assert.deepEqual(next.scoreIds,[]);}});

@@ -26,4 +26,8 @@ master d3f610b，前端V1.7.0；开始时实际API1.5.2/Edge17/728cc446…，15�
 
 ## 生产发布
 
-待实际Edge回执、源码回读、版本查询、Pages构建/部署/验证、权限与事实校验后记录；不得将本地通过或工作流跳过称已上线。
+已发布源码8909062。连接Supabase实际部署Edge18 ACTIVE/API1.7.1，25文件逐字节回读一致；实际指纹ef38b3dd7e358f48038b99f3e51acbd2a5469c77407da4d9721bb78d8c8616e8，版本接口显式能力true。
+
+[Pages40161755634](https://github.com/baokaijian/Nico/actions/runs/40161755634)及[函数40161755584](https://github.com/baokaijian/Nico/actions/runs/40161755584)均success；后端工作流无CLI凭据时通过实际匹配指纹核对，本次实际部署依据是连接器Edge18回执与源码回读，不能把跳过CLI称为部署。89项访客权限通过；6表RLS且anon/authenticated无直接权限，Nico RPC同样拒绝这两个角色，存储桶private。
+
+部署前后正式revision22、校验344b33243eb2e0094c643b6876c370e7、台账23、备份14、9对象94,317,512字节一致；15迁移不变，本阶段无新DDL。旧分支仍保留备查，其两字段raw PUT方案被本次更严格专用接口取代，未重复合并旧UI或核心计算。真人业务裁决未代家长执行。
