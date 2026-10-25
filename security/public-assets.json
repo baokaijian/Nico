@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "release/public-summary.json",
+      "sha256": "b0d07de2108375cd1c100e767caa70f4f8caa0e562e47f1824c43116a4bf8d03"
+    },
+    {
+      "path": "release/uploads/file-1782489250807-29167927-720p.mp4",
+      "sha256": "ce4b5e96a3554018cdedf9798182d58f7d7da78615c9eff4a404795f33acaf69"
+    },
+    {
+      "path": "release/uploads/file-1782489250807-29167927-poster.jpg",
+      "sha256": "401b394e00d99d3ea8395897090225ca17284683c4436da70f440900f0bad482"
+    },
+    {
+      "path": "release/uploads/file-1782489259090-516342653-720p.mp4",
+      "sha256": "e1a25600ed217c07d10d1fc657bc59fea1c814b33565650d2c74efa7d42b4457"
+    },
+    {
+      "path": "release/uploads/file-1782489259090-516342653-poster.jpg",
+      "sha256": "13e07041725ee37031e2b794f6fa5f4a0eb53c073f109b2ce519dad5ea50ac37"
+    },
+    {
+      "path": "release/uploads/file-1789893938254-176345168-720p.mp4",
+      "sha256": "abe54de751ff06ee5243cd85480846960f7bdea5d41fa488c5e9afa8b7b12b44"
+    },
+    {
+      "path": "release/uploads/file-1789893938254-176345168-poster.jpg",
+      "sha256": "40a48b61651ab1c857b20e7cebd9fa0ad912e2f464bf8c09ec6066f5d8f941ef"
+    }
+  ]
+}

@@ -9,10 +9,11 @@ import { sealBackupFiles, openBackupPackage, generateBackupKeyPair, digestBytes 
 import { normalizeState } from '../shared/domain.mjs';
 const projectRoot=path.resolve(import.meta.dirname,'..');
 const MAX_FILE_BYTES=100*1024*1024,MAX_FILES=500;
-const forbiddenOutputs=['public','.generated-public','dist','dist-private','release','release.previous','legacy-archive','supabase','data'].map(dir=>path.join(projectRoot,dir)+path.sep);
 export function assertSafeOutputDir(target){
  const resolved=path.resolve(target);
- if(forbiddenOutputs.some(prefix=>resolved===prefix.slice(0,-1)||resolved.startsWith(prefix))||resolved===projectRoot)throw Error(`输出目录不能落在公开产物或真实档案目录：${path.relative(projectRoot,resolved)||resolved}`);
+ let existing=resolved;while(!fs.existsSync(existing)){const parent=path.dirname(existing);if(parent===existing)break;existing=parent;}
+ const physical=path.resolve(fs.realpathSync(existing),path.relative(existing,resolved)),root=fs.realpathSync(projectRoot);
+ if(physical===root||physical.startsWith(root+path.sep)||resolved===projectRoot||resolved.startsWith(projectRoot+path.sep))throw Error('输出目录不能落在仓库内，请使用仓库外的私有目录');
  return resolved;
 }
 export function collectFiles(inputDir){

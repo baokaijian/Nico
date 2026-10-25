@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 // Deterministic protocol examples for CI only. Never used by the application or its seed.
 const protocolFixture = {
   growth: [{ id: 'fixture-growth-A', date: '2000-01-01', height: 100, handWidth: 5, footLength: 10 }, { id: 'fixture-growth-B', date: '2000-02-01', height: 101, handWidth: 4, footLength: 9 }],
@@ -7,6 +6,6 @@ const protocolFixture = {
   media: [{ id: 'fixture-media', date: '2000-03-01', title: '测试素材占位（无文件）', type: 'video', url: '/uploads/test.mp4', description: '' }],
 };
 export const originalPath = new URL('../data/original-input.json', import.meta.url);
-export const hasPrivateInput = process.env.NICO_TEST_PROTOCOL_ONLY !== 'true' && fs.existsSync(originalPath);
-export const seedBytes = hasPrivateInput ? fs.readFileSync(originalPath) : Buffer.from(JSON.stringify(protocolFixture));
+export const hasPrivateInput = false;
+export const seedBytes = Buffer.from(JSON.stringify(protocolFixture));
 export const raw = JSON.parse(seedBytes);

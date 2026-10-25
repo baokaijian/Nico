@@ -19,10 +19,15 @@ jobs:
       NICO_TEST_PROTOCOL_ONLY: 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+      - name: Refuse private files and secrets anywhere in the pushed history
+        run: node scripts/check-repository-privacy.mjs --history --revision "${{ github.sha }}"
       - run: npm ci
       - run: npm run check
       - name: Refuse an empty replacement for the existing public site

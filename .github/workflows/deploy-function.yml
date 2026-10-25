@@ -26,10 +26,15 @@ jobs:
       VITE_API_URL: https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+      - name: Refuse private files and secrets anywhere in the pushed history
+        run: node scripts/check-repository-privacy.mjs --history --revision "${{ github.sha }}"
       - run: npm ci
       - run: npm run check
   deploy:

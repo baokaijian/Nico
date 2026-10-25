@@ -41,6 +41,28 @@ review/
 .workbuddy/
 uploads/
 server/db.json
+# Private exports and encryption keys must never enter Git, including new paths.
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
+*.zip
+*.tar
+*.tgz
+*.bak
+*.bundle
+snapshot.json
+receipt.json
+pending-alert.json
+ops-*.json
 # Only the explicitly confirmed public package may contain distributable media.
 !release/uploads/
 !release/uploads/*
