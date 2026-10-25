@@ -5,7 +5,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {runSeal,runVerify,runRehearsal} from './backup-job.mjs';
 import {digestBytes,generateBackupKeyPair} from '../shared/backup-crypto.mjs';
-import {normalizeState,LEGACY_COLLECTIONS,emptyState} from '../shared/domain.mjs';
+import {normalizeState,COLLECTIONS,emptyState} from '../shared/domain.mjs';
 import {sanitizeOperationsEvent,sendOperationsAlert} from '../shared/operations-alerts.mjs';
 const root=path.resolve(import.meta.dirname,'..'),MiB=1024*1024;
 const within=(file,parent)=>file===parent||file.startsWith(parent+path.sep);
@@ -44,8 +44,15 @@ async function inventory(source,maxTotalBytes){
  return {files:files.sort((a,b)=>a.name.localeCompare(b.name)),totalBytes};
 }
 function snapshotInfo(source,files){
- let snapshot,state;try{snapshot=JSON.parse(fs.readFileSync(path.join(source,'snapshot.json'),'utf8'));if(snapshot.format!=='nico-backup-v1'||!Number.isSafeInteger(snapshot.revision)||snapshot.revision<0||LEGACY_COLLECTIONS.some(k=>!Array.isArray(snapshot.data?.[k])))fail('format');state=normalizeState(snapshot.data);}catch{fail('format');}
- const media=[...state.media,...state.trash.filter(t=>t.collection==='media').map(t=>t.record),...(state.growthHistory||[]).filter(h=>h.collection==='media').map(h=>h.record)],names=new Set(files.map(f=>f.name)),required=new Set();
+ let snapshot,state;try{snapshot=JSON.parse(fs.readFileSync(path.join(source,'snapshot.json'),'utf8'));if(snapshot.format!=='nico-backup-v1'||!Number.isSafeInteger(snapshot.revision)||snapshot.revision<0||COLLECTIONS.some(k=>!Array.isArray(snapshot.data?.[k]))||!['profile','publishing','trash'].every(k=>Object.hasOwn(snapshot.data,k))||!Array.isArray(snapshot.data.trash))fail('format');state=normalizeState(snapshot.data);}catch{fail('format');}
+ const retained=key=>[...state[key],...state.trash.filter(t=>t.collection===key).map(t=>t.record),...(state.growthHistory||[]).filter(h=>h.collection===key).map(h=>h.record)];
+ const media=[...state.media,...state.trash.filter(t=>t.collection==='media').map(t=>t.record)];
+ const reports=[...retained('reportDrafts')];
+ for(const book of retained('yearbooks')){media.push(...book.mediaSnapshots);reports.push(book.reportSnapshot);}
+ // Frozen report baselines retain old media variants even after current metadata changes.
+ // Inspect the typed snapshots, never free-text notes or remote URLs.
+ for(const report of reports){let baseline;try{baseline=JSON.parse(report.baseline);}catch{fail('format');}for(const item of baseline.sources)if(item.collection==='media')media.push(item.record);}
+ const names=new Set(files.map(f=>f.name)),required=new Set();
  for(const row of media){if(!row?.url)fail('missing-media');for(const key of ['url','playbackUrl','posterUrl'])if(row[key]){
   const match=typeof row[key]==='string'&&row[key].match(/^\/uploads\/([A-Za-z0-9_-][A-Za-z0-9_.-]*)$/);if(!match)fail('missing-media');const name=`uploads/${match[1]}`;if(!names.has(name))fail('missing-media');required.add(name);
  }}
@@ -58,10 +65,10 @@ export async function runOperations(config=null,{notification={}}={}){
  const phase=async(name,fn)=>{const started=Date.now();try{const result=await fn();receipt.phases.push({name,status:'pass',elapsedMs:Date.now()-started});return result;}catch(error){receipt.phases.push({name,status:'fail',elapsedMs:Date.now()-started});throw error;}};
  try{
   const cfg=await phase('configuration',()=>settings(config));
+  jobDir=path.join(cfg.work,receipt.runId);fs.mkdirSync(jobDir,{mode:0o700});
   const inv=await phase('inventory',()=>inventory(cfg.source,cfg.maxTotalBytes));
   const info=await phase('completeness',()=>snapshotInfo(cfg.source,inv.files));
   receipt.sourceRevision=info.revision;receipt.counts={files:inv.files.length,bytes:inv.totalBytes,mediaFiles:info.mediaFiles};
-  jobDir=path.join(cfg.work,receipt.runId);fs.mkdirSync(jobDir,{mode:0o700});
   const sealed=await phase('seal',async()=>{const result=await runSeal({inputDir:cfg.source,keyFile:cfg.publicKey,outDir:jobDir,info:{revision:info.revision,release:'1.9.0'}});if(!result.ok)fail('crypto');fs.chmodSync(path.join(jobDir,'package.json'),0o600);return path.join(jobDir,'package.json');});
   await phase('verify',async()=>{if(!(await runVerify({packageFile:sealed,keyFile:cfg.privateKey})).ok)fail('integrity');});
   await phase('source-stability',async()=>{try{if(JSON.stringify(await inventory(cfg.source,cfg.maxTotalBytes))!==JSON.stringify(inv))fail('source-changed');}catch{fail('source-changed');}});

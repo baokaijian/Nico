@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {generateBackupKeyPair,openBackupPackage} from '../shared/backup-crypto.mjs';
-import {emptyState} from '../shared/domain.mjs';
+import {emptyState,LEGACY_COLLECTIONS,normalizeState} from '../shared/domain.mjs';
+import {saveGrowth,actGrowth} from '../shared/growth-records.mjs';
 import {runOperations,rehearseOperations} from '../scripts/reliability-runner.mjs';
 import {sanitizeOperationsEvent,sendOperationsAlert} from '../shared/operations-alerts.mjs';
 const fixture=async t=>{
@@ -30,3 +31,17 @@ test('输入变化阻断投递；投递错误和回读损坏均明确失败且�
 });
 test('隔离恢复演练独立回执，不冒称生产恢复',async()=>{const result=await rehearseOperations();assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.productionRestore,false);assert.equal(result.mode,'isolated-protocol');for(const name of ['wrong-key','tampered','missing-entry','stale','restore'])assert.ok(result.phases.some(p=>p.name===name&&p.status==='pass'));});
 test('运行成功但回执写失败也不能报成功，错误不包含私人路径',async t=>{const {config,dir}=await fixture(t),write=fs.writeFileSync;try{fs.writeFileSync=function(file,...args){if(typeof file==='string'&&file.endsWith('/receipt.json'))throw Error('private '+dir);return write.call(this,file,...args);};const result=await runOperations(config);assert.equal(result.ok,false);assert.equal(result.category,'storage');assert.equal(JSON.stringify(result).includes(dir),false);}finally{fs.writeFileSync=write;}});
+test('完整备份不得将缺少的新集合/档案/公开范围/回收站静默补空',async t=>{const {config}=await fixture(t),file=path.join(config.sourceDir,'snapshot.json'),snapshot=JSON.parse(fs.readFileSync(file));const minimal={...snapshot,data:Object.fromEntries(LEGACY_COLLECTIONS.map(k=>[k,snapshot.data[k]]))};fs.writeFileSync(file,JSON.stringify(minimal));assert.equal((await runOperations(config)).category,'format');for(const key of ['profile','publishing','trash','skillAssessments']){const bad=structuredClone(snapshot);delete bad.data[key];fs.writeFileSync(file,JSON.stringify(bad));assert.equal((await runOperations(config)).category,'format',key);}});
+test('冻结报告/纪念册及仅保留历史/回收站版本中的旧媒体必须在包内',async t=>{
+ const {config}=await fixture(t),file=path.join(config.sourceDir,'snapshot.json'),snapshot=JSON.parse(fs.readFileSync(file));snapshot.data.media[0].posterUrl='/uploads/old-poster.png';
+ const ctx={actor:'protocol-parent',now:'2001-01-02T00:00:00Z'};
+ saveGrowth(snapshot.data,'reportDrafts',{title:'协议年报',periodType:'year',period:'2000',selectedMediaIds:['protocol-media']},{...ctx,id:'r'});
+ actGrowth(snapshot.data,'reportDrafts','r','confirm',{confirmedBy:'协议家长',note:'协议确认'},ctx);
+ saveGrowth(snapshot.data,'yearbooks',{title:'协议纪念册',year:'2000',reportId:'r',theme:'协议',selectedMediaIds:['protocol-media'],sectionOrder:['training','scores','skills','competitions','milestones','media','messages']},{...ctx,id:'b'});
+ snapshot.data.media[0].posterUrl='/uploads/new-poster.png';fs.writeFileSync(path.join(config.sourceDir,'uploads/new-poster.png'),'new');
+ normalizeState(snapshot.data);fs.writeFileSync(file,JSON.stringify(snapshot));assert.equal((await runOperations(config)).category,'missing-media');
+ snapshot.data.trash.push({collection:'yearbooks',record:snapshot.data.yearbooks.pop()});snapshot.data.reportDrafts=[];normalizeState(snapshot.data);fs.writeFileSync(file,JSON.stringify(snapshot));assert.equal((await runOperations(config)).category,'missing-media');
+ snapshot.data.trash=[];normalizeState(snapshot.data);fs.writeFileSync(file,JSON.stringify(snapshot));assert.equal((await runOperations(config)).category,'missing-media');
+ fs.writeFileSync(path.join(config.sourceDir,'uploads/old-poster.png'),'old');const complete=await runOperations(config);assert.equal(complete.ok,true,JSON.stringify(complete));assert.equal(complete.counts.mediaFiles,3);
+});
+test('完整性/容量预检失败也持久保存脱敏回执与待重试事件',async t=>{const {config}=await fixture(t);fs.unlinkSync(path.join(config.sourceDir,'uploads/protocol.png'));for(const current of [config,{...config,maxTotalBytes:1}]){const result=await runOperations(current);assert.equal(result.ok,false);const dir=path.join(config.workDir,result.runId);assert.ok(fs.existsSync(path.join(dir,'receipt.json')));const event=JSON.parse(fs.readFileSync(path.join(dir,'pending-alert.json')));assert.equal(event.runId,result.runId);assert.equal(event.category,result.category);assert.equal(event.kind,'backup-failed');assert.equal(JSON.stringify(event).includes(config.sourceDir),false);}});

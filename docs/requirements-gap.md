@@ -4,7 +4,7 @@
 | --- | --- | --- | --- | --- |
 | V1.7.1按未知保留 | Edge无能力，旧两字段缺审计 | score-decisions/ScoreDecision/api-capabilities、双后端专用接口 | 原swim元数据兼容，owner限定；不改PB或公开范围 | 已实际上线、225测试；真人裁决待执行 |
 | V1.8真实业务闭环 | 测评证据重选、目标往返、嵌套保存保护不足 | QuickEntry/entry-flow/GrowthGoals/Skills/busy-registry | 组合原实体，人工保存/确认、CAS/幂等/草稿不变 | 已实际上线、230测试和隔离UI；真机/45秒待验 |
-| V1.9备份运营 | 工具缺配置/投递回验/通知 | reliability-runner/operations-alerts/notify-operations/HealthPanel/工作流 | 仓库外私有目录、密文、无内容通知；无新迁移 | 239测试及隔离演练；正式目的地/密钥保管/调度/通知未启用 |
+| V1.9备份运营 | 工具缺配置/投递回验/通知 | reliability-runner/operations-alerts/notify-operations/HealthPanel/工作流 | 仓库外私有目录、密文、无内容通知；无新迁移 | 242测试及隔离演练；正式目的地/密钥保管/调度/通知未启用 |
 
 阶段文件、风险/回滚/生产回执分别见[v1-7-1-acceptance](v1-7-1-acceptance.md)、[v1-8-acceptance](v1-8-acceptance.md)、[v1-9-acceptance](v1-9-acceptance.md)。家长已明确V1.9仅配置与演练。历史隐私清理另需授权，本次未删除/重写。
 
