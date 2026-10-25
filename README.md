@@ -4,6 +4,10 @@
 
 访客无需登录即可查看公开成长概览、家长选定的成绩和授权影像；完整档案、训练计划、分析及原片需登录。管理员账号用于录入、修改、导出与恢复记录。网站仍由GitHub Pages提供，账号、记录与素材由Supabase承接。详见[管理员登录说明](ADMIN_LOGIN.md)。
 
+## 当前增量版本
+
+V1.7.1服务端裁决与V1.8连续成长操作已发布。V1.9提供私有加密作业配置、投递回读校验和隔离恢复演练；家长未选定离站目的地/密钥保管，正式上传、调度及外部通知未启用。见[状态矩阵](docs/feature-status.md)、[运维执行说明](docs/v1-9-operations.md)及[验收回执](docs/v1-9-acceptance.md)。真人、真机与真实素材验收仍待执行。
+
 ## V1.2 管理体验
 
 V1.2已合入master并发布到GitHub Pages，兼容API v12已部署。详细[导航方案、旧新映射、原操作路径和原型](docs/superpowers/specs/2026-10-22-v1-2-management-design.md)、[分阶段计划](docs/superpowers/plans/2026-10-22-v1-2-management.md)、[实际验收与回滚记录](docs/v1-2-acceptance.md)。前端与兼容API已配套验证，无破坏性数据库迁移。真人45秒录入目标尚未测量。

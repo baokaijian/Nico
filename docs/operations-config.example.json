@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "enabled": false,
+  "sourceDir": "/PRIVATE/immutable-export",
+  "workDir": "/PRIVATE/operations-work",
+  "targetDir": "/PRIVATE-MOUNT/nico-encrypted",
+  "allowedTargetRoot": "/PRIVATE-MOUNT",
+  "recipientPublicKeyFile": "/PRIVATE-KEYS/backup-public.key",
+  "verificationPrivateKeyFile": "/TEMPORARY-OFFLINE-KEY/backup-private.key",
+  "maxTotalBytes": 268435456
+}

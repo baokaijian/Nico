@@ -74,3 +74,20 @@ jobs:
           done
           echo "发布验证失败：线上资源、版本或API指纹与本次发布不一致"
           exit 1
+  notify-failure:
+    if: always() && github.event_name != 'pull_request' && (needs.build.result == 'failure' || needs.deploy.result == 'failure' || needs.verify.result == 'failure')
+    needs: [build, deploy, verify]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Record actual release failure
+        run: echo 'Release failed. A failed version/asset verification is not a completed release. External delivery requires an explicitly configured private recipient.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Optional technical notification
+        env:
+          NICO_ALERT_KIND: release-failed
+          NICO_OPERATIONS_WEBHOOK: ${{ secrets.NICO_OPERATIONS_WEBHOOK }}
+          NICO_OPERATIONS_ALLOWED_HOSTS: ${{ secrets.NICO_OPERATIONS_ALLOWED_HOSTS }}
+        run: node scripts/notify-operations.mjs

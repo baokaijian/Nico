@@ -58,3 +58,20 @@ jobs:
         run: node scripts/verify-deployment.mjs --wait
       - name: Guest read check against the deployed function
         run: node scripts/verify-guest-read.mjs https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
+  notify-failure:
+    if: always() && (needs.check.result == 'failure' || needs.deploy.result == 'failure')
+    needs: [check, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Record actual API release failure
+        run: echo 'API release or actual source verification failed. A skipped deployment is not proof of deployment.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Optional technical notification
+        env:
+          NICO_ALERT_KIND: release-failed
+          NICO_OPERATIONS_WEBHOOK: ${{ secrets.NICO_OPERATIONS_WEBHOOK }}
+          NICO_OPERATIONS_ALLOWED_HOSTS: ${{ secrets.NICO_OPERATIONS_ALLOWED_HOSTS }}
+        run: node scripts/notify-operations.mjs

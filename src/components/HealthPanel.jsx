@@ -19,6 +19,7 @@ export default function HealthPanel({api}) {
     <article className="glass-card"><h2>本设备观测</h2><p>仅本页面生命周期内计数，退出或更换账号后清空。</p><Counts value={device}/></article>
     <article className="glass-card"><h2>当前后端实例</h2><p>实例冷启动会重置；全站趋势需按运维手册查询平台日志。</p><Counts value={server?.instance}/></article>
     <article className="glass-card"><h2>媒体与备份</h2>{ops?<><p>私有存储：{ops.storage?.count??'未知'} 个对象，{ops.storage?.bytes==null?'未知':(ops.storage.bytes/1024/1024).toFixed(1)} MB{ops.storage?.complete===false?'（列表不完整，不能当作总容量）':''}。</p><p>原始素材 {ops.media?.originals??'未知'}；视频 {ops.media?.videos??'未知'}；已处理 {ops.media?.processed??'未知'}；处理失败 {ops.media?.failed??'未知'}；待处理或未知 {ops.media?.pendingOrUnknown??'未知'}。这是当前记录状态，不是处理尝试成功率。</p><p>最近写前备份：{time(ops.backups?.latestAt)}；备份版本 {ops.backups?.latestRevision??'未知'}，当前版本 {ops.backups?.currentRevision??'未知'}。</p></>:<p>存储与备份信息尚未读取。</p>}<p className="muted">定时备份与自动恢复验证尚未配置。隔离恢复演练另记验收记录，不能证明已恢复生产档案。</p></article>
+    <article className="glass-card"><h2>私人运维配置</h2><p>加密、完整性检查、私有挂载目录投递、回读校验和隔离恢复工具已就绪。家长尚未选定离站目的地与恢复密钥保管方式，正式上传、定时运行及外部通知未启用。</p><p className="muted">隔离演练使用合成资料，不代表生产档案已经离站备份或成功恢复。通知失败和发布指纹不符会保留明确失败状态；当前页面不代表外部作业的实时状态。</p></article>
     <article className="glass-card"><h2>待人工验收</h2><p>真人45秒录入、真实手机、真实训练视频转码、浏览器PDF打印和完整无障碍。</p><p className="muted">生产业务样本不足，暂不启用错误率或延迟告警。版本不一致需立即排查；401 权限拒绝包含正常安全校验，不能计作服务故障。</p></article>
   </section>;
 }

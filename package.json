@@ -22,6 +22,7 @@
     "release:verify": "node scripts/verify-deployment.mjs",
     "release:consistency": "node scripts/verify-release-consistency.mjs",
     "backup:job": "node scripts/backup-job.mjs",
+    "operations:run": "node scripts/reliability-runner.mjs",
     "storage:report": "node scripts/storage-report.mjs",
     "media:prepare": "node scripts/media-prepare.mjs",
     "init:data": "node scripts/init-data.mjs",

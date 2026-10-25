@@ -1,3 +1,15 @@
+# 最新需求差距（2026-10-25）
+
+| 需求 | 原有差距 | 本次增量/代码 | 数据与权限 | 验收/遗留 |
+| --- | --- | --- | --- | --- |
+| V1.7.1按未知保留 | Edge无能力，旧两字段缺审计 | score-decisions/ScoreDecision/api-capabilities、双后端专用接口 | 原swim元数据兼容，owner限定；不改PB或公开范围 | 已实际上线、225测试；真人裁决待执行 |
+| V1.8真实业务闭环 | 测评证据重选、目标往返、嵌套保存保护不足 | QuickEntry/entry-flow/GrowthGoals/Skills/busy-registry | 组合原实体，人工保存/确认、CAS/幂等/草稿不变 | 已实际上线、230测试和隔离UI；真机/45秒待验 |
+| V1.9备份运营 | 工具缺配置/投递回验/通知 | reliability-runner/operations-alerts/notify-operations/HealthPanel/工作流 | 仓库外私有目录、密文、无内容通知；无新迁移 | 239测试及隔离演练；正式目的地/密钥保管/调度/通知未启用 |
+
+阶段文件、风险/回滚/生产回执分别见[v1-7-1-acceptance](v1-7-1-acceptance.md)、[v1-8-acceptance](v1-8-acceptance.md)、[v1-9-acceptance](v1-9-acceptance.md)。家长已明确V1.9仅配置与演练。历史隐私清理另需授权，本次未删除/重写。
+
+以下为旧版本当时记录，不表示上述功能仍待开发。
+
 # 需求差距与交付状态
 
 最新范围：2026-10-24 V1.5.3。新增真实资料首次引导、统一待办、公开核验/历史成绩分区；不重复V1.2–V1.5.2模块、不补造生产记录、不改变公开白名单。当前差距与风险见[v1-5-3-gap-and-risks.md](v1-5-3-gap-and-risks.md)，验收及发布见[v1-5-3-acceptance.md](v1-5-3-acceptance.md)。真人操作见[待验模板](manual-acceptance-template.md)；V1.6只有[设计及配置依赖](v1-6-reliability-design.md)，未启用离站传输或外部告警。以下旧阶段按历史保留。
