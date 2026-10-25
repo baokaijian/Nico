@@ -55,11 +55,17 @@ export function validateDecisionHistory(row){
 export function retainScoreDecisions(previous,next,ctx){
  const all=d=>[...(d.swim||[]),...(d.trash||[]).filter(t=>t.collection==='swim').map(t=>t.record)];
  const current=new Map(all(previous).map(r=>[r.id,r]));
+ const present=new Set(all(next).map(r=>r.id));next.trash||=[];
+ for(const prior of current.values())if(prior.conditionsDecisionHistory?.length&&!present.has(prior.id)){
+  const oldTrash=(previous.trash||[]).find(t=>t.collection==='swim'&&t.record.id===prior.id);
+  next.trash.push(oldTrash?structuredClone(oldTrash):{id:`retained-swim-${prior.id}`,collection:'swim',record:structuredClone(prior),deletedAt:ctx.now,deletedBy:ctx.actor});
+ }
  for(const row of all(next)){
-  const prior=current.get(row.id);if(!prior?.conditionsDecisionHistory?.length)continue;
-  const old=prior.conditionsDecisionHistory,incoming=row.conditionsDecisionHistory||[];
+  const prior=current.get(row.id);if(!prior)continue;
+  const old=prior.conditionsDecisionHistory||[],incoming=row.conditionsDecisionHistory||[];
+  if(incoming.length>old.length)fail('备份包含服务端未核实的裁决审计扩展',409);
   for(let i=0;i<Math.min(old.length,incoming.length);i++)if(canonical(old[i])!==canonical(incoming[i]))fail('备份裁决审计与已有历史矛盾',409);
-  if(incoming.length<=old.length){row.conditionsDecisionHistory=structuredClone(old);clear(row);for(const k of metadata)if(prior[k]!==undefined)row[k]=prior[k];expireScoreDecision(prior,row,ctx);}
+  if(incoming.length<=old.length){if(old.length)row.conditionsDecisionHistory=structuredClone(old);else delete row.conditionsDecisionHistory;clear(row);for(const k of metadata)if(prior[k]!==undefined)row[k]=prior[k];expireScoreDecision(prior,row,ctx);}
   validateDecisionHistory(row);
  }
  return next;
