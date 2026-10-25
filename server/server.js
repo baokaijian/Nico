@@ -1,3 +1,4 @@
+import {decisionInput,decisionReplay,applyScoreDecision,expireScoreDecision,retainScoreDecisions} from '../shared/score-decisions.mjs';
 import { activityRelations } from '../shared/activity-records.mjs';
 import { growthCollection, growthId } from '../shared/growth-model.ts';
 import { saveGrowth, actGrowth, deleteGrowth, restoreGrowth, retainGrowthHistory, goalCandidates, skillTimeline } from '../shared/growth-records.mjs';
@@ -54,7 +55,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     next();
   });
   const publicSummary = () => publicSnapshot(store.read().data);
-  app.get('/api/version',(_req,res)=>res.json({schema:1,release:'local-development',sourceHash:null}));
+  app.get('/api/version',(_req,res)=>res.json({schema:1,release:'local-development',sourceHash:null,capabilities:{scoreConditionsDecisionV1:true}}));
   app.get('/api/public-summary', (_req, res) => res.json(publicSummary()));
   app.get('/api/public-media/:file', (req, res) => {
     const files = publicSummary().media.flatMap(item => [item.url, item.posterUrl].filter(Boolean).map(url => path.basename(url)));
@@ -151,6 +152,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   });
   app.get('/api/skills-overview', (req, res) => res.json(skillTimeline(store.read().data, req.query.skillId ? growthId(req.query.skillId) : '')));
   app.get('/api/goals/:id/candidates', (req, res) => { const data = store.read().data, goal = data.goals.find(row => row.id === req.params.id); if (!goal) throw httpError(404, '目标不存在'); res.json(goalCandidates(data, goal)); });
+  app.post('/api/swim/:id/conditions-decision',(req,res)=>{requireOwner(req);revision(req);const input=decisionInput(req.body),current=store.read(),row=current.data.swim.find(r=>r.id===req.params.id);if(!row)throw httpError(404,'记录不存在');if(decisionReplay(row,input,req.username))return reply(res,{revision:current.revision,result:row});reply(res,change(req,data=>applyScoreDecision(data.swim.find(r=>r.id===req.params.id),input,{actor:req.username,now:new Date().toISOString()})));});
   app.post('/api/:collection/:id/:action', (req, res, next) => { if (!growthCollection(req.params.collection)) return next(); requireOwner(req); reply(res, change(req, data => actGrowth(data, req.params.collection, req.params.id, req.params.action, req.body, { actor: req.username, now: new Date().toISOString() }))); });
   for (const key of COLLECTIONS) {
     app.get(`/api/${key}`, (req, res) => { const current = store.read(); const skillId = key === 'skillAssessments' && req.query.skillId ? growthId(req.query.skillId) : ''; res.set('X-Nico-Revision', String(current.revision)).json(skillId ? current.data[key].filter(row => row.skillId === skillId) : current.data[key]); });
@@ -172,7 +174,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
         if (index < 0) throw httpError(404, '记录不存在');
         const previous = data[key][index];
         if (growthCollection(key, previous) || key === 'goals' && req.body.modelVersion === 1) return saveGrowth(data, key, req.body, { id: previous.id, actor: req.username, now: new Date().toISOString() });
-        const record = validate(key, req.body, previous); relations(key, record, data, previous);
+        const record = validate(key, req.body, previous); if(key==='swim')expireScoreDecision(previous,record,{actor:req.username,now:new Date().toISOString()}); relations(key, record, data, previous);
         if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, previous, req.username, new Date().toISOString());
         if (key === 'plans') {
           const outcome = commitPlanUpdate(data, req.params.id, data[key][index], record);
@@ -232,7 +234,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     let restored; try { restored = normalizeState(req.body.data); } catch (error) { throw httpError(400, error.message); }
     // Backups exported before the practice loop existed simply have no weakpoints/checkins.
     for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(req.body.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw httpError(400, '备份集合或记录ID缺失、重复');
-    reply(res, change(req, data => { const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion; const retained = retainGrowthHistory(data, retainPlanHistory(data, restored), { actor: req.username, now: new Date().toISOString() }); let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained; if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); return { success: true }; }, { planSync: false }));
+    reply(res, change(req, data => { const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion; const retained = retainScoreDecisions(data,retainGrowthHistory(data, retainPlanHistory(data, restored), { actor: req.username, now: new Date().toISOString() }),{actor:req.username,now:new Date().toISOString()}); let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained; if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data; for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); return { success: true }; }, { planSync: false }));
   });
   const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_req, file, cb) => cb(null, `${makeId('file')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: 100 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
     const formats = { '.png': ['image/png'], '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.webp': ['image/webp'], '.mp4': ['video/mp4'], '.mov': ['video/quicktime'], '.webm': ['video/webm'] };

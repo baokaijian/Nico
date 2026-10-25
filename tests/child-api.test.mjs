@@ -24,7 +24,7 @@ for(const runtime of ['cloud','local'])test(`${runtime}: 儿童限权、父撤�
   const grant=await send('/api/auth/child','POST',{viewId:view.id});assert.equal(grant.status,200,await grant.clone().text());const result=await grant.json();assert.equal(result.role,'child');assert.ok(result.expiresAt<=time+900000);const child=runtime==='cloud'?{token:result.accessToken}:{cookie:grant.headers.get('set-cookie').split(';')[0],csrf:result.csrf};
   const visible=await send('/api/child-view','GET',undefined,child);assert.equal(visible.status,200);assert.doesNotMatch(await visible.text(),/uploads|未授权照片|createdBy/);
   for(const route of ['/api/snapshot','/api/backup','/api/swim','/api/health','/api/media/hidden/content/original'])assert.equal((await send(route,'GET',undefined,child)).status,403,route);
-  for(const route of ['/api/trainings','/api/childViews','/api/auth/child','/api/auth/password'])assert.equal((await send(route,'POST',{},child)).status,403,route);
+  for(const route of ['/api/trainings','/api/childViews','/api/auth/child','/api/auth/password','/api/swim/protocol-score/conditions-decision'])assert.equal((await send(route,'POST',{},child)).status,403,route);
   assert.equal((await send('/api/child-media/selected','GET',undefined,child)).status,200);assert.equal((await send('/api/child-media/hidden','GET',undefined,child)).status,404);
   const input={date:'2000-01-01',trainingId:'',mood:'开心',text:'今天想再试试',clientRequestId:'child-request'};const base=read().revision;
   const saved=await send('/api/child-reflections','POST',input,child);assert.equal(saved.status,201,await saved.clone().text());const receipt=await saved.json();assert.equal(read().data.childReflections[0].status,'待确认');assert.doesNotMatch(JSON.stringify(receipt),/createdBy|confirmationNote/);

@@ -1,3 +1,4 @@
+import {validateDecisionHistory} from './score-decisions.mjs';
 import { validateGrowthInput, validateStoredGrowth, growthCollection } from './growth-model.ts';
 import { validateGrowthHistory } from './growth-records.mjs';
 import { PERFORMANCE_VERSION, TIME_FIELDS, VALIDITY_STATUSES, validTimeMs, formatMilliseconds, parseMilliseconds, normalizePerformanceRecord, performanceMilliseconds, performanceSeconds, validityLabel, eligiblePerformance } from './performance.ts';
@@ -214,6 +215,7 @@ export function normalizeState(raw) {
   return state;
 }
 function validateStoredFields(collection, record) {
+  if(collection==='swim')validateDecisionHistory(record);
   if (growthCollection(collection, record)) { validateStoredGrowth(collection, record); return; }
   for (const field of FIELDS[collection]) {
     const value = record[field.key];

@@ -1,0 +1,1 @@
+export async function readApiCapabilities(api,signal){const v=await api.request('/api/version',{anonymous:true,signal});return {scoreConditionsDecisionV1:v?.schema===1&&v?.capabilities?.scoreConditionsDecisionV1===true};}

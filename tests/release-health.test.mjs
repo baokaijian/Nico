@@ -52,7 +52,7 @@ test('版本接口无档案读写；健康只对有效家长会话开放且没�
   let reads=0;const release={schema:1,release:'1.4.1',sourceHash:'a'.repeat(64)};
   const handler=createCloudHandler({origins:[],release,backend:{read:async()=>{reads++;throw Error('must not read facts');},session:async()=>({username:'private-account',expires_at:'2100-01-01T00:00:00Z'}),account:async()=>({must_change_password:false}),health:async()=>({storage:{count:2,bytes:100},backups:{count:3}})}});
   const call=(p,token)=>handler(new Request('https://protocol.invalid/nico-api'+p,{headers:token?{Authorization:`Bearer ${token}`}:{}}));
-  const version=await call('/api/version');assert.equal(version.status,200);assert.deepEqual(await version.json(),release);assert.equal(reads,0);
+  const version=await call('/api/version');assert.equal(version.status,200);assert.deepEqual(await version.json(),{...release,capabilities:{scoreConditionsDecisionV1:true}});assert.equal(reads,0);
   assert.equal((await call('/api/health')).status,401);const health=await call('/api/health','a'.repeat(64));assert.equal(health.status,200);
   const info=await health.json();assert.equal(info.release.sourceHash,release.sourceHash);assert.equal(info.operations.storage.bytes,100);assert.doesNotMatch(JSON.stringify(info),/private-account|accessToken/);assert.equal(reads,0);
 });

@@ -1,3 +1,4 @@
+import {decisionInput,decisionReplay,applyScoreDecision,expireScoreDecision,retainScoreDecisions} from '../shared/score-decisions.mjs';
 import { activityRelations } from '../shared/activity-records.mjs';
 import { growthCollection, growthId } from '../shared/growth-model.ts';
 import { saveGrowth, actGrowth, deleteGrowth, restoreGrowth, retainGrowthHistory, goalCandidates, skillTimeline } from '../shared/growth-records.mjs';
@@ -72,7 +73,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
       const url = new URL(request.url), endpoint = url.pathname.replace(/^.*\/nico-api(?=\/|$)/, '').replace(/\/$/, '');
       const parts = endpoint.split('/').filter(Boolean).map(decodeURIComponent);
       const method = request.method;
-      if (['GET','HEAD'].includes(method) && endpoint === '/api/version') return method === 'HEAD' ? new Response(null,{headers}) : json(release);
+      if (['GET','HEAD'].includes(method) && endpoint === '/api/version') return method === 'HEAD' ? new Response(null,{headers}) : json({...release,capabilities:{scoreConditionsDecisionV1:true}});
       const body = async () => {
         if (!request.headers.get('content-type')?.startsWith('application/json')) throw fail(415, '请求内容格式无效');
         const text = await request.text(); if (text.length > 5 * 1024 * 1024) throw fail(413, '请求内容过大');
@@ -179,12 +180,20 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
         const replay = creationReplay(data, 'media', receipt); if (replay) return json(replay);
         mediaInput = { input, file, source, sourceSha256 };
       }
+      let decision;
+      if(method==='POST'&&parts[1]==='swim'&&parts.length===4&&parts[3]==='conditions-decision'){
+        if(session.role!=='owner')throw fail(403,'此操作仅限家长管理者');
+        const row=data.swim.find(r=>r.id===parts[2]);if(!row)throw fail(404,'记录不存在');
+        decision=decisionInput(await body());
+        if(decisionReplay(row,decision,session.username))return json(row);
+      }
       if (Number(expected) !== current.revision) throw fail(409, '记录已被更新，请刷新后核对并重试；当前输入已保留');
       let result, uploadedFile;
       const uploadedVariants = [];
       let planSync = true;
       try {
-        if (parts[1] === 'media' && parts.length === 2 && method === 'POST') {
+        if(decision){result=applyScoreDecision(data.swim.find(r=>r.id===parts[2]),decision,{actor:session.username,now:new Date(now()).toISOString()});}
+        else if (parts[1] === 'media' && parts.length === 2 && method === 'POST') {
           const { input, file, source, sourceSha256 } = mediaInput;
           if (!(file instanceof Blob) || !file.size || file.size > 50 * 1024 * 1024) throw fail(400, '请选择50MB以内的素材');
           const types = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' };
@@ -243,7 +252,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
             if (method === 'PUT') {
               const previous = data[key][index], input = await body();
               if (growthCollection(key, previous) || key === 'goals' && input.modelVersion === 1) { result = saveGrowth(data, key, input, { id: previous.id, actor: session.username, now: new Date(now()).toISOString() }); } else {
-              const record = validate(key, input, previous); relations(key, record, data, previous);
+              const record = validate(key, input, previous); if(key==='swim')expireScoreDecision(previous,record,{actor:session.username,now:new Date(now()).toISOString()}); relations(key, record, data, previous);
               if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, previous, session.username, new Date(now()).toISOString());
               if (key === 'plans') { const outcome = commitPlanUpdate(data, parts[2], data[key][index], record); if (outcome.error) throw fail(400, outcome.error); }
               data[key][index] = record; result = record; }
@@ -267,7 +276,7 @@ export function createCloudHandler({ backend, origins, now = Date.now, sessionMs
           let restored; try { restored = normalizeState(input.data); } catch (error) { throw fail(400, error.message); }
           for (const key of LEGACY_COLLECTIONS) if (!Object.hasOwn(input.data, key) || new Set(restored[key].map(r => r.id)).size !== restored[key].length || restored[key].some(r => !r.id)) throw fail(400, '备份集合或记录ID缺失、重复');
           const dataVersion = data.schemaVersion, performanceVersion = data.performanceSchemaVersion;
-          const retained = retainGrowthHistory(data, retainPlanHistory(data, restored), { actor: session.username, now: new Date(now()).toISOString() });
+          const retained = retainScoreDecisions(data,retainGrowthHistory(data, retainPlanHistory(data, restored), { actor: session.username, now: new Date(now()).toISOString() }),{actor:session.username,now:new Date(now()).toISOString()});
           let compatible = dataVersion === 2 ? upgradePrdState(retained).data : retained;
           if (performanceVersion === 1) compatible = upgradePerformanceState(compatible).data;
           for (const key of Object.keys(data)) delete data[key]; Object.assign(data, compatible); result = { success: true };

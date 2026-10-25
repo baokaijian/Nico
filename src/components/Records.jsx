@@ -1,6 +1,7 @@
+import ScoreDecision from './ScoreDecision';
 import { TIME_FIELDS, performanceInput, performanceLabel, performanceMilliseconds, validityLabel, eligiblePerformance } from '../../shared/performance.ts';
 import { BODY_FIELDS, bodyFormat, dateFormat, derivePrdState } from '../../shared/prd.mjs';
-import { missingScoreConditions, scoreConditionLabel, readablePerformance } from '../../shared/score-conditions.mjs';
+import { missingScoreConditions, readablePerformance } from '../../shared/score-conditions.mjs';
 import { downloadJSON, today } from '../services/files';
 import { useEffect, useRef, useState } from 'react';
 import { FIELDS, ordered, best, validateRecord, WOMEN_50, STANDARD_SOURCE, STANDARD_VERSION } from '../../shared/domain.mjs';
@@ -16,7 +17,7 @@ function valueLabel(value) { return value === true ? '按既有专业建议服�
 export default function Records(props) {
   return props.type === 'trainings' ? <TrainingRecords {...props}/> : <GenericRecords {...props}/>;
 }
-function GenericRecords({ focusMediaId, focusId, type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
+function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
   const fields = FIELDS[type];
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => ({ ...Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : ''])), ...(type === 'swim' ? { validityStatus: '未核验' } : {}), ...initialContext });
@@ -102,27 +103,12 @@ function GenericRecords({ focusMediaId, focusId, type, data, api, onSaved, readO
       {type === 'swim' && !publicMode && <p className="muted">{r.startType || '出发未知'} · {r.timingMethod || '计时未知'} · {r.recordType || '记录性质未知'} · {validityLabel(r)}</p>}
       {type === 'swim' && !publicMode && r.timeMs !== undefined && <p className="muted">精确计时：{(performanceMilliseconds(r) / 1000).toFixed(3)}秒 · 录入值：{r.timeInput || r.time}</p>}
       {type === 'swim' && !publicMode && r.conditionsKeptUnknownAt && <p className="muted">计时条件已按未知保留（{r.conditionsKeptUnknownAt}，裁决人：{r.conditionsKeptUnknownBy}）；成绩数值、有效性与PB参与规则不变。</p>}
-      {type === 'swim' && !publicMode && !readOnly && missingScoreConditions(r).length > 0 && !r.conditionsKeptUnknownAt && <KeepUnknown record={r} api={api} onSaved={onSaved}/>}
+      {type==='swim'&&!publicMode&&(missingScoreConditions(r).length>0||r.conditionsDecisionHistory?.length)&&<ScoreDecision record={r} api={api} onSaved={onSaved} canAct={!readOnly&&role==='owner'}/>}
       <details><summary>{type === 'goals' ? '查看原始目标（规则待复核）' : publicMode ? '查看成绩条件' : '查看完整字段与来源'}</summary><dl className="record-fields">{displayFields.map(f => <div key={f.key}><dt>{f.label}</dt><dd>{type === 'growth' && BODY_FIELDS.includes(f.key) ? bodyFormat(r[f.key]) : f.type === 'date' ? dateFormat(r[f.key]) : valueLabel(r[f.key])}</dd></div>)}<div><dt>记录ID</dt><dd>{r.id}</dd></div></dl></details>
       {type === 'swim' && !publicMode && <dl className="record-fields"><div><dt>测试年龄组</dt><dd>{valueLabel(effective.swim.find(s => s.id === r.id)?.testAgeGroup)}</dd></div><div><dt>与第一名差距</dt><dd>{valueLabel(effective.swim.find(s => s.id === r.id)?.gapTime)}</dd></div><div><dt>关联照片 / 视频</dt><dd>{data.media.filter(m => m.recordId === r.id).map(m => m.title).join('、') || '未关联（请在素材说明中选择关联记录）'}</dd></div></dl>}
       {type === 'swim' && !publicMode && <StandardNote record={r} sex={data.profile.sex}/>}
     </article>)}</div></>}
   </div>;
-}
-function KeepUnknown({ record, api, onSaved }) {
-  const [name, setName] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const save = async event => {
-    event.preventDefault(); setBusy(true); setError('');
-    try {
-      const saved = await api.request(`/api/swim/${record.id}`, { method: 'PUT', body: { conditionsKeptUnknownAt: today(), conditionsKeptUnknownBy: name }, expectedRevision: api.getRevision() });
-      onSaved('swim', saved);
-    } catch (problem) { setError(String(problem?.message || '').includes('不支持的字段') ? '云端API尚未部署到支持“按未知保留”的版本，此操作暂不可用；已填内容保留，请稍后由管理员部署最新API后重试。' : problem.message); } finally { setBusy(false); }
-  };
-  return <details className="keep-unknown"><summary>计时条件确实未知？</summary>
-    <p className="muted">当前缺失：{missingScoreConditions(record).map(scoreConditionLabel).join('、')}。核对原始来源后仍无法确认时，可按未知保留：这条记录不再出现在“计时条件缺失”待办；条件字段保持未知，成绩数值、有效性与PB参与规则不变，且保留裁决记录。</p>
-    <form onSubmit={save} className="actions"><label className="form-group">裁决人<input className="apple-input" value={name} onChange={e => setName(e.target.value)} required maxLength={50}/></label><button className="apple-btn apple-btn-secondary" disabled={busy}>{busy ? '正在保存…' : '确认按未知保留'}</button></form>
-    <Message error>{error}</Message>
-  </details>;
 }
 function StandardNote({ record, sex }) {
   if (!eligiblePerformance(record)) return <p className="muted">当前成绩未核验有效或池长未知，不匹配等级参考线。</p>;

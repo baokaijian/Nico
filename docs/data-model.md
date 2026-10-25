@@ -120,3 +120,7 @@ V1.5 `yearbooks`冻结同年已确认reportDraft及其版本/基线、精选素�
 `growthSetup(data,day)`从成绩条件、当前标准版本的已确认测评、实际训练、目标和素材关系推导五步状态。localStorage仅保存按API/账号/档案隔离的activeStep/deferredIds枚举；不存事实、等级、完成位或个人资料。设备间位置不承诺同步；不能代替后台核验。
 
 `publicResults(summary.swim)`只消费已有公开投影，核心PB/有效性函数不改。当前公开合同没有testItem：具体打腿项目不明的授权记录留在历史，保留原有效性，但不合并成可比PB；不回取私有档案补字段。公开名单与后端合同均不变。
+
+## V1.7.1 私有计时条件裁决
+
+swim可含conditionsKeptUnknownAt/By/Note及conditionsDecisionHistory。历史由owner专用POST生成，事件保存稳定请求ID、递增版本、动作keep/reopen/expire、人工裁决人/理由、认证actor、服务端时间及条件快照。通用PUT不可注入；普通条件编辑使旧决定失效但不影响成绩有效性。恢复保留较新历史，矛盾同版本拒绝；旧记录无需迁移。此元数据不进入publicSnapshot，不改变PB和timeMs。
