@@ -22,14 +22,15 @@ export function createAccounts({ filename, setupCodePath, now = Date.now, sessio
     return value;
   };
   account(); // Invalid credentials must fail closed, never reset an existing account.
-  const issue = current => {
+  const issue = (current, role = 'owner') => {
     for (const [key, session] of sessions) if (session.expiresAt <= now()) sessions.delete(key);
     while (sessions.size >= 10) sessions.delete(sessions.keys().next().value);
     const token = randomBytes(32).toString('hex');
-    const session = { username: current.username, role: 'owner', csrf: randomBytes(32).toString('hex'), expiresAt: now() + sessionMs, fingerprint: current.passwordHash };
+    const session = { username: current.username, role, csrf: randomBytes(32).toString('hex'), expiresAt: now() + sessionMs, fingerprint: current.passwordHash };
     sessions.set(hash(token), session);
     return { token, session };
   };
+  const issueCoach = coachAccount => issue(coachAccount, 'coach');
   async function login(username, password, address) {
     for (const [key, value] of attempts) if (value.until <= now()) attempts.delete(key);
     const key = hash(address), previous = attempts.get(key);
@@ -60,10 +61,10 @@ export function createAccounts({ filename, setupCodePath, now = Date.now, sessio
     if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
     const key = hash(token), session = sessions.get(key);
     if (!session) return null;
-    if (session.expiresAt <= now() || session.fingerprint !== account()?.passwordHash) { sessions.delete(key); return null; }
+    if (session.expiresAt <= now() || (session.role !== 'coach' && session.fingerprint !== account()?.passwordHash)) { sessions.delete(key); return null; }
     if(session.role==='child'){const parent=sessions.get(session.parentHash);if(!parent||parent.role!=='owner'||parent.expiresAt<=now()||parent.username!==session.username){sessions.delete(key);return null;}}
     return session;
   };
   const issueChild=(parentToken,context)=>{const parent=readSession(parentToken);if(parent?.role!=='owner')throw failure(403,'只有家长可以开启儿童查看');const result=issue(account());Object.assign(result.session,{role:'child',parentHash:hash(parentToken),context:structuredClone(context),expiresAt:Math.min(parent.expiresAt,now()+900000)});return result;};
-  return { configured: () => !!account(), login, setup, readSession, issueChild, logout: token => { if (token) sessions.delete(hash(token)); }, sessionMs };
+  return { configured: () => !!account(), login, setup, readSession, issueChild, issueCoach, logout: token => { if (token) sessions.delete(hash(token)); }, sessionMs };
 }

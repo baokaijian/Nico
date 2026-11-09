@@ -24,13 +24,15 @@ const Profile = lazy(() => import('./Profile'));
 const PrivateArchive = lazy(() => import('./PrivateArchive'));
 const ChildSettings = lazy(() => import('./ChildSettings'));
 const HealthPanel = lazy(() => import('./HealthPanel'));
-export default function ManagementView({ location, navigate, data, api, onSaved, reload, readOnly, role, openQuickEntry, initialOpen, initialFilter, mediaTarget, resumeVersion, onEnterChild }) {
-  const { section, view } = location, owner = role === 'owner';
+const CoachGrants = lazy(() => import('./CoachGrants'));
+const PeriodComparison = lazy(() => import('./PeriodComparison'));
+export default function ManagementView({ location, navigate, data, api, onSaved, reload, readOnly, role, openQuickEntry, initialOpen, initialFilter, mediaTarget, resumeVersion, onEnterChild, onSwitchAthlete }) {
+  const { section, view } = location, owner = role === 'owner', coach = role === 'coach';
   const shared = { data, api, onSaved, reload, readOnly, navigate, role };
   const views = section === 'settings' ? SETTINGS_VIEWS : MANAGEMENT_NAV.find(item => item.key === section)?.views || [];
   const archive = section === 'review' && ['archive', 'growth', 'fitness', 'nutrition'].includes(view);
   if (section === 'settings' && !owner) return <Message>管理设置仅限家长管理者。</Message>;
-  return <div className="management-view stack">{(section !== 'workbench'||views.length>1) && <nav className="management-sections" aria-label={`${section === 'settings' ? '管理设置' : MANAGEMENT_NAV.find(item => item.key === section)?.label}分类`}>{section === 'review' ? REVIEW_GROUPS.map(([group, keys]) => <span className="nav-group" key={group}><small className="nav-group-label">{group}</small>{keys.map(key => { const item = views.find(([value]) => value === key); return item ? <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{item[1]}</button> : null; })}</span>) : views.map(([key, label]) => <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{label}</button>)}</nav>}
+  return <div className="management-view stack">{coach && <Message>教练协作精简视图：您仅可查看或录入已获家长授权的运动员训练、成绩、点评及关联影像；档案设置、公开展示与删除操作仅限家长管理。</Message>}{(section !== 'workbench'||views.length>1) && <nav className="management-sections" aria-label={`${section === 'settings' ? '管理设置' : MANAGEMENT_NAV.find(item => item.key === section)?.label}分类`}>{section === 'review' ? REVIEW_GROUPS.map(([group, keys]) => <span className="nav-group" key={group}><small className="nav-group-label">{group}</small>{keys.map(key => { const item = views.find(([value]) => value === key); return item ? <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{item[1]}</button> : null; })}</span>) : views.map(([key, label]) => <button key={key} aria-current={view === key || archive && key === 'archive' ? 'page' : undefined} onClick={() => navigate(section, key)}>{label}</button>)}</nav>}
     {archive && <div className="ctx-tabs" role="group" aria-label="成长档案内容">{[['archive', '基础档案'], ['growth', '身体测量'], ['fitness', '体能测量'], ['nutrition', '恢复与饮食']].map(([key, label]) => <button key={key} aria-pressed={view === key} onClick={() => navigate('review', key)}>{label}</button>)}</div>}
     <Suspense fallback={<Message>正在打开记录…</Message>}>
       {section === 'workbench' && view==='home' && <Workbench {...shared} role={role} resumeVersion={resumeVersion} openQuickEntry={openQuickEntry}/>}
@@ -45,6 +47,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'growth' && view === 'skills' && <GrowthWorkspace {...shared} manageSkills={owner}/>}
       {section === 'growth' && view === 'goals' && <Goals {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'compare' && <VideoCompare {...shared} readOnly={readOnly || !owner}/>}
+      {section === 'review' && view === 'compare-periods' && <PeriodComparison {...shared}/>}
       {section === 'review' && view === 'timeline' && <GrowthTimeline {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'quality' && <DataQuality {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'trends' && <Dashboard {...shared} detailOnly/>}
@@ -52,7 +55,7 @@ export default function ManagementView({ location, navigate, data, api, onSaved,
       {section === 'review' && view === 'yearbooks' && <Yearbooks {...shared} readOnly={readOnly || !owner}/>}
       {section === 'review' && view === 'reports' && <Reports {...shared} readOnly={readOnly || !owner}/>}
       {archive && (view === 'archive' ? <Profile {...shared} role="viewer" view="archive" readOnly/> : <Records key={view} {...shared} type={view} readOnly={readOnly || !owner} initialFilter={initialFilter}/>)}
-      {section === 'settings' && (view === 'privateArchive' ? <PrivateArchive {...shared}/> : view === 'child' ? <ChildSettings {...shared} onEnterChild={onEnterChild}/> : view === 'health' ? <HealthPanel api={api}/> : view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view}/>)}
+      {section === 'settings' && (view === 'privateArchive' ? <PrivateArchive {...shared}/> : view === 'coaches' ? <CoachGrants {...shared}/> : view === 'child' ? <ChildSettings {...shared} onEnterChild={onEnterChild}/> : view === 'health' ? <HealthPanel api={api}/> : view === 'standards' ? <Skills {...shared} initialSection="standards"/> : <Profile {...shared} role={role} view={view} onSwitchAthlete={onSwitchAthlete}/>)}
     </Suspense>
   </div>;
 }

@@ -19,6 +19,9 @@ import { exportPublic } from './public-export.mjs';
 import { createAccounts } from './accounts.mjs';
 import { createHealth,mediaHealth } from '../shared/runtime-health.mjs';
 import {childContext,childProjection,childReflectionInput,nicoDay} from '../shared/child-growth.mjs';
+import { DEFAULT_ATHLETE_ID, athletesList, findAthlete, recordAthleteId, saveAthlete, softDeleteAthlete, restoreAthlete, createCoachInvite, acceptCoachInvite, confirmCoachGrant, revokeCoachGrant, verifyCoachLogin, coachGrantsForAccount, activeCoachGrants, authorizeCoachRequest, enforceCoachFeedbackIntegrity } from '../shared/athletes-coaches.mjs';
+import { comparePeriods } from '../shared/period-comparison.mjs';
+import { randomHex } from '../shared/password.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let sequence = 0;
@@ -48,7 +51,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (!authRequired && !['127.0.0.1', 'localhost', '[::1]'].includes((req.headers.host || '').replace(/:\d+$/, ''))) return next(httpError(403, '本机服务只接受本机地址'));
     if (origin) { res.set('Access-Control-Allow-Origin', origin); res.set('Vary', 'Origin'); }
     res.set('Access-Control-Allow-Credentials', 'true');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-Match, X-CSRF-Token');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-Match, X-CSRF-Token, X-Nico-Athlete-Id');
     res.set('Access-Control-Expose-Headers', 'X-Nico-Revision');
     res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -62,10 +65,43 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (!files.includes(req.params.file)) throw httpError(404, '此素材未对外开放');
     res.sendFile(path.resolve(uploadsDir, req.params.file));
   });
+  const coachBearerSessions = new Map();
+  const issueCoachBearer = coachAccount => {
+    const token = randomHex(32);
+    const csrf = randomHex(32);
+    const expiresAt = Date.now() + (accounts?.sessionMs || 60 * 60 * 1000);
+    const session = { username: coachAccount.username, role: 'coach', csrf, expiresAt };
+    coachBearerSessions.set(token, session);
+    return { token, session };
+  };
   const cookieToken = req => /(?:^|;\s*)nico_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1];
   const sessionFor = req => accounts?.readSession(cookieToken(req));
   const requireCSRF = req => { const session = sessionFor(req); if (!session || req.headers['x-csrf-token'] !== session.csrf) throw httpError(403, '会话验证失败，请重新登录'); return session; };
   const cookie = (req, res, token, age) => res.cookie('nico_session', token, { httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/api', maxAge: age });
+  app.post('/api/auth/coach-register', express.json({ limit: '16kb', strict: true }), async (req, res, next) => {
+    try {
+      const current = store.read();
+      const outcome = await acceptCoachInvite(current.data, req.body || {}, { now: new Date().toISOString() });
+      const saved = store.change(current.revision, data => {
+        data.coachAccounts = current.data.coachAccounts;
+        data.coachGrants = current.data.coachGrants;
+        data.auditLog = current.data.auditLog;
+        return outcome;
+      }, outcome.coachAccount.username, { planSync: false });
+      const issued = accounts ? accounts.issueCoach({ username: outcome.coachAccount.username, passwordHash: 'coach' }) : issueCoachBearer(outcome.coachAccount);
+      if (accounts) cookie(req, res, issued.token, accounts.sessionMs);
+      coachBearerSessions.set(issued.token, issued.session);
+      res.set('X-Nico-Revision', String(saved.revision)).status(201).json({
+        authenticated: true,
+        username: outcome.coachAccount.username,
+        role: 'coach',
+        csrf: issued.session.csrf,
+        expiresAt: issued.session.expiresAt,
+        accessToken: issued.token,
+        grant: outcome.grant,
+      });
+    } catch (error) { next(error); }
+  });
   if (accounts) {
     app.get('/api/auth/session', (req, res) => {
       const session = sessionFor(req);
@@ -74,6 +110,15 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     app.use('/api/auth', express.json({ limit: '4kb', strict: true }));
     app.post('/api/auth/login', async (req, res) => {
       if (!req.is('application/json')) throw httpError(415, '请使用账号登录表单');
+      const stateData = store.read().data;
+      const coachAcc = await verifyCoachLogin(stateData, req.body?.username, req.body?.password);
+      if (coachAcc) {
+        if (!activeCoachGrants(stateData, coachAcc.username).length) throw httpError(403, '该教练协作授权尚待家长确认或已撤销');
+        const { token, session } = accounts.issueCoach(coachAcc);
+        coachBearerSessions.set(token, session);
+        cookie(req, res, token, accounts.sessionMs);
+        return res.json({ ...session, accessToken: token, fingerprint: undefined });
+      }
       const { token, session } = await accounts.login(req.body?.username, req.body?.password, req.ip);
       cookie(req, res, token, accounts.sessionMs); res.json({ ...session, fingerprint: undefined });
     });
@@ -85,17 +130,38 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     });
     app.post('/api/auth/logout', (req, res) => { requireCSRF(req); accounts.logout(cookieToken(req)); cookie(req, res, '', 0); res.json({ success: true }); });
     app.post('/api/auth/child',(req,res)=>{const parent=requireCSRF(req);if(parent.role!=='owner')throw httpError(403,'只有家长可以开启儿童查看');if(!req.body||Object.keys(req.body).some(key=>key!=='viewId'))throw httpError(400,'儿童授权参数无效');const view=store.read().data.childViews.find(row=>row.id===req.body.viewId&&row.status==='启用');if(!view)throw httpError(400,'请先保存并启用儿童页');const {token,session}=accounts.issueChild(cookieToken(req),{viewId:view.id,viewVersion:view.version});cookie(req,res,token,session.expiresAt-Date.now());res.json({authenticated:true,role:'child',username:session.username,csrf:session.csrf,expiresAt:session.expiresAt});});
+  } else {
+    app.post('/api/auth/login', express.json({ limit: '4kb', strict: true }), async (req, res, next) => {
+      try {
+        const stateData = store.read().data;
+        const coachAcc = await verifyCoachLogin(stateData, req.body?.username, req.body?.password);
+        if (!coachAcc) throw httpError(401, '账号或密码不正确');
+        if (!activeCoachGrants(stateData, coachAcc.username).length) throw httpError(403, '该教练协作授权尚待家长确认或已撤销');
+        const { token, session } = issueCoachBearer(coachAcc);
+        res.json({ ...session, accessToken: token });
+      } catch (error) { next(error); }
+    });
   }
   app.use((req, _res, next) => {
     const credential = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
     const session = sessionFor(req);
     let role = session?.role || '';
-    if (credential) role = Object.entries(tokens).find(([, token]) => token && timingSafeEqual(digest(token), digest(credential)))?.[0] || '';
+    let resolvedUser = session?.username || '';
+    if (credential) {
+      const dynamicCoach = coachBearerSessions.get(credential);
+      if (dynamicCoach && dynamicCoach.expiresAt > Date.now()) {
+        role = dynamicCoach.role;
+        resolvedUser = dynamicCoach.username;
+      } else {
+        role = Object.entries(tokens).find(([, token]) => token && timingSafeEqual(digest(token), digest(credential)))?.[0] || '';
+        resolvedUser = role;
+      }
+    }
     if (!role) {
       return next(httpError(401, '完整档案需要登录后查看'));
     }
     if (session && !credential && !['GET', 'HEAD'].includes(req.method)) { try { requireCSRF(req); } catch (error) { return next(error); } }
-    req.role = role; req.username = credential ? role : session?.username || role; next();
+    req.role = role; req.username = resolvedUser || role; next();
   });
   app.use(express.json({ limit: '5mb' }));
   app.use('/api',(req,res,next)=>{
@@ -110,10 +176,27 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     }catch(error){next(error);}
   });
   const requireOwner = req => { if (req.role !== 'owner') throw httpError(403, '此操作仅限家长管理者'); };
+  const stripClientMeta = body => (body && typeof body === 'object' && !Array.isArray(body))
+    ? Object.fromEntries(Object.entries(body).filter(([k]) => !['athleteId', 'role', 'feedbackBy', 'feedbackAt'].includes(k)))
+    : body;
+  const resolveAthlete = (req, state, { collection = null, method = 'GET', previous = null, isFeedbackOnly = false, isMediaRead = false } = {}) => {
+    const headerAthlete = typeof req.headers['x-nico-athlete-id'] === 'string' ? req.headers['x-nico-athlete-id'].trim() : '';
+    const queryAthlete = typeof req.query?.athleteId === 'string' ? req.query.athleteId.trim() : '';
+    const bodyAthlete = req.body && typeof req.body === 'object' && typeof req.body.athleteId === 'string' ? req.body.athleteId.trim() : '';
+    if (req.role === 'coach') {
+      const requested = previous ? recordAthleteId(previous) : (headerAthlete || queryAthlete || bodyAthlete);
+      const auth = authorizeCoachRequest({ state, username: req.username, athleteId: requested, collection, method, isFeedbackOnly, isMediaRead });
+      return auth.athleteId;
+    }
+    if (req.role !== 'owner' && ['POST', 'PUT', 'DELETE'].includes(method)) throw httpError(403, '没有此记录的修改权限');
+    const target = previous ? recordAthleteId(previous) : (headerAthlete || queryAthlete || DEFAULT_ATHLETE_ID);
+    if (target !== DEFAULT_ATHLETE_ID && !findAthlete(state, target)) throw httpError(400, '所选儿童档案不存在或已删除');
+    return target;
+  };
   app.get('/api/health',(req,res)=>{requireOwner(req);const current=store.read(),files=fs.readdirSync(uploadsDir,{withFileTypes:true}).filter(row=>row.isFile()).map(row=>fs.statSync(path.join(uploadsDir,row.name)));res.json({release:{schema:1,release:'local-development',sourceHash:null},instance:health.snapshot(),operations:{storage:{count:files.length,bytes:files.reduce((n,row)=>n+row.size,0),complete:true},media:mediaHealth(current.data.media),backups:{mode:'before-write',latestAt:null,latestRevision:null,currentRevision:current.revision,scheduled:'not-configured',restoreVerification:'manual-isolated-only'}}});});
-  const canWrite = (req, collection) => {
-    // Parents are the operators; the collaborator account only enters records.
-    if (req.role === 'owner' || req.role === 'coach' && ['plans', 'annotations', 'trainings', 'swim', 'weakpoints', 'checkins'].includes(collection)) return;
+  const canWrite = (req, collection, state = store.read().data, previous = null) => {
+    if (req.role === 'owner') return resolveAthlete(req, state, { collection, method: req.method, previous });
+    if (req.role === 'coach') return resolveAthlete(req, state, { collection, method: req.method, previous });
     throw httpError(403, '没有此记录的修改权限');
   };
   const revision = req => {
@@ -126,6 +209,11 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   const validate = (...args) => { try { return validateRecord(...args); } catch (error) { throw httpError(400, error.message); } };
   function relations(collection, record, data, previous = null) {
     activityRelations(collection, record, data, previous);
+    const targetAthlete = recordAthleteId(record);
+    if (record.trainingId) {
+      const tr = data.trainings.find(t => t.id === record.trainingId);
+      if (tr && recordAthleteId(tr) !== targetAthlete) throw httpError(400, '不能关联其他儿童档案的训练记录');
+    }
     if (collection === 'plans') {
       const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
       if ((record.sourceIds || []).some(id => !existingIds.has(id))) throw httpError(400, '计划引用的来源记录不存在');
@@ -134,48 +222,205 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
     if (collection === 'annotations') {
       const media = data.media.find(m => m.id === record.mediaId);
       if (!media) throw httpError(400, '批注素材不存在');
+      if (recordAthleteId(media) !== targetAthlete) throw httpError(400, '不能批注其他儿童档案的素材');
       if (media.duration != null && record.endSecond > media.duration) throw httpError(400, '批注时间超出素材时长');
       if (record.status === '已审核' && !record.athleteIdentity) throw httpError(400, '请先确认运动员与泳道');
     }
-    if (record.recordId && ![...data.swim, ...data.trainings].some(r => r.id === record.recordId)) throw httpError(400, '关联成绩/训练不存在');
+    if (record.recordId) {
+      const linked = [...data.swim, ...data.trainings].find(r => r.id === record.recordId);
+      if (!linked) throw httpError(400, '关联成绩/训练不存在');
+      if (recordAthleteId(linked) !== targetAthlete) throw httpError(400, '不能关联其他儿童档案的成绩或训练');
+    }
     trainingRelations(collection, record, data, previous);
+    if (collection === 'trainings') {
+      for (const mediaId of record.mediaIds || []) {
+        const media = data.media.find(m => m.id === mediaId);
+        if (media && recordAthleteId(media) !== targetAthlete) throw httpError(400, '不能关联其他儿童档案的影像');
+      }
+    }
     if (collection === 'weakpoints') {
       const existingIds = new Set(COLLECTIONS.flatMap(key => data[key].map(r => r.id)));
       const refs = String(record.sourceRef || '').split(/[,，、\s]+/).filter(Boolean);
       if (refs.some(id => !existingIds.has(id))) throw httpError(400, '薄弱点引用的来源记录不存在');
       if (record.sourceType === '技能评估' && (!refs.length || refs.some(id => !data.skillAssessments.some(row => row.id === id && row.status === '已确认')))) throw httpError(400, '技能来源须关联已确认评估');
     }
-    if (collection === 'checkins' && !data.weakpoints.some(point => point.id === record.weakPointId)) throw httpError(400, '打卡关联的薄弱点不存在');
+    if (collection === 'checkins') {
+      const point = data.weakpoints.find(p => p.id === record.weakPointId);
+      if (!point) throw httpError(400, '打卡关联的薄弱点不存在');
+      if (recordAthleteId(point) !== targetAthlete) throw httpError(400, '不能关联其他儿童档案的薄弱点');
+    }
   }
   app.get('/api/snapshot', (req, res) => {
-    const current = store.read(); res.set('X-Nico-Revision', String(current.revision)).json({ ...current, role: req.role, athleteId: 'nico' });
+    const current = store.read();
+    const targetAthlete = resolveAthlete(req, current.data, { method: 'GET' });
+    if (req.role === 'coach') {
+      const grants = coachGrantsForAccount(current.data, req.username);
+      const allowedAthletes = new Set(grants.length ? activeCoachGrants(current.data, req.username).map(g => g.athleteId) : [DEFAULT_ATHLETE_ID]);
+      const filteredData = { ...current.data, athletes: athletesList(current.data).filter(a => allowedAthletes.has(a.id)), coachGrants: grants };
+      for (const key of COLLECTIONS) {
+        if (key === 'skillDefinitions' || key === 'trainingTemplates') continue;
+        filteredData[key] = (current.data[key] || []).filter(r => allowedAthletes.has(recordAthleteId(r)));
+      }
+      filteredData.trash = [];
+      return res.set('X-Nico-Revision', String(current.revision)).json({ data: filteredData, revision: current.revision, role: req.role, athleteId: targetAthlete, grantedAthleteIds: [...allowedAthletes] });
+    }
+    res.set('X-Nico-Revision', String(current.revision)).json({ ...current, role: req.role, athleteId: targetAthlete });
+  });
+  app.get('/api/athletes', (req, res) => {
+    const current = store.read();
+    const includeDeleted = req.role === 'owner' && req.query.includeDeleted === 'true';
+    const list = athletesList(current.data, { includeDeleted });
+    if (req.role === 'coach') {
+      const grants = coachGrantsForAccount(current.data, req.username);
+      const allowed = new Set(grants.length ? activeCoachGrants(current.data, req.username).map(g => g.athleteId) : [DEFAULT_ATHLETE_ID]);
+      return res.set('X-Nico-Revision', String(current.revision)).json(list.filter(a => allowed.has(a.id)));
+    }
+    res.set('X-Nico-Revision', String(current.revision)).json(list);
+  });
+  app.post('/api/athletes', (req, res) => {
+    requireOwner(req);
+    reply(res, change(req, data => saveAthlete(data, req.body || {}, { id: makeId('athlete'), actor: req.username, now: new Date().toISOString() }), { planSync: false }), 201);
+  });
+  app.put('/api/athletes/:id', (req, res) => {
+    requireOwner(req);
+    reply(res, change(req, data => saveAthlete(data, req.body || {}, { id: req.params.id, isUpdate: true, actor: req.username, now: new Date().toISOString() }), { planSync: false }));
+  });
+  app.delete('/api/athletes/:id', (req, res) => {
+    requireOwner(req);
+    reply(res, change(req, data => softDeleteAthlete(data, req.params.id, { actor: req.username, now: new Date().toISOString(), makeTrashId: makeId }), { planSync: false }));
+  });
+  app.post('/api/athletes/:id/restore', (req, res) => {
+    requireOwner(req);
+    reply(res, change(req, data => restoreAthlete(data, req.params.id, { actor: req.username, now: new Date().toISOString() }), { planSync: false }));
+  });
+  app.get('/api/coach-grants', (req, res) => {
+    const current = store.read();
+    if (req.role === 'owner') return res.set('X-Nico-Revision', String(current.revision)).json(current.data.coachGrants || []);
+    if (req.role === 'coach') return res.set('X-Nico-Revision', String(current.revision)).json(coachGrantsForAccount(current.data, req.username));
+    throw httpError(403, '此操作仅限家长管理者');
+  });
+  app.post('/api/coach-grants/invite', async (req, res) => {
+    requireOwner(req);
+    revision(req);
+    const current = store.read();
+    const outcome = await createCoachInvite(current.data, req.body || {}, { id: makeId('grant'), actor: req.username, now: new Date().toISOString() });
+    const saved = change(req, data => {
+      data.athletes = current.data.athletes;
+      data.coachGrants = current.data.coachGrants;
+      data.auditLog = current.data.auditLog;
+      return outcome;
+    }, { planSync: false });
+    reply(res, saved, 201);
+  });
+  app.post('/api/coach-grants/accept', async (req, res) => {
+    revision(req);
+    const current = store.read();
+    const outcome = await acceptCoachInvite(current.data, req.body || {}, { now: new Date().toISOString() });
+    const saved = change(req, data => {
+      data.coachAccounts = current.data.coachAccounts;
+      data.coachGrants = current.data.coachGrants;
+      data.auditLog = current.data.auditLog;
+      return outcome;
+    }, { planSync: false });
+    reply(res, saved, 201);
+  });
+  app.post('/api/coach-grants/:id/confirm', (req, res) => {
+    requireOwner(req);
+    reply(res, change(req, data => confirmCoachGrant(data, req.params.id, req.body || {}, { actor: req.username, now: new Date().toISOString() }), { planSync: false }));
+  });
+  app.post('/api/coach-grants/:id/revoke', (req, res) => {
+    requireOwner(req);
+    reply(res, change(req, data => revokeCoachGrant(data, req.params.id, { actor: req.username, now: new Date().toISOString() }), { planSync: false }));
+  });
+  app.get('/api/audit-log', (req, res) => {
+    requireOwner(req);
+    const current = store.read();
+    res.set('X-Nico-Revision', String(current.revision)).json(current.data.auditLog || []);
+  });
+  app.get('/api/period-comparison', (req, res) => {
+    const current = store.read();
+    const athleteId = resolveAthlete(req, current.data, { method: 'GET' });
+    const windowA = { start: req.query.startA, end: req.query.endA, label: req.query.labelA };
+    const windowB = { start: req.query.startB, end: req.query.endB, label: req.query.labelB };
+    res.set('X-Nico-Revision', String(current.revision)).json(comparePeriods(current.data, windowA, windowB, { athleteId }));
+  });
+  app.post('/api/period-comparison', (req, res) => {
+    const current = store.read();
+    const athleteId = resolveAthlete(req, current.data, { method: 'GET' });
+    res.set('X-Nico-Revision', String(current.revision)).json(comparePeriods(current.data, req.body?.windowA, req.body?.windowB, { athleteId }));
+  });
+  app.post('/api/trainings/:id/feedback', (req, res) => {
+    const current = store.read();
+    const target = current.data.trainings.find(r => r.id === req.params.id);
+    if (!target) throw httpError(404, '训练记录不存在');
+    resolveAthlete(req, current.data, { collection: 'trainings', method: 'POST', previous: target, isFeedbackOnly: true });
+    const coachNotes = typeof req.body?.coachNotes === 'string' ? req.body.coachNotes.trim() : '';
+    if (!coachNotes || coachNotes.length > 4000) throw httpError(400, '请填写有效的教练点评内容（1–4000字）');
+    reply(res, change(req, data => {
+      const row = data.trainings.find(r => r.id === req.params.id);
+      if (!row) throw httpError(404, '训练记录不存在');
+      const now = new Date().toISOString();
+      row.coachNotes = coachNotes;
+      row.feedbackBy = req.username;
+      row.feedbackAt = now;
+      row.updatedAt = now;
+      row.updatedBy = req.username;
+      return row;
+    }));
   });
   app.get('/api/skills-overview', (req, res) => res.json(skillTimeline(store.read().data, req.query.skillId ? growthId(req.query.skillId) : '')));
   app.get('/api/goals/:id/candidates', (req, res) => { const data = store.read().data, goal = data.goals.find(row => row.id === req.params.id); if (!goal) throw httpError(404, '目标不存在'); res.json(goalCandidates(data, goal)); });
   app.post('/api/swim/:id/conditions-decision',(req,res)=>{requireOwner(req);revision(req);const input=decisionInput(req.body),current=store.read(),row=current.data.swim.find(r=>r.id===req.params.id);if(!row)throw httpError(404,'记录不存在');if(decisionReplay(row,input,req.username))return reply(res,{revision:current.revision,result:row});reply(res,change(req,data=>applyScoreDecision(data.swim.find(r=>r.id===req.params.id),input,{actor:req.username,now:new Date().toISOString()})));});
   app.post('/api/:collection/:id/:action', (req, res, next) => { if (!growthCollection(req.params.collection)) return next(); requireOwner(req); reply(res, change(req, data => actGrowth(data, req.params.collection, req.params.id, req.params.action, req.body, { actor: req.username, now: new Date().toISOString() }))); });
   for (const key of COLLECTIONS) {
-    app.get(`/api/${key}`, (req, res) => { const current = store.read(); const skillId = key === 'skillAssessments' && req.query.skillId ? growthId(req.query.skillId) : ''; res.set('X-Nico-Revision', String(current.revision)).json(skillId ? current.data[key].filter(row => row.skillId === skillId) : current.data[key]); });
+    app.get(`/api/${key}`, (req, res) => {
+      const current = store.read();
+      const explicitAthlete = req.headers['x-nico-athlete-id'] || req.query.athleteId;
+      const targetAthlete = resolveAthlete(req, current.data, { collection: key, method: 'GET', isMediaRead: key === 'media' });
+      const skillId = key === 'skillAssessments' && req.query.skillId ? growthId(req.query.skillId) : '';
+      let rows = current.data[key];
+      if (skillId) rows = rows.filter(row => row.skillId === skillId);
+      if (explicitAthlete || req.role === 'coach') {
+        if (key !== 'skillDefinitions' && key !== 'trainingTemplates') {
+          rows = rows.filter(row => recordAthleteId(row) === targetAthlete);
+        }
+      }
+      res.set('X-Nico-Revision', String(current.revision)).json(rows);
+    });
     if (key !== 'media') app.post(`/api/${key}`, async (req, res) => {
-      canWrite(req, key);
+      const current = store.read();
+      const targetAthlete = canWrite(req, key, current.data);
       revision(req);
-      const request = (trainingCollection(key) || growthCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) ? await creationRequest(req.body, req.username) : null;
-      const current = store.read(), replay = creationReplay(current.data, key, request);
+      const cleanBody = stripClientMeta(req.body);
+      const request = (trainingCollection(key) || growthCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) ? await creationRequest(cleanBody, req.username) : null;
+      const replay = creationReplay(current.data, key, request);
       if (replay) return reply(res, { revision: current.revision, result: replay });
-      if (growthCollection(key)) return reply(res, change(req, data => saveGrowth(data, key, req.body, { id: makeId(key), actor: req.username, now: new Date().toISOString(), request })), 201);
-      const record = { ...validate(key, req.body), id: makeId(key) };
-      if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, null, req.username, new Date().toISOString(), request);
+      const now = new Date().toISOString();
+      if (growthCollection(key)) return reply(res, change(req, data => saveGrowth(data, key, cleanBody, { id: makeId(key), actor: req.username, now, request, athleteId: targetAthlete })), 201);
+      const record = { ...validate(key, cleanBody), id: makeId(key) };
+      if (targetAthlete !== DEFAULT_ATHLETE_ID) record.athleteId = targetAthlete;
+      if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, null, req.username, now, request, targetAthlete);
+      if (key === 'trainings') enforceCoachFeedbackIntegrity(record, null, { role: req.role, username: req.username, now });
       reply(res, change(req, data => { relations(key, record, data); data[key].push(record); return record; }), 201);
     });
     app.put(`/api/${key}/:id`, (req, res) => {
-      canWrite(req, key);
+      const current = store.read();
+      const existing = current.data[key].find(r => r.id === req.params.id);
+      if (!existing) throw httpError(404, '记录不存在');
+      const targetAthlete = canWrite(req, key, current.data, existing);
+      const cleanBody = stripClientMeta(req.body);
       reply(res, change(req, data => {
         const index = data[key].findIndex(r => r.id === req.params.id);
         if (index < 0) throw httpError(404, '记录不存在');
         const previous = data[key][index];
-        if (growthCollection(key, previous) || key === 'goals' && req.body.modelVersion === 1) return saveGrowth(data, key, req.body, { id: previous.id, actor: req.username, now: new Date().toISOString() });
-        const record = validate(key, req.body, previous); if(key==='swim')expireScoreDecision(previous,record,{actor:req.username,now:new Date().toISOString()}); relations(key, record, data, previous);
-        if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, previous, req.username, new Date().toISOString());
+        const now = new Date().toISOString();
+        if (growthCollection(key, previous) || key === 'goals' && cleanBody.modelVersion === 1) return saveGrowth(data, key, cleanBody, { id: previous.id, actor: req.username, now, athleteId: targetAthlete });
+        const record = validate(key, cleanBody, previous);
+        if (previous.athleteId) record.athleteId = previous.athleteId;
+        else if (targetAthlete !== DEFAULT_ATHLETE_ID) record.athleteId = targetAthlete;
+        if (key === 'trainings') enforceCoachFeedbackIntegrity(record, previous, { role: req.role, username: req.username, now });
+        if(key==='swim')expireScoreDecision(previous,record,{actor:req.username,now}); relations(key, record, data, previous);
+        if (trainingCollection(key) || ['swim', 'weakpoints', 'checkins'].includes(key)) stampTraining(record, previous, req.username, now, null, targetAthlete);
         if (key === 'plans') {
           const outcome = commitPlanUpdate(data, req.params.id, data[key][index], record);
           if (outcome.error) throw httpError(400, outcome.error);
@@ -184,6 +429,7 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
       }));
     });
     app.delete(`/api/${key}/:id`, (req, res) => {
+      if (req.role === 'coach') throw httpError(403, '教练账号无权删除记录，仅家长可移入回收站');
       canWrite(req, key);
       reply(res, change(req, data => {
         const index = data[key].findIndex(r => r.id === req.params.id);
@@ -210,7 +456,14 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   app.put('/api/profile', (req, res) => {
     requireOwner(req); const { name, sex, birthDate } = req.body;
     if (typeof name !== 'string' || !name.trim() || name.length > 100 || !['', '女', '男', '其他'].includes(sex) || birthDate && !validDate(birthDate)) throw httpError(400, '档案字段无效');
-    reply(res, change(req, data => (data.profile = { name: name.trim(), sex, birthDate: birthDate || '' })));
+    reply(res, change(req, data => {
+      data.profile = { name: name.trim(), sex, birthDate: birthDate || '' };
+      if (Array.isArray(data.athletes)) {
+        const nico = data.athletes.find(a => a.id === DEFAULT_ATHLETE_ID);
+        if (nico) { nico.displayName = name.trim().slice(0, 20); nico.sex = sex; nico.birthDate = birthDate || ''; nico.updatedAt = new Date().toISOString(); }
+      }
+      return data.profile;
+    }));
   });
   app.put('/api/publishing', (req, res) => {
     requireOwner(req); const { swimIds, mediaIds, story, confirmedBy, confirmedAt } = req.body;
@@ -244,12 +497,15 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   app.post('/api/media', (req, _res, next) => { try { canWrite(req, 'media'); revision(req); next(); } catch (error) { next(error); } }, upload.single('file'), async (req, res) => {
     if (!req.file) throw httpError(400, '请选择文件');
     try {
+      const current = store.read();
+      const targetAthlete = resolveAthlete(req, current.data, { collection: 'media', method: 'POST' });
+      const cleanBody = stripClientMeta(req.body);
       const sourceSha256 = createHash('sha256').update(fs.readFileSync(req.file.path)).digest('hex');
-      const receipt = await creationRequest({ ...req.body, sourceSha256, sourceType: req.file.mimetype }, req.username);
-      const current = store.read(), replay = creationReplay(current.data, 'media', receipt);
+      const receipt = await creationRequest({ ...cleanBody, sourceSha256, sourceType: req.file.mimetype }, req.username);
+      const replay = creationReplay(current.data, 'media', receipt);
       if (replay) { fs.unlinkSync(req.file.path); return reply(res, { revision: current.revision, result: replay }); }
-      const record = { ...validate('media', req.body), id: makeId('media'), type: req.file.mimetype.startsWith('video/') ? 'video' : 'photo', url: `/uploads/${req.file.filename}`, sourceSha256, processingStatus: '待处理' };
-      stampTraining(record, null, req.username, new Date().toISOString(), receipt);
+      const record = { ...validate('media', cleanBody), id: makeId('media'), type: req.file.mimetype.startsWith('video/') ? 'video' : 'photo', url: `/uploads/${req.file.filename}`, sourceSha256, processingStatus: '待处理' };
+      stampTraining(record, null, req.username, new Date().toISOString(), receipt, targetAthlete);
       if (processUploads) {
         let info;
         try { info = await inspectMedia(req.file.path, record.type); } catch { throw httpError(400, '无法识别真实素材格式，请检查文件或FFmpeg配置'); }
@@ -263,8 +519,10 @@ export function createApp({ store, uploadsDir, authRequired = true, accounts, al
   });
   app.get('/api/media/:id/content/:variant', (req, res) => {
     if (!['poster', 'original', 'playback'].includes(req.params.variant)) throw httpError(404, '素材类型不存在');
-    const item = store.read().data.media.find(m => m.id === req.params.id);
+    const current = store.read();
+    const item = current.data.media.find(m => m.id === req.params.id);
     if (!item) throw httpError(404, '素材不存在');
+    if (req.role === 'coach') resolveAthlete(req, current.data, { previous: item, method: 'GET', isMediaRead: true });
     const url = req.params.variant === 'poster' ? item.posterUrl : req.params.variant === 'original' ? item.url : item.playbackUrl || item.url;
     if (!url?.startsWith('/uploads/')) throw httpError(404, '素材尚未生成');
     res.sendFile(path.join(uploadsDir, path.basename(url)));

@@ -1,4 +1,5 @@
 import {validateDecisionHistory} from './score-decisions.mjs';
+import { validateStoredAthletes, validateStoredCoachGrants, validateStoredAuditLog } from './athletes-coaches.mjs';
 import { validateGrowthInput, validateStoredGrowth, growthCollection } from './growth-model.ts';
 import { validateGrowthHistory } from './growth-records.mjs';
 import { PERFORMANCE_VERSION, TIME_FIELDS, VALIDITY_STATUSES, validTimeMs, formatMilliseconds, parseMilliseconds, normalizePerformanceRecord, performanceMilliseconds, performanceSeconds, validityLabel, eligiblePerformance } from './performance.ts';
@@ -211,10 +212,14 @@ export function normalizeState(raw) {
     if (record.timeMs !== undefined) normalizePerformanceRecord(record);
   }
   validateGrowthHistory(state);
+  validateStoredAthletes(state);
+  validateStoredCoachGrants(state);
+  validateStoredAuditLog(state);
   if (state.schemaVersion === 2) validatePrdState(state);
   return state;
 }
 function validateStoredFields(collection, record) {
+  if (record.athleteId !== undefined && (typeof record.athleteId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(record.athleteId))) throw new Error('记录运动员归属ID无效');
   if(collection==='swim')validateDecisionHistory(record);
   if (growthCollection(collection, record)) { validateStoredGrowth(collection, record); return; }
   for (const field of FIELDS[collection]) {
