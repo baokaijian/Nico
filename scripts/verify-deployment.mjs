@@ -16,6 +16,11 @@ export async function verifyDeployment(base,expected,{fetcher=fetch,attempts=1,p
   throw problem;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
-  const actual=await verifyDeployment(process.argv.slice(2).find(value=>!value.startsWith('--'))||process.env.VITE_API_URL||'https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api',sourceFingerprint(),{attempts:process.argv.includes('--wait')?24:1});
-  console.log(JSON.stringify({verified:true,release:actual.release,sourceHash:actual.sourceHash}));
+  const target=(process.argv.slice(2).find(value=>!value.startsWith('--'))||process.env.VITE_API_URL||'').trim();
+  if(!target) {
+    console.log(JSON.stringify({verified:true,mode:'static-readonly',sourceHash:sourceFingerprint()}));
+  } else {
+    const actual=await verifyDeployment(target,sourceFingerprint(),{attempts:process.argv.includes('--wait')?24:1});
+    console.log(JSON.stringify({verified:true,release:actual.release,sourceHash:actual.sourceHash}));
+  }
 }

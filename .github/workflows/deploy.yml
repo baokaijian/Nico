@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_APP_MODE: public
-      VITE_API_URL: https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
+      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
       NICO_TEST_PROTOCOL_ONLY: 'true'
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_APP_MODE: public
-      VITE_API_URL: https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
+      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

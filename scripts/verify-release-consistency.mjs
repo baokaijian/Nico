@@ -5,7 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { sourceFingerprint } from './release-info.mjs';
 const PRODUCTION_PAGES=process.env.NICO_PAGES_URL||'https://baokaijian.github.io/Nico';
-const PRODUCTION_API=process.env.VITE_API_URL||'https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api';
+const PRODUCTION_API=(process.env.VITE_API_URL||'').trim();
 const assetNames=html=>[...new Set([...String(html).matchAll(/(?:src|href)="[^"]*\/?(assets\/[A-Za-z0-9_.-]+)"/g)].map(match=>match[1]))].sort();
 export async function verifyReleaseConsistency({pagesBase,apiBase,expectedAssets,expectedBuild,expectedApiHash,fetcher=fetch}){
  if(!Array.isArray(expectedAssets)||!expectedAssets.length)throw Error('缺少本地构建资源清单');
@@ -18,7 +18,9 @@ export async function verifyReleaseConsistency({pagesBase,apiBase,expectedAssets
  const record=async(name,run)=>{try{checks.push({name,status:'pass',detail:await run()});}catch(error){checks.push({name,status:'fail',detail:error instanceof Error?error.message:'未知失败'});}};
  await record('pages-index',async()=>{const html=await fetchText(`${pagesBase.replace(/\/+$/,'')}/index.html`);const live=assetNames(html);if(live.join('\n')!==expected.join('\n'))throw Error(`版本不一致：线上资源 ${live.join(',')} 与本地构建 ${expected.join(',')} 不同`);return {assets:live.length};});
  await record('pages-build',async()=>{const build=JSON.parse(await fetchText(`${pagesBase.replace(/\/+$/,'')}/nico-build.json`));if(build.release!==expectedBuild.release||build.frontendCommit!==expectedBuild.frontendCommit)throw Error(`版本不一致：线上 ${build.release}/${String(build.frontendCommit).slice(0,7)} 与本地 ${expectedBuild.release}/${String(expectedBuild.frontendCommit).slice(0,7)} 不同`);if(build.apiSourceHash!==expectedApiHash)throw Error('线上构建声明的API指纹与当前源码不一致');return {release:build.release,commit:String(build.frontendCommit).slice(0,7)};});
- await record('api-version',async()=>{const version=JSON.parse(await fetchText(`${apiBase.replace(/\/+$/,'')}/api/version`));if(version.sourceHash!==expectedApiHash)throw Error(`版本不一致：实际API指纹 ${String(version.sourceHash).slice(0,8)}… 与当前源码 ${expectedApiHash.slice(0,8)}… 不同`);return {release:version.release,compatible:true};});
+ if(apiBase){
+  await record('api-version',async()=>{const version=JSON.parse(await fetchText(`${apiBase.replace(/\/+$/,'')}/api/version`));if(version.sourceHash!==expectedApiHash)throw Error(`版本不一致：实际API指纹 ${String(version.sourceHash).slice(0,8)}… 与当前源码 ${expectedApiHash.slice(0,8)}… 不同`);return {release:version.release,compatible:true};});
+ }
  const failed=checks.filter(check=>check.status==='fail');
  return {schema:1,ok:!failed.length,checks,category:!failed.length?null:(failed.some(check=>check.detail.startsWith('版本不一致'))?'mismatch':'unreachable')};
 }

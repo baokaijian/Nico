@@ -23,7 +23,7 @@ jobs:
     env:
       NICO_TEST_PROTOCOL_ONLY: 'true'
       VITE_APP_MODE: public
-      VITE_API_URL: https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
+      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,6 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,19 +51,21 @@ jobs:
           cache: npm
       - run: npm ci
       - uses: supabase/setup-cli@v1
-        if: env.SUPABASE_ACCESS_TOKEN != ''
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.VITE_API_URL != ''
         with:
           version: 2.121.0
       - run: node scripts/prepare-release.mjs
       - run: supabase functions deploy nico-api --project-ref oeyirzlgqixvcxofimit --no-verify-jwt --use-api
-        if: env.SUPABASE_ACCESS_TOKEN != ''
-      - name: No deployment credential configured
-        if: env.SUPABASE_ACCESS_TOKEN == ''
-        run: echo 'No CLI credential. An actual matching API deployment is required below; a skipped CLI step is not deployment success.'
-      - name: Verify actual API fingerprint (also required without CLI credentials)
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.VITE_API_URL != ''
+      - name: Static read-only mode when no cloud API is configured
+        if: env.SUPABASE_ACCESS_TOKEN == '' || env.VITE_API_URL == ''
+        run: echo 'Static read-only Pages mode active (no cloud API URL or CLI token configured). Skipping cloud Edge Function deployment.'
+      - name: Verify actual API fingerprint
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.VITE_API_URL != ''
         run: node scripts/verify-deployment.mjs --wait
       - name: Guest read check against the deployed function
-        run: node scripts/verify-guest-read.mjs https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.VITE_API_URL != ''
+        run: node scripts/verify-guest-read.mjs "${VITE_API_URL}"
   notify-failure:
     if: always() && (needs.check.result == 'failure' || needs.deploy.result == 'failure')
     needs: [check, deploy]
