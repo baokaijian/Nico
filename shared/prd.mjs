@@ -50,7 +50,9 @@ export function derivePrdState(state) {
   const scores = [...state.swim, ...deleted.filter(t => t.collection === 'swim').map(t => t.record)];
   const media = [...state.media, ...deleted.filter(t => t.collection === 'media').map(t => t.record)];
   for (const score of scores) {
-    score.testAgeGroup = score.recordType === '测试' && state.profile.birthDate && score.date >= state.profile.birthDate ? Number(score.date.slice(0, 4)) - Number(state.profile.birthDate.slice(0, 4)) : null;
+    const scoreAthleteId = score.athleteId || 'nico';
+    const athleteBirthDate = state.athletes?.find(a => a.id === scoreAthleteId)?.birthDate ?? (scoreAthleteId === 'nico' ? state.profile?.birthDate || '' : '');
+    score.testAgeGroup = score.recordType === '测试' && athleteBirthDate && score.date >= athleteBirthDate ? Number(score.date.slice(0, 4)) - Number(athleteBirthDate.slice(0, 4)) : null;
     const ownMs = performanceMilliseconds(score), winnerMs = performanceMilliseconds(score, 'winnerTime');
     const gapMs = ownMs !== null && winnerMs !== null && ownMs >= winnerMs ? ownMs - winnerMs : null;
     score.gapTime = formatMilliseconds(gapMs);

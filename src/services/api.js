@@ -7,8 +7,8 @@ export class ApiError extends Error {
 export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = () => '', options = {}) {
   const persistence = createSessionPersistence(base, options);
   const health = createHealth();
-  let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {}, draftIdentity = null, childIdentity=null;
-  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; childIdentity=null; persistence.clear(); health.reset(); };
+  let revision = null, csrf = '', accessToken = persistence.load()?.accessToken || '', generation = 0, onUnauthorized = () => {}, draftIdentity = null, childIdentity=null, athleteId = 'nico', explicitAthlete = false;
+  const resetAuth = () => { generation++; revision = null; csrf = ''; accessToken = ''; draftIdentity = null; childIdentity=null; athleteId = 'nico'; explicitAthlete = false; persistence.clear(); health.reset(); };
   const unauthorized = reason => { resetAuth(); onUnauthorized(reason); };
   const credential = () => accessToken || getToken();
   const credentials = base ? 'omit' : 'same-origin';
@@ -22,6 +22,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     const headers = {};
     const token = anonymous ? '' : credential();
     if (token) headers.Authorization = `Bearer ${token}`;
+    if (!anonymous && (explicitAthlete || athleteId !== 'nico')) headers['X-Nico-Athlete-Id'] = athleteId;
     if (method !== 'GET') {
       if (revision == null) throw new ApiError('请先加载数据再保存', 428);
       headers['If-Match'] = String(expectedRevision ?? revision);
@@ -49,6 +50,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       xhr.withCredentials = !base;
       const token = credential(); if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
+      if (explicitAthlete || athleteId !== 'nico') xhr.setRequestHeader('X-Nico-Athlete-Id', athleteId);
       if (revision == null) return reject(new ApiError('请先加载数据', 428));
       xhr.setRequestHeader('If-Match', String(expectedRevision ?? revision));
       xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
@@ -91,15 +93,22 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
     if (started !== generation) throw new DOMException('登录状态已改变', 'AbortError');
     if (!response.ok) { if (action === 'session' && response.status === 401) resetAuth(); throw new ApiError(result.error || '账号操作失败', response.status); }
     if (action === 'logout' || (action === 'session' && !result.authenticated)) resetAuth();
-    if (result.accessToken || ['login','setup','child'].includes(action)) { generation++; revision = null; if(result.accessToken)accessToken = result.accessToken; health.reset(); }
+    if (result.accessToken || ['login','setup','child','coach-register'].includes(action)) { generation++; revision = null; if(result.accessToken)accessToken = result.accessToken; health.reset(); }
     if (result.csrf) csrf = result.csrf;
     if (accessToken && result.expiresAt) persistence.save(accessToken, result.expiresAt);
     if (result.authenticated && !result.mustChangePassword && result.username && ['owner', 'coach'].includes(result.role)) {
-      if (draftIdentity?.account !== result.username || draftIdentity.epoch !== generation) draftIdentity = { backend: base || globalThis.location?.origin || 'local', account: result.username, athlete: 'nico', epoch: generation };
+      if (draftIdentity?.account !== result.username || draftIdentity.epoch !== generation) draftIdentity = { backend: base || globalThis.location?.origin || 'local', account: result.username, athlete: athleteId, epoch: generation };
     } else if (action === 'session' || action === 'login' || result.role==='child') draftIdentity = null;
     if(result.authenticated&&result.role==='child'&&!result.mustChangePassword&&result.username&&result.expiresAt){if(childIdentity?.account!==result.username||childIdentity.epoch!==generation||childIdentity.expiresAt!==result.expiresAt)childIdentity={role:'child',backend:base||globalThis.location?.origin||'local',account:result.username,expiresAt:result.expiresAt,epoch:generation};}else if(result.authenticated||action==='session'||action==='logout')childIdentity=null;
     return result;
   }
-  return { health, childPhotoBlob:async(id,signal)=>URL.createObjectURL(await mediaFile(id,'original',signal,true)), cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile:(id,variant,signal,options={})=>mediaFile(id,variant,signal,false,options.maxBytes), authRequest, resetAuth, getDraftScope: () => draftIdentity, getChildScope:()=>childIdentity, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
+  const setAthleteId = nextId => {
+    if (typeof nextId === 'string' && nextId.trim()) {
+      athleteId = nextId.trim();
+      explicitAthlete = true;
+      if (draftIdentity) draftIdentity = { ...draftIdentity, athlete: athleteId };
+    }
+  };
+  return { health, childPhotoBlob:async(id,signal)=>URL.createObjectURL(await mediaFile(id,'original',signal,true)), cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile:(id,variant,signal,options={})=>mediaFile(id,variant,signal,false,options.maxBytes), authRequest, resetAuth, getDraftScope: () => draftIdentity, getChildScope:()=>childIdentity, getAthleteId: () => athleteId, setAthleteId, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };
 }

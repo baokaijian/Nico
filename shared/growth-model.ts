@@ -114,7 +114,7 @@ function iso(value: unknown): boolean { return typeof value === 'string' && /^\d
 export function validateStoredGrowth(key: string, raw: unknown): void {
   const record = objectRecord(raw);
   if (key === 'goals' && record.modelVersion !== 1) return;
-  if (record.modelVersion !== 1 || record.athleteId !== 'nico' || !Number.isSafeInteger(record.version) || Number(record.version) < 1 || !iso(record.updatedAt) || !growthText(record.updatedBy, '修改人', true, 100)) return failGrowth('成长记录版本或归属元数据无效');
+  if (record.modelVersion !== 1 || typeof record.athleteId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(record.athleteId) || !Number.isSafeInteger(record.version) || Number(record.version) < 1 || !iso(record.updatedAt) || !growthText(record.updatedBy, '修改人', true, 100)) return failGrowth('成长记录版本或归属元数据无效');
   growthId(record.id);
   if (record.createdAt !== undefined && (!iso(record.createdAt) || !growthText(record.createdBy, '创建人', true, 100))) return failGrowth('成长创建信息无效');
   if (key !== 'goals' && record.createdAt === undefined) return failGrowth('新成长实体缺少创建信息');

@@ -17,7 +17,7 @@ function valueLabel(value) { return value === true ? '按既有专业建议服�
 export default function Records(props) {
   return props.type === 'trainings' ? <TrainingRecords {...props}/> : <GenericRecords {...props}/>;
 }
-function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
+function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved, reload, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
   const fields = FIELDS[type];
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => ({ ...Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : ''])), ...(type === 'swim' ? { validityStatus: '未核验' } : {}), ...initialContext });
@@ -38,13 +38,13 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
     setValues(next); localDraft.persist({ values: next, editing, baseRevision: revision, clientRequestId: requestId });
   };
   const reset = () => { dirty.current = false; setRequestId(clientRequestId || crypto.randomUUID()); setBaseRevision(api.getRevision()); setConflict(false); setEditing(null); setValues(blank()); setError(''); localDraft.clear(); };
-  const save = async e => {
-    e.preventDefault(); setBusy(true); setError('');
+  const saveWithRevision = async (expectedRevision) => {
+    setBusy(true); setError('');
     try {
       const previous = editing ? data[type].find(r => r.id === editing) : null;
       validateRecord(type, values, previous);
-      localDraft.persist({ values, editing, baseRevision, clientRequestId: requestId });
-      const saved = await api.request(`/api/${type}${editing ? `/${editing}` : ''}`, { method: editing ? 'PUT' : 'POST', body: { ...values, ...(!editing && type === 'swim' ? { clientRequestId: requestId } : {}) }, expectedRevision: baseRevision });
+      localDraft.persist({ values, editing, baseRevision: expectedRevision, clientRequestId: requestId });
+      const saved = await api.request(`/api/${type}${editing ? `/${editing}` : ''}`, { method: editing ? 'PUT' : 'POST', body: { ...values, ...(!editing && type === 'swim' ? { clientRequestId: requestId } : {}) }, expectedRevision });
       let message = '记录已保存。';
       if (type === 'swim') {
         const prior = best(data.swim, saved.distance, saved.stroke, saved.poolLength);
@@ -53,6 +53,10 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
       }
       onSaved(type, saved); reset(); setSavedMessage(message); onRecordSaved?.(saved, type);
     } catch (problem) { setError(problem.message); setConflict(problem.status === 409); } finally { setBusy(false); }
+  };
+  const save = async e => {
+    e.preventDefault();
+    await saveWithRevision(baseRevision);
   };
   const remove = async id => {
     if (!window.confirm('移入回收站？可以在档案页恢复。')) return;
@@ -86,7 +90,7 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
     {type === 'fitness' && <Message>目前只做个人测量记录。体能值不能替代游泳等级标准；具体训练请与教练沟通后由家长录入。</Message>}
     {type === 'nutrition' && <Message>记录实际睡眠、感受和饮食。晨脉与恢复感受不用于自动判断能否下水；补充剂仅记录既有专业建议。</Message>}
     {type === 'goals' && <Message>历史目标原文完整保留，包含未核实的规则或旧标准。手动进度不代表预测概率；未经确认的原文不作为训练指令。</Message>}
-    <Message error>{error}</Message>{conflict && <Message>请先用顶部“刷新记录”读取最新版本，对照下方记录。<button onClick={() => { setBaseRevision(api.getRevision()); setConflict(false); setError('已采用当前版本，请确认输入后再次保存'); }}>已核对最新记录，允许重试</button></Message>}
+    <Message error>{error}</Message>{conflict && <Message>检测到版本冲突（409）：请先核对服务端最新版本。<div className="actions"><button type="button" onClick={async () => { await reload?.(); setBaseRevision(api.getRevision()); setConflict(false); setError(''); }}>查看最新</button><button type="button" onClick={() => { if (!window.confirm('确认用您当前填写的版本覆盖服务端最新记录？')) return; const rev = api.getRevision(); setBaseRevision(rev); setConflict(false); void saveWithRevision(rev); }}>用我的版本覆盖</button><button type="button" onClick={() => { setBaseRevision(api.getRevision()); setConflict(false); setError('已采用当前版本，请确认输入后再次保存'); }}>已核对最新记录，允许重试</button></div></Message>}
     {!readOnly && ((allowAdd && !focused) || editing) && <details className="glass-card" open={Boolean(editing) || entryOnly || initialOpen}><summary>{editing ? '编辑记录' : '添加记录'}</summary>
       <DraftNotice draft={localDraft} onRestore={draft => { dirty.current = true; setRequestId(draft.clientRequestId || crypto.randomUUID()); setValues({ ...blank(), ...draft.values }); setEditing(draft.editing); setBaseRevision(draft.baseRevision ?? 0); }}/>
 
@@ -99,7 +103,7 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
     {hasFilter && <div className="actions"><span className="muted">已应用筛选：当前显示{records.length}条 / 共{data[type].length}条</span><button type="button" className="apple-btn apple-btn-secondary" onClick={clearFilters}>清除筛选</button></div>}
     </>}
     {!entryOnly && <>{!data[type].length ? <Empty>{`尚无${names[type]}记录；未录入不代表没有训练。`}</Empty> : !records.length ? <Empty>没有符合当前筛选条件的记录。<button type="button" className="apple-btn apple-btn-secondary" onClick={clearFilters}>清除筛选</button></Empty> : null}
-    <div className="record-list">{records.map(r => <article className="glass-card" key={r.id}><div className="flex-between"><h2>{dateFormat(r.date || r.deadline)} · {type === 'swim' ? `${r.distance}${r.stroke} ${performanceLabel(r)}${readablePerformance(r) ? `（${readablePerformance(r)}）` : ''} · ${r.poolLength}池` : type === 'goals' ? '个人目标原始记录' : names[type]}</h2>{!readOnly && <div className="actions"><button onClick={() => edit(r)}>编辑</button><button onClick={() => remove(r.id)}>移入回收站</button></div>}</div>
+    <div className="record-list">{records.map(r => <article className="glass-card" key={r.id}><div className="flex-between"><h2>{dateFormat(r.date || r.deadline)} · {type === 'swim' ? `${r.distance}${r.stroke} ${performanceLabel(r)}${readablePerformance(r) ? `（${readablePerformance(r)}）` : ''} · ${r.poolLength}池` : type === 'goals' ? '个人目标原始记录' : names[type]}</h2>{!readOnly && <div className="actions"><button onClick={() => edit(r)}>编辑</button>{role !== 'coach' && <button onClick={() => remove(r.id)}>移入回收站</button>}</div>}</div>
       {type === 'swim' && !publicMode && <p className="muted">{r.startType || '出发未知'} · {r.timingMethod || '计时未知'} · {r.recordType || '记录性质未知'} · {validityLabel(r)}</p>}
       {type === 'swim' && !publicMode && r.timeMs !== undefined && <p className="muted">精确计时：{(performanceMilliseconds(r) / 1000).toFixed(3)}秒 · 录入值：{r.timeInput || r.time}</p>}
       {type === 'swim' && !publicMode && r.conditionsKeptUnknownAt && <p className="muted">计时条件已按未知保留（{r.conditionsKeptUnknownAt}，裁决人：{r.conditionsKeptUnknownBy}）；成绩数值、有效性与PB参与规则不变。</p>}

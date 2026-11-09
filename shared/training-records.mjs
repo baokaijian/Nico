@@ -18,8 +18,8 @@ export function creationReplay(data, key, request) {
   if (found.creationRequest.hash !== request.hash || found.creationRequest.actor !== request.actor) throw fail(409, '此请求已保存过不同内容，请刷新核对原记录；需要另建时请清空表单');
   return found;
 }
-export function stampTraining(record, previous, actor, timestamp, request = null) {
-  Object.assign(record, { athleteId: previous?.athleteId || 'nico', updatedAt: timestamp, updatedBy: actor });
+export function stampTraining(record, previous, actor, timestamp, request = null, athleteId = 'nico') {
+  Object.assign(record, { athleteId: previous?.athleteId || athleteId || 'nico', updatedAt: timestamp, updatedBy: actor });
   if (!previous) Object.assign(record, { createdAt: timestamp, createdBy: actor, ...(request ? { creationRequest: request } : {}) });
   return record;
 }

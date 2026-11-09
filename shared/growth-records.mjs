@@ -5,14 +5,18 @@ import { eligiblePerformance } from './performance.ts';
 const records = (data, key) => data[key] || [];
 const canonical = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
 const lookup = (data, key, id, archived = false) => records(data, key).find(row => row.id === id) || (archived ? data.trash?.find(item => item.collection === key && item.record.id === id)?.record : null);
-function related(data, key, id, archived = false) {
-  const row = lookup(data, key, id, archived); if (!row || row.athleteId && row.athleteId !== 'nico') failGrowth('关联记录不存在、已删除或不属于当前档案'); return row;
+function related(data, key, id, archived = false, athleteId = 'nico') {
+  const row = lookup(data, key, id, archived);
+  const rowAthlete = row?.athleteId || 'nico';
+  const targetAthlete = athleteId || 'nico';
+  if (!row || (key !== 'skillDefinitions' && rowAthlete !== targetAthlete)) failGrowth('关联记录不存在、已删除或不属于当前档案');
+  return row;
 }
-function snapshots(data, refs, oldRefs = [], oldSnapshots = [], { completed = false, selfId } = {}) {
+function snapshots(data, refs, oldRefs = [], oldSnapshots = [], { completed = false, selfId, athleteId = 'nico' } = {}) {
   return refs.map(ref => {
     if (ref.id === selfId) failGrowth('不能引用自身作为证据');
     const old = oldRefs.findIndex(item => item.collection === ref.collection && item.id === ref.id);
-    const row = related(data, ref.collection, ref.id, old >= 0);
+    const row = related(data, ref.collection, ref.id, old >= 0, athleteId);
     if (completed && ref.collection === 'skillAssessments' && row.status !== '已确认') failGrowth('目标技能证据须为已确认测评');
     if (completed && ref.collection === 'swim' && !eligiblePerformance(row)) failGrowth('目标成绩证据须先核验为有效成绩且池长明确');
     if (old >= 0 && oldSnapshots[old]) return structuredClone(oldSnapshots[old]);
@@ -20,21 +24,22 @@ function snapshots(data, refs, oldRefs = [], oldSnapshots = [], { completed = fa
     return { ...ref, ...Object.fromEntries(keys.filter(key => row[key] !== undefined).map(key => [key, structuredClone(row[key])])) };
   });
 }
-export function validateGrowthRelations(data, key, record, previous = null) {
-  if(key==='childViews')for(const id of record.selectedMediaIds)if(!['photo','image'].includes(related(data,'media',id,previous?.selectedMediaIds?.includes(id)).type))failGrowth('儿童页只能选择照片');
-  if(key==='childReflections'){related(data,'childViews',record.viewId,previous?.viewId===record.viewId);if(record.trainingId)related(data,'trainings',record.trainingId,previous?.trainingId===record.trainingId);}
+export function validateGrowthRelations(data, key, record, previous = null, athleteId = 'nico') {
+  const targetAthlete = previous?.athleteId || athleteId || 'nico';
+  if(key==='childViews')for(const id of record.selectedMediaIds)if(!['photo','image'].includes(related(data,'media',id,previous?.selectedMediaIds?.includes(id),targetAthlete).type))failGrowth('儿童页只能选择照片');
+  if(key==='childReflections'){related(data,'childViews',record.viewId,previous?.viewId===record.viewId,targetAthlete);if(record.trainingId)related(data,'trainings',record.trainingId,previous?.trainingId===record.trainingId,targetAthlete);}
   if (key === 'videoComparisons') {
     for (const side of ['left','right']) {
-      const media = related(data,'media',record[`${side}MediaId`],previous?.[`${side}MediaId`] === record[`${side}MediaId`]);
+      const media = related(data,'media',record[`${side}MediaId`],previous?.[`${side}MediaId`] === record[`${side}MediaId`],targetAthlete);
       if (media.type !== 'video') failGrowth('A/B对比只能选择真实视频');
       if (media.duration != null && record[`${side}Second`] >= media.duration) failGrowth('对比时间点须小于视频时长');
     }
     if (record.skillId) {
-      const skill = related(data,'skillDefinitions',record.skillId,previous?.skillId === record.skillId);
+      const skill = related(data,'skillDefinitions',record.skillId,previous?.skillId === record.skillId,targetAthlete);
       record.skillVersion = previous?.skillId === record.skillId ? previous.skillVersion : skill.version;
     } else if (record.assessmentId) failGrowth('关联测评前请选择对应技能标准');
     if (record.assessmentId) {
-      const assessment = related(data,'skillAssessments',record.assessmentId,previous?.assessmentId === record.assessmentId);
+      const assessment = related(data,'skillAssessments',record.assessmentId,previous?.assessmentId === record.assessmentId,targetAthlete);
       if (assessment.skillId !== record.skillId) failGrowth('测评与技能标准不一致');
       record.assessmentVersion = previous?.assessmentId === record.assessmentId ? previous.assessmentVersion : assessment.version;
     }
@@ -43,45 +48,45 @@ export function validateGrowthRelations(data, key, record, previous = null) {
   }
   if (key === 'competitionEvents') {
     for (const id of record.performanceIds) {
-      const score = related(data, 'swim', id, previous?.performanceIds?.includes(id));
+      const score = related(data, 'swim', id, previous?.performanceIds?.includes(id), targetAthlete);
       if (!previous?.performanceIds?.includes(id) || previous.date !== record.date || previous.poolLength !== record.poolLength) {
         if (score.recordType !== '比赛' || score.date !== record.date || score.poolLength !== record.poolLength) failGrowth('关联成绩须为同日、同池长的比赛记录，请先核对真实来源');
       }
       if (records(data, key).some(item => item.id !== record.id && item.performanceIds.includes(id))) failGrowth('此成绩已属于另一赛事，请先核对或解除原关联', 409);
     }
-    for (const id of record.mediaIds) related(data, 'media', id, previous?.mediaIds?.includes(id));
-    for (const id of record.certificateIds) if (related(data, 'media', id, previous?.certificateIds?.includes(id)).type !== 'image') failGrowth('证书请关联真实照片，不能把视频当作证书');
+    for (const id of record.mediaIds) related(data, 'media', id, previous?.mediaIds?.includes(id), targetAthlete);
+    for (const id of record.certificateIds) if (related(data, 'media', id, previous?.certificateIds?.includes(id), targetAthlete).type !== 'image') failGrowth('证书请关联真实照片，不能把视频当作证书');
   }
   if (key === 'skillAssessments') {
     if (previous?.skillId === record.skillId) {
       if (record.definitionVersion !== previous.definitionVersion) failGrowth('既有评估的标准版本不可替换；请新建复测', 409);
       record.standardSnapshot = structuredClone(previous.standardSnapshot);
     } else {
-      const definition = related(data, 'skillDefinitions', record.skillId);
+      const definition = related(data, 'skillDefinitions', record.skillId, false, targetAthlete);
       if (definition.status !== '启用' || definition.version !== record.definitionVersion) failGrowth('标准未启用或版本已改变，请重新选择', 409);
       record.standardSnapshot = structuredClone(definition);
     }
     if (record.previousAssessmentId) {
-      const prior = related(data, 'skillAssessments', record.previousAssessmentId, previous?.previousAssessmentId === record.previousAssessmentId);
+      const prior = related(data, 'skillAssessments', record.previousAssessmentId, previous?.previousAssessmentId === record.previousAssessmentId, targetAthlete);
       if (prior.skillId !== record.skillId || prior.id === record.id || prior.date > record.date || prior.status !== '已确认') failGrowth('复测须关联同技能、日期不晚于本次的已确认评估');
     }
     if (record.weakPointId) {
-      const point = related(data, 'weakpoints', record.weakPointId, previous?.weakPointId === record.weakPointId);
+      const point = related(data, 'weakpoints', record.weakPointId, previous?.weakPointId === record.weakPointId, targetAthlete);
       if (record.previousAssessmentId && !String(point.sourceRef || '').split(/[,，、\s]+/).includes(record.previousAssessmentId)) failGrowth('技术短板来源与本次前评估不一致');
     }
     if (record.checkinIds.length && !record.weakPointId) failGrowth('关联打卡须先选择技术短板');
-    for (const id of record.checkinIds) if (related(data, 'checkins', id, previous?.checkinIds?.includes(id)).weakPointId !== record.weakPointId) failGrowth('打卡不属于本次技术短板');
-    record.evidenceSnapshots = snapshots(data, record.evidenceRefs, previous?.evidenceRefs, previous?.evidenceSnapshots, { selfId: record.id });
+    for (const id of record.checkinIds) if (related(data, 'checkins', id, previous?.checkinIds?.includes(id), targetAthlete).weakPointId !== record.weakPointId) failGrowth('打卡不属于本次技术短板');
+    record.evidenceSnapshots = snapshots(data, record.evidenceRefs, previous?.evidenceRefs, previous?.evidenceSnapshots, { selfId: record.id, athleteId: targetAthlete });
   }
   if (key === 'goals') {
-    record.baselineSnapshots = snapshots(data, record.baselineRefs, previous?.baselineRefs, previous?.baselineSnapshots, { selfId: record.id });
+    record.baselineSnapshots = snapshots(data, record.baselineRefs, previous?.baselineRefs, previous?.baselineSnapshots, { selfId: record.id, athleteId: targetAthlete });
     record.relatedSkillSnapshots = record.relatedSkillIds.map(id => {
-      const definition = related(data, 'skillDefinitions', id, previous?.relatedSkillIds?.includes(id));
+      const definition = related(data, 'skillDefinitions', id, previous?.relatedSkillIds?.includes(id), targetAthlete);
       return structuredClone(previous?.relatedSkillSnapshots?.find(item => item.id === id) || definition);
     });
-    for (const id of record.relatedTrainingIds) related(data, 'trainings', id, previous?.relatedTrainingIds?.includes(id));
+    for (const id of record.relatedTrainingIds) related(data, 'trainings', id, previous?.relatedTrainingIds?.includes(id), targetAthlete);
   }
-  if (['milestones', 'growthStories'].includes(key)) record.evidenceSnapshots = snapshots(data, record.evidenceRefs, previous?.evidenceRefs, previous?.evidenceSnapshots, { selfId: record.id });
+  if (['milestones', 'growthStories'].includes(key)) record.evidenceSnapshots = snapshots(data, record.evidenceRefs, previous?.evidenceRefs, previous?.evidenceSnapshots, { selfId: record.id, athleteId: targetAthlete });
 }
 function historyVersion(data, key, id) {
   return Math.max(0, ...records(data, 'growthHistory').filter(item => item.collection === key && item.recordId === id).map(item => item.version), Number(lookup(data, key, id, true)?.version) || 0);
@@ -93,16 +98,17 @@ function appendHistory(data, key, record, operation, actor, now, version = recor
   if (prior && canonical(prior) !== canonical(item)) failGrowth('同版本成长历史发生冲突，禁止覆盖', 409);
   if (!prior) data.growthHistory.push(item);
 }
-function finish(data, key, record, previous, operation, actor, now, request = null) {
+function finish(data, key, record, previous, operation, actor, now, request = null, athleteId = 'nico') {
   if (previous && !growthCollection(key, previous) && !records(data, 'growthHistory').some(row => row.collection === key && row.recordId === record.id)) appendHistory(data, key, previous, 'legacy', actor, now, 0);
-  Object.assign(record, { modelVersion: 1, athleteId: 'nico', version: historyVersion(data, key, record.id) + 1, updatedAt: now, updatedBy: actor });
+  Object.assign(record, { modelVersion: 1, athleteId: previous?.athleteId || record.athleteId || athleteId || 'nico', version: historyVersion(data, key, record.id) + 1, updatedAt: now, updatedBy: actor });
   if (!previous) Object.assign(record, { createdAt: now, createdBy: actor, ...(request ? { creationRequest: request } : {}) });
   validateStoredGrowth(key, record); appendHistory(data, key, record, operation, actor, now); return record;
 }
-export function saveGrowth(data, key, input, { id, actor, now, request = null }) {
+export function saveGrowth(data, key, input, { id, actor, now, request = null, athleteId = 'nico' }) {
   const previous = records(data, key).find(row => row.id === id) || null;
+  const targetAthlete = previous?.athleteId || athleteId || 'nico';
   const record = { ...validateGrowthInput(key, input, previous), id };
-  validateGrowthRelations(data, key, record, previous);
+  validateGrowthRelations(data, key, record, previous, targetAthlete);
   if(key==='yearbooks') {
     if(previous&&(previous.year!==record.year||previous.reportId!==record.reportId||canonical(previous.selectedMediaIds)!==canonical(record.selectedMediaIds)))failGrowth('已保存纪念册的来源不可替换，请新建草稿',409);
     if(!previous)Object.assign(record,freezeYearbook(data,record));
@@ -112,7 +118,7 @@ export function saveGrowth(data, key, input, { id, actor, now, request = null })
     if (previous && (previous.period !== record.period || previous.periodType !== record.periodType || canonical(previous.selectedMediaIds) !== canonical(record.selectedMediaIds))) failGrowth('已保存报告的来源范围不可直接更换，请新建草稿', 409);
     if (!previous) Object.assign(record, buildReportFacts(data, record), { generatedAt: now, status: '待确认' });
   }
-  finish(data, key, record, previous, previous ? 'update' : 'create', actor, now, request);
+  finish(data, key, record, previous, previous ? 'update' : 'create', actor, now, request, targetAthlete);
   if (previous) data[key][data[key].findIndex(row => row.id === id)] = record; else data[key].push(record);
   return record;
 }
@@ -126,7 +132,8 @@ const actionNote = input => {
   return growthText(raw.note, '操作原因', true);
 };
 export function actGrowth(data, key, id, action, input, { actor, now }) {
-  const previous = related(data, key, id), record = structuredClone(previous);
+  const rawRow = lookup(data, key, id);
+  const previous = related(data, key, id, false, rawRow?.athleteId || 'nico'), record = structuredClone(previous);
   if (!growthCollection(key, previous)) failGrowth('请先补充基线、结果和标准，明确采用新版目标流程');
   if (action === 'confirm' && ['skillAssessments', 'goals', 'milestones', 'growthStories', 'reportDrafts','childReflections','yearbooks'].includes(key)) {
     const proof = confirmation(input), done = key === 'goals' ? '已达成' : '已确认';
@@ -139,7 +146,7 @@ export function actGrowth(data, key, id, action, input, { actor, now }) {
     if (key === 'reportDrafts' && reportStale(data, record)) failGrowth('报告来源基线已过期，请明确重新生成并核对', 409);
     if (key === 'goals') {
       if (!proof.refs.length) failGrowth('请关联至少一条可验证达成证据');
-      record.completionRefs = proof.refs; record.completionSnapshots = snapshots(data, proof.refs, [], [], { completed: true, selfId: id });
+      record.completionRefs = proof.refs; record.completionSnapshots = snapshots(data, proof.refs, [], [], { completed: true, selfId: id, athleteId: record.athleteId || 'nico' });
     } else if (proof.refs.length) failGrowth('评估和里程碑使用本记录的证据，请先保存证据再确认');
     Object.assign(record, { status: done, confirmedAt: now, confirmedBy: proof.confirmedBy, confirmedActor: actor, confirmationNote: proof.confirmationNote });
   } else if (action === 'refresh' && key === 'reportDrafts') {
@@ -160,10 +167,10 @@ export function actGrowth(data, key, id, action, input, { actor, now }) {
     if (record.status !== '已确认') failGrowth('仅已确认评估可撤销', 409);
     Object.assign(record, { status: '已撤销', withdrawnAt: now, withdrawnBy: actor, withdrawalNote: actionNote(input) });
   } else failGrowth('不支持的成长操作', 404);
-  finish(data, key, record, previous, action, actor, now); data[key][data[key].findIndex(row => row.id === id)] = record;
+  finish(data, key, record, previous, action, actor, now, null, record.athleteId || 'nico'); data[key][data[key].findIndex(row => row.id === id)] = record;
   if (key === 'goals' && action === 'confirm' && ![...records(data, 'milestones'), ...(data.trash || []).filter(item => item.collection === 'milestones').map(item => item.record)].some(item => item.sourceGoalId === id && item.sourceGoalVersion === record.version)) {
     const candidate = { ...validateGrowthInput('milestones', { title: `达成目标：${record.title}`, date: now.slice(0, 10), status: '待确认', evidenceNote: record.confirmationNote, evidenceRefs: record.completionRefs, notes: '由目标的人工完成确认生成，待家长再次确认成长事件。' }), id: `milestone-${crypto.randomUUID()}`, origin: 'goal', sourceGoalId: id, sourceGoalVersion: record.version, sourceGoalSnapshot: structuredClone(record), evidenceSnapshots: structuredClone(record.completionSnapshots) };
-    finish(data, 'milestones', candidate, null, 'candidate', actor, now); data.milestones.push(candidate);
+    finish(data, 'milestones', candidate, null, 'candidate', actor, now, null, record.athleteId || 'nico'); data.milestones.push(candidate);
   }
   return record;
 }
