@@ -1,8 +1,8 @@
 import {adminTasks} from '../../shared/admin-tasks.mjs';
 import { eligiblePerformance, performanceMilliseconds } from '../../shared/performance.ts';
 import { analysis, planContext, ordered } from '../../shared/domain.mjs';
-import { practiceOverview } from '../../shared/practice.mjs';
-import { trainingFacts, trainingSummary } from '../../shared/training.ts';
+import { trainingFacts } from '../../shared/training.ts';
+import { coachFeedbackList, parentToday } from '../../shared/parent-experience.mjs';
 import { draftScopeKey } from './drafts.js';
 import { growthCollection } from '../../shared/growth-model.ts';
 export const managementSaveRequiresSnapshot = collection => collection === 'plans' || growthCollection(collection);
@@ -39,11 +39,13 @@ export function createManagementPosition({ scope, storage, isCurrent = () => tru
   };
 }
 export function workbenchModel(data, day) {
-  const pending = adminTasks(data,day);
-  const week = practiceOverview(data, day).week, result = analysis(data), context = planContext(data, day, result.version);
+  const todayModel = parentToday(data, day);
+  const pending = adminTasks(data, day);
+  const week = { start: todayModel.week.start, end: todayModel.week.end };
+  const result = analysis(data), context = planContext(data, day, result.version);
   const actual = ordered(data.trainings).filter(row => row.date <= day && trainingFacts(row).occurred);
   const latestScore = ordered(data.swim).filter(row => row.date <= day).at(-1);
   const peers = latestScore && eligiblePerformance(latestScore) ? ordered(data.swim).filter(row => row.date <= day && eligiblePerformance(row) && ['distance','stroke','poolLength'].every(key => row[key] === latestScore[key])) : [];
   const scoreChange = peers.length >= 2 ? { current: peers.at(-1), previous: peers.at(-2), deltaMs: performanceMilliseconds(peers.at(-1)) - performanceMilliseconds(peers.at(-2)) } : null;
-  return { pending, week, scoreChange, summary: trainingSummary(data.trainings.filter(row => row.date >= week.start && row.date <= day)), goals: (data.goals || []).filter(row => row.status === '进行中'), latestTraining: actual.at(-1) || null, recentScores: ordered(data.swim).filter(row => row.date <= day).reverse().slice(0, 3), focus: context.current?.focus || result.focus, confirmedFocus: !!context.current };
+  return { today: todayModel, coachFeedback: coachFeedbackList(data, 3), pending, week, scoreChange, summary: todayModel.week.summary, goals: (data.goals || []).filter(row => row.status === '进行中'), latestTraining: actual.at(-1) || null, recentScores: ordered(data.swim).filter(row => row.date <= day).reverse().slice(0, 3), focus: context.current?.focus || result.focus, confirmedFocus: !!context.current };
 }

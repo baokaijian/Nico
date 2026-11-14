@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApi } from '../src/services/api.js';
 import { loadPublicSummary } from '../src/services/public-summary.js';
+import { quickFields, recordFormFields } from '../src/services/record-form.js';
+import { FIELDS } from '../shared/domain.mjs';
 const memoryStorage = () => { const data = new Map(); return { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key), values: () => [...data.values()] }; };
 test('进入儿童会话替换家长凭据、清除草稿身份，旧事实响应失效',async()=>{
   const old=globalThis.fetch,storage=memoryStorage(),api=createApi('https://protocol.invalid',()=>'',{storage});let release;
@@ -154,4 +156,27 @@ test('草稿身份只来自当前已验证会话，退出/强制改密不授予�
     globalThis.fetch = async () => new Response(JSON.stringify({ authenticated: true, username: 'protocol-b', role: 'owner' }));
     await api.authRequest('session'); assert.equal(api.getDraftScope().account, 'protocol-b'); assert.notEqual(api.getDraftScope(), old);
   } finally { globalThis.fetch = original; }
+});
+
+test('V2 极简主路径：训练默认 4 项必填/常用字段，成绩默认 6 项且非打腿隐藏 testItem', () => {
+  const trainingQuick = quickFields('trainings', { entryMode: '快速' });
+  assert.deepEqual(
+    trainingQuick.map(f => f.key),
+    ['date', 'durationMinutes', 'totalMeters', 'completionStatus']
+  );
+
+  const swimFree = quickFields('swim', { stroke: '自由泳' });
+  assert.deepEqual(
+    swimFree.map(f => f.key),
+    ['date', 'distance', 'stroke', 'poolLength', 'time', 'validityStatus']
+  );
+  assert.ok(!swimFree.some(f => f.key === 'testItem'));
+  assert.deepEqual(swimFree.conditionKeys, ['startType', 'timingMethod', 'recordType']);
+
+  const swimKick = recordFormFields('swim', FIELDS.swim, { stroke: '打腿' });
+  assert.ok(swimKick.primary.some(f => f.key === 'testItem' && f.required === true));
+
+  const api = createApi('https://protocol.invalid');
+  assert.equal(api.setAthleteId('leo'), 'leo');
+  assert.equal(api.getAthleteId(), 'leo');
 });

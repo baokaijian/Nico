@@ -4,7 +4,7 @@ import { athletesList, scopeStateForAthlete } from '../shared/athletes-coaches.m
 import { EVIDENCE_COLLECTIONS } from '../shared/plan-engine.mjs';
 import { createApi } from './services/api';
 import { loadAppView } from './services/app-view';
-import { Message, Modal } from './components/ui';
+import { Message, Modal, LoadingSkeleton } from './components/ui';
 import LoginPanel from './components/LoginPanel';
 import LogoutDialog from './components/LogoutDialog';
 import { createDraftStore, draftScopeKey } from './services/drafts';
@@ -16,6 +16,7 @@ const adminCapable = import.meta.env.DEV || import.meta.env.VITE_APP_MODE === 'p
 const ChildView = lazy(() => import('./components/ChildView'));
 const QuickEntry = lazy(() => import('./components/QuickEntry'));
 const ChangePassword = lazy(() => import('./components/ChangePassword'));
+const SearchResults = lazy(() => import('./components/SearchResults'));
 const privateTabs = MANAGEMENT_NAV.map(item => [item.key, item.label]);
 const publicTabs = [['home', '概览'], ['results', '成绩'], ['media', '影像']];
 const roleLabels = { owner: '家长管理', coach: '协作录入', viewer: '只读访问' };
@@ -28,7 +29,7 @@ export default function App() {
   const entryOpener = useRef(null);
   const positionStore = useRef(null), positionIdentity = useRef(null);
   const [mediaTarget, setMediaTarget] = useState(null), [quickEntry, setQuickEntry] = useState(false);
-  const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState('');
+  const [searchValue, setSearchValue] = useState(''), [searchSeed, setSearchSeed] = useState(''), [searchQuery, setSearchQuery] = useState('');
   const api = useMemo(() => createApi(import.meta.env.VITE_API_URL || ''), []);
   useEffect(()=>installPageHealth(api.health),[api]);
   const [activeAthleteId, setActiveAthleteId] = useState(() => api.getAthleteId());
@@ -102,6 +103,7 @@ export default function App() {
     setTab(lastTabs.current[next]); void reload();
   };
   const navigate = (next, type) => {
+    setSearchQuery('');
     if (fullView) { const target = resolveManagementLocation(next, type); setLocation(target); positionStore.current?.write(target); setQuickEntry(next === 'records' && type === 'trainings'); }
     else setTab(next);
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -135,6 +137,7 @@ export default function App() {
     reloadController.current?.abort(); api.resetAuth(); setSession(null); setLoaded(false); setData(emptyState());
     const cleared = deleteDrafts ? drafts.clear() : null;
     setLogoutOpen(false); setLogoutBusy(false); setMediaTarget(null); setEntry(null); setQuickMenuOpen(false);
+    setSearchValue(''); setSearchSeed(''); setSearchQuery('');
     modeRef.current = 'view'; api.setMode('view'); setMode('view'); setPasswordOpen(false); setAuth(false);
     const draftMessage = deleteDrafts ? cleared.status === 'cleared' ? '已删除本账号的新版草稿。' : '未能确认草稿已清除，请在下次登录后检查。' : '草稿按原账号保留，重新登录后可恢复。';
     setNotice(`${failed ? '已清除本机登录；服务端会话将在有效期结束后失效。' : '已退出账号。'}${draftMessage}`); await reload();
@@ -143,7 +146,11 @@ export default function App() {
     event.preventDefault();
     const query = searchValue.trim();
     setSearchSeed(query);
-    if (query || location.section !== 'training') navigate('training', 'swim');
+    if (!query) {
+      setSearchQuery('');
+      return;
+    }
+    setSearchQuery(query);
   };
   const enterChild=async viewId=>{const granted=await api.authRequest('child',{viewId});setData(emptyState());setLoaded(false);setEntry(null);setQuickMenuOpen(false);setUserMenuOpen(false);setChildData(null);setSession(granted);setRole('child');await reload();};
   const returnParent=async()=>{try{await api.authRequest('logout',{});}catch{setNotice('本机儿童授权已清除，服务端退出待连接恢复后核对。');}finally{api.resetAuth();setSession(null);setChildData(null);setData(emptyState());setLoaded(false);modeRef.current='manage';api.setMode('manage');setMode('manage');setAuth(true);await reload();}};
@@ -153,12 +160,20 @@ export default function App() {
     return activeAthletes[0]?.id || 'nico';
   }, [activeAthletes, activeAthleteId]);
   const switchAthlete = useCallback(nextId => {
+    if (nextId === effectiveAthleteId) return;
+    const hasReadyDraft = createDraftStore({ scope: api.getDraftScope() }).list().items.some(item => item.status === 'ready');
+    if ((entry !== null || hasReadyDraft) && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (!window.confirm('当前运动员有未保存草稿或打开的快捷录入。草稿按原运动员保留，切换后不会自动提交。确认切换当前运动员？')) return;
+    }
     const resolved = api.setAthleteId(nextId);
     setActiveAthleteId(resolved);
     setEntry(null);
     setQuickMenuOpen(false);
+    setSearchValue('');
+    setSearchSeed('');
+    setSearchQuery('');
     setResumeVersion(v => v + 1);
-  }, [api]);
+  }, [api, effectiveAthleteId, entry]);
   const scopedData = useMemo(() => scopeStateForAthlete(data, effectiveAthleteId), [data, effectiveAthleteId]);
   if(session?.authenticated&&session.role==='child')return <Suspense fallback={<Message>正在打开成长小岛…</Message>}><ChildView snapshot={childData} api={api} error={error} loading={loading} refresh={reload} onReturnParent={returnParent}/></Suspense>;
   const tabs = fullView ? privateTabs : publicTabs;
@@ -169,10 +184,10 @@ export default function App() {
       <div className="brand"><span className="brand-mark" aria-hidden="true">≈</span><div><b>{fullView ? `${scopedData.profile?.name || 'Nico'} 游泳成长记录` : 'Nico 游泳成长记录'}</b><small>{!fullView ? (authenticated ? '查看模式 · 已登录' : '精选摘要') : authenticated ? `${roleLabels[role] || '访问'}` : '只读浏览'}</small></div></div>
       <nav className="main-tabs" aria-label="主要导航">{tabs.map(([key, label]) => <button key={key} className={`tab-btn ${(fullView ? location.section : tab) === key ? 'active' : ''}`} aria-current={(fullView ? location.section : tab) === key ? 'page' : undefined} onClick={() => navigate(key)}>{label}</button>)}</nav>
       <div className="topbar-right">
-        {fullView && activeAthletes.length > 0 && (
-          <label className="athlete-switcher" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        {fullView && activeAthletes.length > 1 && (
+          <label className="athlete-switcher">
             <span className="sr-only">切换当前运动员</span>
-            <select aria-label="切换当前运动员" className="apple-input" value={effectiveAthleteId} onChange={e => switchAthlete(e.target.value)} style={{ width: 'auto', minWidth: '108px', padding: '4px 8px' }}>
+            <select aria-label="切换当前运动员" className="apple-input athlete-switcher-select" value={effectiveAthleteId} onChange={e => switchAthlete(e.target.value)}>
               {activeAthletes.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
             </select>
           </label>
@@ -200,11 +215,25 @@ export default function App() {
     </div></div>}
     <div className="shell">
       <main id="main" className="pane">
-        <Message error>{error}</Message><Message>{notice}</Message>
+        {error && selectedLoaded && (
+          <Message error>
+            读取失败，显示的是上次成功的数据：{error}{' '}
+            <button type="button" className="apple-btn apple-btn-secondary" onClick={reload} disabled={loading}>重试</button>
+          </Message>
+        )}
+        {error && !selectedLoaded && (
+          <Message error>
+            读取失败：{error}{' '}
+            <button type="button" className="apple-btn apple-btn-secondary" onClick={reload} disabled={loading}>重试</button>
+          </Message>
+        )}
+        <Message>{notice}</Message>
         {session?.authenticated && session.mustChangePassword
-          ? <Suspense fallback={<Message>正在打开账号设置…</Message>}><ChangePassword api={api} onChanged={reload}/></Suspense>
-          : loading && !selectedLoaded ? <Message>正在读取记录…</Message> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并刷新。</Message> : <Suspense key={session?.authenticated ? session.username : 'guest'} fallback={<Message>正在打开页面…</Message>}>
-            {fullView && <ManagementView location={location} navigate={navigate} onEnterChild={enterChild} onSwitchAthlete={switchAthlete} data={scopedData} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget} resumeVersion={resumeVersion}/>}
+          ? <Suspense fallback={<LoadingSkeleton label="正在打开账号设置…" />}><ChangePassword api={api} onChanged={reload}/></Suspense>
+          : loading && !selectedLoaded ? <LoadingSkeleton label="正在读取记录…" /> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并点击重试。<button type="button" className="apple-btn apple-btn-secondary" onClick={reload} disabled={loading}>重试</button></Message> : <Suspense key={session?.authenticated ? session.username : 'guest'} fallback={<LoadingSkeleton label="正在打开页面…" />}>
+            {fullView && searchQuery
+              ? <SearchResults query={searchQuery} data={scopedData} api={api} role={role} readOnly={readOnly} navigate={navigate} onSaved={onSaved} reload={reload} onClose={() => { setSearchQuery(''); setSearchValue(''); setSearchSeed(''); }} />
+              : fullView && <ManagementView location={location} navigate={navigate} onEnterChild={enterChild} onSwitchAthlete={switchAthlete} data={scopedData} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget} resumeVersion={resumeVersion}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}
         {fullView && entry && !readOnly && <Suspense fallback={<Message>正在打开快捷录入…</Message>}><QuickEntry key={entry.type} {...entry} data={scopedData} api={api} onSaved={onSaved} reload={reload} onClose={closeEntry} navigate={navigate} role={role} restoreFocus={() => { const target = entryOpener.current?.isConnected ? entryOpener.current : document.querySelector('.mobile-quick-entry > button'); target?.focus(); }}/></Suspense>}

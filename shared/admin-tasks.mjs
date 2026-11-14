@@ -8,7 +8,7 @@ const categoryFor=issue=>issue.ruleId==='DQ-REFERENCE'||issue.collection==='medi
 // 待办标题优先给出真实实体（日期+项目），让家长一眼知道要处理哪条记录。
 const taskTitle=(issue,row)=>{
  if(issue.collection==='swim'&&row)return `${row.date||'日期未知'} · ${row.distance||''}${row.stroke||''}${row.testItem?`（${row.testItem}）`:''}${['25m','50m'].includes(row.poolLength)?`（${row.poolLength}池）`:''}`;
- if(row?.title||row?.name||row?.standardSnapshot?.name||row?.trainingType||row?.session)return row.title||row.name||row.standardSnapshot.name||row.trainingType||row.session;
+ if(row?.title||row?.name||row?.standardSnapshot?.name||row?.trainingType||row?.session)return row.title||row.name||row.standardSnapshot?.name||row.trainingType||row.session;
  if(row?.date)return `${row.date} · ${issue.type}`;
  return `${issue.type}记录`;
 };
