@@ -6,7 +6,13 @@ export function Field({ field, value, onChange }) {
   return <div className="form-group"><label htmlFor={id}>{field.label}{field.required ? ' *' : ''}</label>{field.type === 'textarea' ? <textarea {...props} rows={3}/> : field.type === 'select' ? <select {...props}><option value="">{field.emptyLabel || '未填写'}</option>{field.options.map(o => <option key={o} value={o}>{field.optionLabels?.[o] || o}</option>)}{shown && !field.options.includes(shown) && <option value={shown}>{shown}（原始值）</option>}</select> : <><input {...props} type={field.type} min={field.min} max={field.max} step={field.integer ? 1 : field.step || 'any'} list={field.options ? `${id}-options` : undefined}/>{field.options && <datalist id={`${id}-options`}>{field.options.map(o => <option value={o} key={o}/>)}</datalist>}</>}{field.description && <small id={`${id}-hint`}>{field.description}</small>}</div>;
 }
 export function Message({ children, error = false }) { return children ? <div className={`notice ${error ? 'error' : ''}`} role={error ? 'alert' : 'status'}>{children}</div> : null; }
-export function Empty({ children = '尚未录入记录。' }) { return <p className="empty">{children}</p>; }
+export function Empty({ children = '尚未录入记录。' }) { return <div className="empty" role="status">{children}</div>; }
+export function LoadingSkeleton({ label = '正在读取记录…', lines = 3 }) {
+  return <div className="loading-skeleton glass-card" role="status" aria-live="polite" aria-busy="true">
+    <p className="skeleton-label">{label}</p>
+    {Array.from({ length: lines }, (_, index) => <div key={index} className={`skeleton-line ${index === 0 ? 'skeleton-title' : index === lines - 1 ? 'skeleton-short' : ''}`} aria-hidden="true"/>)}
+  </div>;
+}
 export function Modal({ title, children, onClose, restoreFocus }) {
   const ref = useRef(null), titleId = useId(), restoreRef = useRef(restoreFocus);
   useEffect(() => {

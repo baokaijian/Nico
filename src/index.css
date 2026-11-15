@@ -748,3 +748,234 @@ dialog:has(.quick-entry) { width:min(760px,calc(100vw - 32px)); max-width:none; 
   input[type="checkbox"]{min-width:24px;min-height:24px;flex:none}
   .training-check{min-height:44px;display:flex;align-items:center;gap:10px}
 }
+
+/* V2.0 家长核心体验：今日概览、教练反馈卡片、运动员范围搜索、报告概览与打印优化 */
+.badge-ok { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 25%, var(--line)); }
+.badge-warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 25%, var(--line)); }
+
+.today-card {
+  border-color: var(--brand-line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-soft) 42%, var(--surface)), var(--surface));
+}
+.today-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.today-week-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+.today-stat {
+  padding: var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.today-stat span {
+  display: block;
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+.today-stat strong {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t-lg);
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+.today-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+}
+.today-primary-action {
+  min-height: 44px;
+  padding-inline: var(--s-4);
+}
+.today-subgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+.today-subcard {
+  padding: var(--s-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: grid;
+  gap: var(--s-2);
+  align-content: start;
+}
+.today-subcard h3 {
+  font-size: var(--t-md);
+  margin: 0;
+}
+.today-feedback-quote {
+  margin: 0;
+  padding-left: var(--s-3);
+  border-left: 3px solid var(--brand);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.setup-compact-banner {
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--brand-line);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--r-sm);
+}
+.setup-compact-text {
+  display: grid;
+  gap: 2px;
+}
+
+.workbench-more-wrap {
+  padding-top: var(--s-2);
+}
+.workbench-more-toggle {
+  width: 100%;
+  justify-content: center;
+}
+
+.coach-feedback-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s-3);
+}
+.coach-feedback-item {
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: grid;
+  gap: var(--s-2);
+}
+.coach-feedback-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+}
+.coach-feedback-quote {
+  margin: 0;
+  padding-left: var(--s-3);
+  border-left: 3px solid var(--brand);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.coach-feedback-highlight {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  border-left: 4px solid var(--brand);
+  background: var(--brand-soft);
+}
+
+.entry-next-bar {
+  margin-top: var(--s-2);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.athlete-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.athlete-switcher-select {
+  width: auto;
+  min-width: 108px;
+  min-height: 36px;
+  padding: 4px 10px;
+}
+
+.search-results-list {
+  list-style: none;
+  margin: var(--s-2) 0 0;
+  padding: 0;
+}
+.search-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line);
+}
+.search-result-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.report-overview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.report-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+.report-action-bar {
+  position: sticky;
+  top: 52px;
+  z-index: 10;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid var(--line);
+}
+
+.loading-skeleton {
+  display: grid;
+  gap: var(--s-2);
+}
+.skeleton-line {
+  height: 14px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.skeleton-title { width: 42%; height: 20px; }
+.skeleton-body { width: 88%; }
+.skeleton-short { width: 62%; }
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (max-width: 767px) {
+  .today-week-summary,
+  .today-subgrid,
+  .report-overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .search-result-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .search-result-row button {
+    align-self: stretch;
+  }
+  .athlete-switcher-select {
+    min-height: 44px;
+  }
+}

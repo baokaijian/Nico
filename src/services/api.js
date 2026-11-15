@@ -108,6 +108,7 @@ export function createApi(base = import.meta.env.VITE_API_URL || '', getToken = 
       explicitAthlete = true;
       if (draftIdentity) draftIdentity = { ...draftIdentity, athlete: athleteId };
     }
+    return athleteId;
   };
   return { health, childPhotoBlob:async(id,signal)=>URL.createObjectURL(await mediaFile(id,'original',signal,true)), cloudMode: /\/functions\/v1\/nico-api\/?$/.test(base), usesCookieSession: !base, request, upload, mediaBlob, mediaFile:(id,variant,signal,options={})=>mediaFile(id,variant,signal,false,options.maxBytes), authRequest, resetAuth, getDraftScope: () => draftIdentity, getChildScope:()=>childIdentity, getAthleteId: () => athleteId, setAthleteId, getMode: persistence.loadMode, setMode: persistence.saveMode, setOnUnauthorized: handler => { onUnauthorized = handler; }, getRevision: () => revision,
     publicMediaUrl: url => base ? `${base}/api/public-media/${encodeURIComponent(url.split('/').pop())}` : `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}` };

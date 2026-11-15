@@ -11,13 +11,11 @@ import useRecordDraft from '../services/useRecordDraft';
 import DraftNotice, { draftHint } from './DraftNotice';
 import { recordFormFields, changeRecordField } from '../services/record-form';
 const names = { checkins:'练习打卡', swim: '成绩', trainings: '水上训练', fitness: '体能', nutrition: '恢复与饮食', growth: '身体测量', goals: '个人目标', annotations: '录像批注', media: '素材说明' };
-// 链路内成绩表单折叠的“计时与条件”字段；独立成绩页仍按原布局完整展示。
-const CONDITION_FIELD_KEYS = ['startType', 'timingMethod', 'recordType', 'validityStatus'];
 function valueLabel(value) { return value === true ? '按既有专业建议服用' : value === false ? '未服用' : value == null || value === '' ? '未填写' : String(value); }
 export default function Records(props) {
   return props.type === 'trainings' ? <TrainingRecords {...props}/> : <GenericRecords {...props}/>;
 }
-function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved, reload, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false }) {
+function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved, reload, readOnly = false, allowAdd = true, publicMode = false, initialFilter, entryOnly = false, draftKey = 'entry', initialContext = {}, clientRequestId, onRecordSaved, onBusyChange, initialOpen = false, openQuickEntry }) {
   const fields = FIELDS[type];
   const displayFields = publicMode ? fields.filter(f => ['date', 'distance', 'stroke', 'time', 'poolLength'].includes(f.key)) : fields;
   const blank = () => ({ ...Object.fromEntries(fields.map(f => [f.key, f.key === 'date' ? today() : ''])), ...(type === 'swim' ? { validityStatus: '未核验' } : {}), ...initialContext });
@@ -28,7 +26,7 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
   const focused = Boolean(focusId), [viewAll, setViewAll] = useState(false);
   const localDraft = useRecordDraft(api, entryOnly ? `quick.${draftKey}.${type}` : type);
   useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
-  const [savedMessage, setSavedMessage] = useState('');
+  const [savedMessage, setSavedMessage] = useState(''), [savedRecord, setSavedRecord] = useState(null);
   useEffect(() => { if (initialFilter !== undefined) setFilter(initialFilter); }, [initialFilter]);
   const [baseRevision, setBaseRevision] = useState(() => api?.getRevision()), [conflict, setConflict] = useState(false);
   const edit = r => { if (localDraft.blocked) { setError('请先处理本账号未提交草稿，再编辑其他记录。'); return; } setBaseRevision(api.getRevision()); setConflict(false); setEditing(r.id); setValues(Object.fromEntries(fields.map(f => [f.key, type === 'swim' && TIME_FIELDS.includes(f.key) ? performanceInput(r, f.key) : r[f.key] ?? '']))); setError(''); };
@@ -51,7 +49,7 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
         message = !eligiblePerformance(saved) ? `成绩已保存：${validityLabel(saved)}；当前不计入PB，原始记录仍保留。`
           : !prior || performanceMilliseconds(saved) < performanceMilliseconds(prior) ? `成绩已保存，刷新${saved.distance}${saved.stroke}（${saved.poolLength}池）个人最佳：${performanceLabel(saved)}。` : '成绩已保存并更新该项目统计。';
       }
-      onSaved(type, saved); reset(); setSavedMessage(message); onRecordSaved?.(saved, type);
+      onSaved(type, saved); reset(); setSavedMessage(message); setSavedRecord(type === 'swim' ? saved : null); onRecordSaved?.(saved, type);
     } catch (problem) { setError(problem.message); setConflict(problem.status === 409); } finally { setBusy(false); }
   };
   const save = async e => {
@@ -85,7 +83,7 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
   };
   const formFields = recordFormFields(type, fields, values);
   const facetOptions = key => FIELDS.swim.find(f => f.key === key)?.options || [];
-  return <div className="stack fade-in">{!entryOnly && <header><h1>{names[type]}记录</h1><p className="muted">{readOnly ? '查看实际录入的记录，未填写的字段表示未知。' : '填写实际观察；留空表示未记录，0只表示实际为零。'}</p></header>}<Message>{savedMessage}</Message>
+  return <div className="stack fade-in">{!entryOnly && <header><h1>{names[type]}记录</h1><p className="muted">{readOnly ? '查看实际录入的记录，未填写的字段表示未知。' : '填写实际观察；留空表示未记录，0只表示实际为零。'}</p></header>}{savedMessage && <Message>{savedMessage}{!entryOnly && type === 'swim' && savedRecord && <div className="entry-next-bar" role="region" aria-label="保存后下一步"><span className="muted">可继续关联影像或结束本次录入：</span><div className="actions">{openQuickEntry && <button type="button" onClick={() => openQuickEntry('media', { date: savedRecord.date, recordId: savedRecord.id })}>关联影像</button>}<button type="button" className="apple-btn apple-btn-secondary" onClick={() => { setSavedRecord(null); setSavedMessage(''); }}>结束</button></div></div>}</Message>}
     {type === 'growth' && <Message>身体测量须保留一位小数。臂长与臂展分别记录，测量方法未确认时请留空。</Message>}
     {type === 'fitness' && <Message>目前只做个人测量记录。体能值不能替代游泳等级标准；具体训练请与教练沟通后由家长录入。</Message>}
     {type === 'nutrition' && <Message>记录实际睡眠、感受和饮食。晨脉与恢复感受不用于自动判断能否下水；补充剂仅记录既有专业建议。</Message>}
@@ -94,7 +92,7 @@ function GenericRecords({ role, focusMediaId, focusId, type, data, api, onSaved,
     {!readOnly && ((allowAdd && !focused) || editing) && <details className="glass-card" open={Boolean(editing) || entryOnly || initialOpen}><summary>{editing ? '编辑记录' : '添加记录'}</summary>
       <DraftNotice draft={localDraft} onRestore={draft => { dirty.current = true; setRequestId(draft.clientRequestId || crypto.randomUUID()); setValues({ ...blank(), ...draft.values }); setEditing(draft.editing); setBaseRevision(draft.baseRevision ?? 0); }}/>
 
-      <form onSubmit={save}><fieldset disabled={busy || localDraft.blocked}><legend className="sr-only">填写记录</legend><div className="form-grid">{(entryOnly && type === 'swim' ? formFields.primary.filter(field => !CONDITION_FIELD_KEYS.includes(field.key)) : formFields.primary).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{entryOnly && type === 'swim' && formFields.primary.some(field => CONDITION_FIELD_KEYS.includes(field.key)) && <details><summary>计时与条件（可选）</summary><div className="form-grid">{formFields.primary.filter(field => CONDITION_FIELD_KEYS.includes(field.key)).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}{formFields.secondary.length > 0 && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{formFields.secondary.filter(field => !(entryOnly && initialContext.trainingId && field.key === 'trainingId')).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
+      <form onSubmit={save}><fieldset disabled={busy || localDraft.blocked}><legend className="sr-only">填写记录</legend><div className="form-grid">{formFields.primary.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div>{type === 'swim' && formFields.conditions?.length > 0 && <details><summary>计时与条件（可选）</summary><div className="form-grid">{formFields.conditions.map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}{formFields.secondary.length > 0 && <details><summary>补充详细字段（可选）</summary><div className="form-grid">{formFields.secondary.filter(field => !(entryOnly && initialContext.trainingId && field.key === 'trainingId')).map(field => <Field key={field.key} field={uiField(field)} value={values[field.key]} onChange={v => change(field.key, v)}/>)}</div></details>}
         <div className="actions"><button disabled={busy} className="apple-btn apple-btn-primary">{busy ? '正在保存…' : '保存到服务端'}</button><button type="button" onClick={reset} className="apple-btn apple-btn-secondary">清空 / 取消</button><details className="more-actions"><summary aria-label="更多操作" title="更多操作">⋯</summary><div className="more-menu" role="menu"><button type="button" role="menuitem" onClick={() => downloadJSON(`Nico-${type}-未提交草稿.json`, { collection: type, values, editing })}>导出未提交草稿</button></div></details></div><p className="muted">{draftHint} 保存失败时输入保留。</p></fieldset>
       </form></details>}
     {focused && !entryOnly && <div className="actions"><button type="button" className="apple-btn apple-btn-secondary" onClick={() => setViewAll(value => !value)}>{viewAll ? '只看目标记录' : '在本类记录中查看全部'}</button></div>}

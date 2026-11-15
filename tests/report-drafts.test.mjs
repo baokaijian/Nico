@@ -38,3 +38,14 @@ test('同日复测优先明确前测；随机ID和未知的同日顺序不推导
   let facts=buildReportFacts(data,draft).facts;assert.equal(facts.skills.find(row=>row.id==='a-retest').previousLevel,'L1');assert.notEqual(facts.skills.find(row=>row.id==='z-first').previousLevel,'L2');
   data.skillAssessments[1].previousAssessmentId='';facts=buildReportFacts(data,draft).facts;assert.ok(facts.skills.every(row=>!['L1','L2'].includes(row.previousLevel)),'同日顺序未知不靠随机ID推导升降');
 });
+test('报告 HTML 含当前运动员标识与打印防断行样式，且不改变基线指纹',()=>{
+  const data=emptyState();
+  data.profile={...data.profile,id:'leo',name:'Leo',displayName:'Leo（弟弟）'};
+  data.trainings=[{id:'t-leo',date:'2000-01-05',durationMinutes:40,totalMeters:1000}];
+  const r=saveGrowth(data,'reportDrafts',draft,options);
+  const beforeBaseline=r.baseline;
+  const html=growthReportHTML(r,false,data.profile);
+  assert.ok(html.includes('运动员：Leo（弟弟）'));
+  assert.ok(html.includes('break-inside:avoid'));
+  assert.equal(r.baseline,beforeBaseline);
+});
