@@ -28,7 +28,7 @@
 - `npm run lint`：通过（0 warning / 0 error）
 - `npm run typecheck`：通过
 - `NICO_TEST_PROTOCOL_ONLY=true npm test`：通过（含新增 `tests/parent-experience.test.mjs` 及更新的 `tests/client.test.mjs`、`tests/report-drafts.test.mjs`）
-- `npm run build && npm run check:bundle && npm run verify:public`：通过（首屏入口 JS gzip 约 80KB，初始总计约 92KB，均 `<= 180KB`，且首屏未加载 `ffmpeg` / `pdf-document`）
+- `npm run build && npm run check:bundle && npm run verify:public`：通过（首屏入口 JS gzip 80.3KB，初始总计 116.3KB，均 `<= 180KB`，且首屏未加载 `ffmpeg` / `pdf-document`）
 - `NICO_TEST_PROTOCOL_ONLY=true npm run check`：全绿通过
 
 ## 3. 真人、真机与真实环境待验项（待验）
@@ -41,3 +41,14 @@
 | 真实手机（iOS Safari / Android Chrome 390px）触控与粘性操作栏体验 | **待验** | 已完成样式与响应式规则，真机软键盘弹起与单手点按待实测 |
 | 浏览器打印 / 另存为 PDF 跨页排版核对 | **待验** | 已加入 `@media print` 防断行样式，需在真实桌面/移动浏览器打印预览核对分页 |
 | 真实视频转码（FFmpeg Worker）与完整读屏无障碍（VoiceOver / TalkBack） | **待验** | 需使用真实视频素材与系统读屏软件逐项核验 |
+| axe 自动扫描（390 / 768 / 1280 三档） | **待验** | 当前环境 Playwright MCP 连接失败；软件检查未执行 axe，不在验收记录中宣称 0 critical |
+
+## 4. 验收方独立复核（2026-11-15）
+
+- 独立运行 `NICO_TEST_PROTOCOL_ONLY=true npm run check`：268 项测试全部通过，lint / typecheck / build / `check:bundle` / `verify:public` 全绿；首屏入口 80.3KB gzip、初始总计 116.3KB gzip；公开产物 70 个文件通过。
+- 复核发现并修复 3 项组件 prop 不匹配（修复提交 `a71f6aa`）：
+  - `TodayCard` 由 `Workbench` 传入 `todayModel` 与 `onNavigate`；
+  - `ReportOverview` 改为接收已计算的 `overview`，`Reports` 传入 `onPrint`；
+  - `App` 向 `SearchResults` 传入 `onClear`。
+- 修复后用 Vite SSR 渲染冒烟核验 `TodayCard`、`ReportOverview`、`SearchResults`、`Workbench` 四个组件，均能渲染出预期内容（今日卡、报告概览、搜索分组、工作台反馈卡）。
+- 结论：**软件验收通过**；真人 45 秒/60 秒计时、真机 390px、真实打印/PDF、真实视频转码、完整读屏与 axe 扫描仍为**待验**，不得表述为已完成。
