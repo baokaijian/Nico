@@ -18,7 +18,7 @@
    - 搜索基于 `scopedData` 检索训练、成绩、影像、报告草稿四类记录，不跨运动员泄漏，区分「当前运动员尚无记录」与「无匹配结果」两类空态，支持跳回原记录工作区。
    - 单运动员家庭隐藏顶部切换下拉框；多运动员切换时若存在未保存草稿或打开的快捷录入弹窗则先弹出确认，切换后重置搜索状态。
 5. **报告概览、运动员归属与打印预算（FR-PX-15..22）**：
-   - 报告预览页顶部新增概览卡与粘性操作栏，样本不足（有效成绩 `< 2` 且训练 `< 2`）时诚实提示「样本不足」且不输出趋势结论。
+   - 报告预览页顶部新增概览卡与粘性操作栏，训练或有效成绩任一 `< 2` 时诚实提示「样本不足」且不输出趋势结论。
    - 报告 HTML 与导出文件名包含当前运动员名称，补充 `@media print` 行内防断页规则。
    - 首屏加载骨架屏与保留旧数据的错误重试提示；新增 `scripts/check-bundle-budget.mjs` 校验首屏 JS gzip `<= 180KB` 且不含 `ffmpeg` / `pdf-document`。
 
@@ -52,3 +52,12 @@
   - `App` 向 `SearchResults` 传入 `onClear`。
 - 修复后用 Vite SSR 渲染冒烟核验 `TodayCard`、`ReportOverview`、`SearchResults`、`Workbench` 四个组件，均能渲染出预期内容（今日卡、报告概览、搜索分组、工作台反馈卡）。
 - 结论：**软件验收通过**；真人 45 秒/60 秒计时、真机 390px、真实打印/PDF、真实视频转码、完整读屏与 axe 扫描仍为**待验**，不得表述为已完成。
+
+## 5. 发布回执（2026-11-15）
+
+- 功能分支：`codex/parent-experience-v2`；合并提交：`b3c5dfac6cec87c6cf59f0db34db2234b1ee8500`。
+- Pages 工作流：`43677946334`，build / deploy / verify 三作业成功；线上 `https://baokaijian.github.io/Nico/` 返回 200。
+- 线上 `nico-build.json`：`release 1.9.1`、`frontendCommit b3c5dfa`、`apiSourceHash 8e0199b4…`；使用与 CI 相同的 `VITE_APP_MODE=public`、空 `VITE_API_URL` 重建后，`release:consistency` 的 `pages-index` 与 `pages-build` 均通过（11 个资源）。
+- 公开摘要未变化：`release/public-summary.json` 与本地构建产物一致，仍为 4 条成绩、3 项影像。
+- 云 API 工作流：`43677946343`，检查通过；但 `supabase functions deploy`、实际指纹与访客检查步骤因缺少 `SUPABASE_ACCESS_TOKEN` / `VITE_API_URL` **跳过**，因此**不宣称后端已发布**。本次共享模块改动位于前端报告展示与工作台投影；Edge 实际使用的报告事实函数行为未变，现有 API 保持兼容。本环境无法解析 Supabase 主机，未执行线上 API 访客检查。
+- Pages 现为静态只读发布；V2 私有工作台功能需在配置了云端 API 的私有构建/本机模式使用。
