@@ -23,7 +23,7 @@ jobs:
     env:
       NICO_TEST_PROTOCOL_ONLY: 'true'
       VITE_APP_MODE: public
-      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
+      VITE_API_URL: ${{ vars.VITE_API_URL || 'https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
+      VITE_API_URL: ${{ vars.VITE_API_URL || 'https://oeyirzlgqixvcxofimit.supabase.co/functions/v1/nico-api' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
