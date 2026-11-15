@@ -103,7 +103,7 @@ export default function App() {
     setTab(lastTabs.current[next]); void reload();
   };
   const navigate = (next, type) => {
-    setSearchQuery('');
+    setSearchQuery(''); setSearchSeed('');
     if (fullView) { const target = resolveManagementLocation(next, type); setLocation(target); positionStore.current?.write(target); setQuickEntry(next === 'records' && type === 'trainings'); }
     else setTab(next);
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -232,7 +232,7 @@ export default function App() {
           ? <Suspense fallback={<LoadingSkeleton label="正在打开账号设置…" />}><ChangePassword api={api} onChanged={reload}/></Suspense>
           : loading && !selectedLoaded ? <LoadingSkeleton label="正在读取记录…" /> : !selectedLoaded ? <Message>暂时无法读取内容，请检查连接并点击重试。<button type="button" className="apple-btn apple-btn-secondary" onClick={reload} disabled={loading}>重试</button></Message> : <Suspense key={session?.authenticated ? session.username : 'guest'} fallback={<LoadingSkeleton label="正在打开页面…" />}>
             {fullView && searchQuery
-              ? <SearchResults query={searchQuery} data={scopedData} api={api} role={role} readOnly={readOnly} navigate={navigate} onSaved={onSaved} reload={reload} onClose={() => { setSearchQuery(''); setSearchValue(''); setSearchSeed(''); }} />
+              ? <SearchResults query={searchQuery} data={scopedData} api={api} role={role} readOnly={readOnly} navigate={navigate} onSaved={onSaved} reload={reload} onClear={() => { setSearchQuery(''); setSearchValue(''); setSearchSeed(''); }} />
               : fullView && <ManagementView location={location} navigate={navigate} onEnterChild={enterChild} onSwitchAthlete={switchAthlete} data={scopedData} api={api} onSaved={onSaved} reload={reload} readOnly={readOnly} role={role} openQuickEntry={openQuickEntry} initialOpen={quickEntry} initialFilter={searchSeed} mediaTarget={mediaTarget} resumeVersion={resumeVersion}/>}
             {!fullView && <Showcase view={publicTabs.some(([key]) => key === tab) ? tab : 'home'} data={publicData} published={published} story={story} api={adminCapable ? api : undefined} onNavigate={navigate}/>}
           </Suspense>}

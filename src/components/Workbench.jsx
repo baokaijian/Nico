@@ -61,11 +61,11 @@ export default function Workbench({ data, navigate, openQuickEntry, readOnly, ap
       </header>
       {!readOnly && <EntryResume key={resumeVersion} api={api} openQuickEntry={openQuickEntry} />}
       <TodayCard
-        today={model.today}
+        todayModel={model.today}
         readOnly={readOnly}
         role={role}
         openQuickEntry={openQuickEntry}
-        navigate={navigate}
+        onNavigate={navigate}
         onOpenSource={setSource}
       />
       {role === 'owner' && setup.readyCount < setup.total && !setupDismissed && (

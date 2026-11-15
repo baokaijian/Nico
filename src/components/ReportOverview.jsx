@@ -1,9 +1,6 @@
-import { useMemo } from 'react';
-import { reportOverview } from '../../shared/parent-experience.mjs';
 import { Message } from './ui';
 
-export default function ReportOverview({ data, report, unsaved = false, loaded = false, readOnly = false, onExportHTML, onPrintPDF, onConfirm }) {
-  const overview = useMemo(() => reportOverview(data, report), [data, report]);
+export default function ReportOverview({ overview, unsaved = false, loaded = false, readOnly = false, onExportHTML, onPrint, onConfirm }) {
   if (!overview) return null;
   const periodLabel = overview.periodType === 'year' ? '年度' : '月度';
 
@@ -82,7 +79,7 @@ export default function ReportOverview({ data, report, unsaved = false, loaded =
         <button type="button" className="apple-btn apple-btn-primary" onClick={onExportHTML}>
           导出 HTML{unsaved ? '（未保存预览）' : ''}
         </button>
-        <button type="button" className="apple-btn apple-btn-secondary" disabled={!loaded} onClick={onPrintPDF}>
+        <button type="button" className="apple-btn apple-btn-secondary" disabled={!loaded} onClick={onPrint}>
           打印 PDF
         </button>
         {!readOnly && overview.status === '待确认' && (

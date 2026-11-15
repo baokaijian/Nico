@@ -171,14 +171,11 @@ export default function Reports(props) {
         <section className="glass-card stack">
           <ReportOverview
             overview={overview}
-            selected={selected}
-            stale={stale}
             unsaved={unsaved}
             loaded={loaded}
             readOnly={readOnly}
             onExportHTML={exportHTML}
             onPrint={printReport}
-            onRefreshBaseline={() => setAction({ record: selected, action: 'refresh' })}
             onConfirm={() => setAction({ record: selected, action: 'confirm' })}
           />
           <iframe
